@@ -10,8 +10,8 @@ Started: 2026-07-16
 - [x] Task 5: scheduler.js — 定时调度
 - [x] Task 6: preload.js — contextBridge API 桥
 - [x] Task 7: main.js — 主进程入口
-- [ ] Task 8: renderer/fullpage.html — 渲染层 HTML
-- [ ] Task 9: renderer/fullpage.js — 渲染层 JS 改造
+- [x] Task 8: renderer/fullpage.html — 渲染层 HTML
+- [x] Task 9: renderer/fullpage.js — 渲染层 JS 改造
 - [ ] Task 10: 打包配置与图标
 Task 1: complete (commits abc0b92..efc3cdc, review clean)
 Task 2: complete (commits 4daa68e..f5e9d7a, review clean)
@@ -20,3 +20,5 @@ Task 4: complete (commits 7c0986b..7787bf8, review pass after fix)
 Task 5: complete (commits 365efec..b1ae353, review clean)
 Task 6: complete (commits 94e12ae..60b9b68, review clean)
 Task 7: complete (commits 9b848a1..dbc0802, review clean)
+Task 8: complete (commits e7e5fa2..88f5f4b, review clean)
+Task 9: complete (commits 88f5f4b..aa99add, review pass after fix)
