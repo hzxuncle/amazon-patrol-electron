@@ -1,0 +1,41 @@
+'use strict';
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+const messageCallbacks = [];
+const storageChangeCallbacks = [];
+
+// 接收主进程推送（PATROL_UPDATE / PATROL_COMPLETE / CRON_AUTO_START）
+ipcRenderer.on('PATROL_UPDATE', (e, data) => {
+  messageCallbacks.forEach(cb => cb({ action: 'PATROL_UPDATE', ...data }));
+});
+ipcRenderer.on('PATROL_COMPLETE', (e, data) => {
+  messageCallbacks.forEach(cb => cb({ action: 'PATROL_COMPLETE', ...data }));
+});
+ipcRenderer.on('CRON_AUTO_START', (e, data) => {
+  messageCallbacks.forEach(cb => cb({ action: 'CRON_AUTO_START', ...data }));
+});
+ipcRenderer.on('STORAGE_CHANGED', (e, changes) => {
+  storageChangeCallbacks.forEach(cb => cb(changes));
+});
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  // 消息通信（替换 chrome.runtime.sendMessage / onMessage）
+  sendMessage: (action, payload) => ipcRenderer.invoke(action, payload || {}),
+  onMessage: (cb) => messageCallbacks.push(cb),
+
+  // 存储（替换 chrome.storage.local）
+  storage: {
+    get: (key) => ipcRenderer.invoke('STORAGE_GET', key),
+    set: (key, value) => ipcRenderer.invoke('STORAGE_SET', key, value),
+    remove: (key) => ipcRenderer.invoke('STORAGE_REMOVE', key),
+    onChanged: (cb) => storageChangeCallbacks.push(cb)
+  },
+
+  // Excel 保存（替换 chrome.downloads）
+  saveExcel: (buffer) => ipcRenderer.invoke('SAVE_EXCEL', buffer),
+
+  // 开机自启动
+  getLoginItem: () => ipcRenderer.invoke('GET_LOGIN_ITEM'),
+  setLoginItem: (openAtLogin) => ipcRenderer.invoke('SET_LOGIN_ITEM', openAtLogin)
+});
