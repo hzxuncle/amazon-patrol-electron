@@ -91,3 +91,5 @@ const CronParser = {
     }
   }
 };
+
+if (typeof module !== 'undefined') module.exports = CronParser;
