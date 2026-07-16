@@ -47,3 +47,12 @@
 - 所有静态资源文件已正确复制 ✓  
 - 目录结构符合 brief 规范 ✓  
 - npm start 未实际运行（缺少 electron/main.js，为 Task 2 的工作）
+
+---
+
+## Review 修复（commit efc3cdc）
+
+修复了 Task 1 review 发现的两个问题：
+
+1. **icon256.png**：使用 Python Pillow 将 icon128.png resize 为 256×256 并保存为 `assets/icons/icon256.png`。
+2. **engines 字段**：在 `package.json` 顶层添加 `"engines": { "node": ">=16", "npm": ">=8" }`，与实际开发环境（Node v16.20.2）保持一致。
