@@ -1,7 +1,6 @@
 'use strict';
 
 const { ipcMain, Notification, app, dialog } = require('electron');
-const path = require('path');
 const fs = require('fs');
 const https = require('https');
 const store = require('./store');
@@ -98,6 +97,8 @@ function processQueue(config) {
         completedResults.push(result);
         broadcastUpdate(result);
       } catch (err) {
+        const key = `${task.asin}_${task.site}`;
+        retryMap[key] = (retryMap[key] || 0) + 1;
         const errorResult = {
           asin: task.asin, site: task.site, index: task.index,
           title: '', price: '', listPrice: '', rating: '', reviews: '',
@@ -105,7 +106,8 @@ function processQueue(config) {
           dealBadge: 'N/A', acBadge: 'N/A', coupon: 'N/A',
           url: `https://${task.site}/dp/${task.asin}`,
           timestamp: new Date().toISOString(),
-          status: 'failed', error: err.message || 'Tab操作失败'
+          status: 'failed', error: err.message || 'Tab操作失败',
+          retryCount: retryMap[key]
         };
         completedResults.push(errorResult);
         broadcastUpdate(errorResult);
@@ -121,7 +123,7 @@ function processQueue(config) {
     activeWorkers--;
     if (activeWorkers === 0 && !allWorkersDone) {
       allWorkersDone = true;
-      if (activePatrol) onPatrolComplete();
+      if (activePatrol) onPatrolComplete().catch(e => console.error('[Patrol] onPatrolComplete error:', e));
     }
   }
 
@@ -338,7 +340,7 @@ function register() {
   ipcMain.handle('GET_CRON_CONFIG', () => store.get('cronConfig') || { enabled: false, expr: '0 9 * * 1-5' });
 
   ipcMain.handle('SAVE_EXCEL', async (e, buffer) => {
-    const { filePath } = await dialog.showSaveDialog({
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
       title: '保存巡店报告',
       defaultPath: `巡店报告_${new Date().toISOString().slice(0,10)}.xlsx`,
       filters: [{ name: 'Excel', extensions: ['xlsx'] }]
