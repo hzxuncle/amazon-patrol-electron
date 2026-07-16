@@ -289,7 +289,7 @@ function processFile(file) {
         expectedSeller: String(r['期望卖家'] || r['Expected Seller'] || r['expectedSeller'] || '').trim(),
         expectedStock: String(r['期望库存'] || r['Expected Stock'] || r['expectedStock'] || '').trim()
       })).filter(r => r.asin);
-      window.electronAPI.storage.set('referenceData', referenceData);
+      window.electronAPI.storage.set('referenceData', referenceData).catch(e => console.error('[Store] referenceData 保存失败:', e));
       renderRefPreview();
     } catch (err) { alert('解析失败: ' + err.message); }
   };
@@ -308,7 +308,7 @@ function renderRefPreview() {
 function clearRef() {
   if (!confirm('清除所有参考数据？')) return;
   referenceData = [];
-  window.electronAPI.storage.remove('referenceData');
+  window.electronAPI.storage.remove('referenceData').catch(e => console.error('[Store] referenceData 删除失败:', e));
   dom.refCard.style.display = 'none';
 }
 
@@ -951,7 +951,7 @@ async function saveCronConfig() {
   btn.textContent = '保存中...';
   try {
     const config = { enabled, expr };
-    await window.electronAPI.sendMessage('SAVE_CRON_CONFIG', { config });
+    await window.electronAPI.sendMessage('SAVE_CRON_CONFIG', config);
     btn.textContent = '已保存 ✓';
     setTimeout(() => { btn.textContent = '保存定时配置'; btn.disabled = false; }, 2000);
   } catch (e) {
