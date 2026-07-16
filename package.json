@@ -3,6 +3,10 @@
   "version": "2.0.0",
   "description": "亚马逊巡店助手桌面版",
   "main": "electron/main.js",
+  "engines": {
+    "node": ">=16",
+    "npm": ">=8"
+  },
   "scripts": {
     "start": "electron .",
     "build:win": "electron-builder --win",
