@@ -37,14 +37,13 @@ async function waitForLoad(win, maxWait = 15000) {
 
 async function injectAndScrape(win, asin, config) {
   return new Promise((resolve, reject) => {
+    const { ipcMain } = require('electron');
+    const channel = `scrape-result-${win.id}`;
     const scrapeTimeout = config.scrapeTimeout || 25000;
     const timeout = setTimeout(() => {
       ipcMain.removeHandler(channel);
       reject(new Error('抓取超时'));
     }, scrapeTimeout);
-
-    const { ipcMain } = require('electron');
-    const channel = `scrape-result-${win.id}`;
 
     ipcMain.handleOnce(channel, (_event, result) => {
       clearTimeout(timeout);
@@ -53,7 +52,7 @@ async function injectAndScrape(win, asin, config) {
 
     // 将 chrome.runtime.onMessage.addListener(...) 替换为直接执行并通过 ipcRenderer 回传
     const patchedContent = CONTENT_JS.replace(
-      /chrome\.runtime\.onMessage\.addListener\([\s\S]*?\}\);/m,
+      /chrome\.runtime\.onMessage\.addListener\([\s\S]*?\n  \}\);/,
       `(async () => {
         try {
           const result = await handleScrape({
@@ -101,7 +100,7 @@ async function openTabForTask(task, config) {
     width: 1280,
     height: 800,
     webPreferences: {
-      nodeIntegration: false,
+      nodeIntegration: true,
       contextIsolation: false, // content.js 需直接访问 DOM，不经 preload
       javascript: true
     }
@@ -114,7 +113,7 @@ async function openTabForTask(task, config) {
     await waitForLoad(win);
     const result = await injectAndScrape(win, asin, config);
     result.site = site;
-    if (task.index !== undefined) result.index = task.index;
+    result.index = task.index !== undefined ? task.index : null;
     return result;
   } finally {
     activeTabs.delete(win.id);
