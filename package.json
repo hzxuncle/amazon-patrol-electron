@@ -55,7 +55,8 @@
       "allowToChangeInstallationDirectory": true,
       "allowElevation": true,
       "installerLanguages": ["zh_CN"],
-      "language": "2052"
+      "language": "2052",
+      "include": "build/installer.nsh"
     }
   }
 }
