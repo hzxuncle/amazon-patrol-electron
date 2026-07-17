@@ -28,11 +28,25 @@ const SITE_URLS = {
   'www.amazon.com.mx': 'https://www.amazon.com.mx'
 };
 
+// 各站点强制语言参数，绕过 Amazon 按 IP 的地区重定向
+const SITE_LANG = {
+  'www.amazon.ca':     'en_CA',
+  'www.amazon.com':    'en_US',
+  'www.amazon.com.au': 'en_AU',
+  'www.amazon.com.mx': 'es_MX'
+};
+
 // Electron 28 内置 Chrome 120，使用对应的真实 UA
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 function getSiteUrl(site) {
   return SITE_URLS[site] || `https://${site}`;
+}
+
+function buildProductUrl(site, asin) {
+  const base = getSiteUrl(site);
+  const lang = SITE_LANG[site] || 'en_US';
+  return `${base}/dp/${asin}?language=${lang}`;
 }
 
 function sleep(ms) {
@@ -89,7 +103,7 @@ async function injectAndScrape(win, asin, config) {
 
 async function openTabForTask(task, config) {
   const { asin, site } = task;
-  const url = `${getSiteUrl(site)}/dp/${asin}`;
+  const url = buildProductUrl(site, asin);
 
   const showWindow = !!config.showScrapeWindow;
   const win = new BrowserWindow({
