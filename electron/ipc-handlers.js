@@ -5,6 +5,7 @@ const fs = require('fs');
 const https = require('https');
 const store = require('./store');
 const tabManager = require('./tab-manager');
+const scheduler = require('./scheduler');
 
 // ========== 状态 ==========
 let activePatrol = null;
@@ -334,6 +335,7 @@ function register() {
 
   ipcMain.handle('SAVE_CRON_CONFIG', (e, config) => {
     store.set('cronConfig', config);
+    scheduler.restart();
     return { success: true };
   });
 

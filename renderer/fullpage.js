@@ -225,7 +225,7 @@ async function loadPersistedState() {
 
   // 监听ASIN输入变化
   dom.asinInput.addEventListener('input', () => {
-    window.electronAPI.storage.set('asinInputCache', dom.asinInput.value);
+    window.electronAPI.storage.set('asinInputCache', dom.asinInput.value).catch(e => console.error('[Store] asinInputCache 保存失败:', e));
   });
 
   // 恢复巡店状态
@@ -402,7 +402,7 @@ async function startPatrol() {
   if (!confirm(msg)) return;
 
   // 保存ASIN输入
-  window.electronAPI.storage.set('asinInputCache', dom.asinInput.value);
+  window.electronAPI.storage.set('asinInputCache', dom.asinInput.value).catch(e => console.error('[Store] asinInputCache 保存失败:', e));
 
   const res = await window.electronAPI.sendMessage('START_PATROL', {
     tasks: remainingTasks,

@@ -101,5 +101,5 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   // macOS dock 点击
-  if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+  if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
 });

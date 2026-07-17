@@ -24,7 +24,13 @@ function start() {
   _job = schedule.scheduleJob('* * * * *', () => {
     const cfg = store.get('cronConfig');
     if (!cfg || !cfg.enabled || !cfg.expr) return;
-    const parsed = CronParser.parseCron(cfg.expr);
+    let parsed;
+    try {
+      parsed = CronParser.parseCron(cfg.expr);
+    } catch (e) {
+      console.warn('[Scheduler] parseCron 失败:', e.message);
+      return;
+    }
     if (!CronParser.matchesCron(parsed, new Date())) return;
     console.log('[Scheduler] Cron 触发，准备启动巡店');
     if (_onTrigger) _onTrigger();
