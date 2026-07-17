@@ -40,7 +40,8 @@
         { "target": "nsis", "arch": ["x64"] },
         { "target": "zip",  "arch": ["x64"] }
       ],
-      "icon": "assets/icons/icon.ico"
+      "icon": "assets/icons/icon.ico",
+      "sign": null
     },
     "mac": {
       "target": [
