@@ -93,3 +93,4 @@ const CronParser = {
 };
 
 if (typeof module !== 'undefined') module.exports = CronParser;
+if (typeof window !== 'undefined') window.CronParser = CronParser;
