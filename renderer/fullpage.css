@@ -1,5 +1,6 @@
 /* ============================================
-   Amazon Patrol Fullpage - RENPHO Light Theme
+   Amazon Patrol Fullpage - RENPHO Theme
+   Light（默认）/ Dark 可切换
    ============================================ */
 
 :root {
@@ -34,6 +35,70 @@
   --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px;
   --sidebar-width: 160px;
 }
+
+/* ===== Dark Theme 变量覆盖 ===== */
+[data-theme="dark"] {
+  --bg-base: #080c14;
+  --bg-surface: #0d1321;
+  --bg-card: #111827;
+  --bg-card-hover: #182032;
+  --bg-input: #0a0f1a;
+  --bg-header: #131a2b;
+
+  --border: #1a2940;
+  --border-glow: rgba(0, 229, 255, 0.12);
+
+  --accent: #00e5ff;
+  --accent-dim: #008fa0;
+  --accent-glow: rgba(0, 229, 255, 0.25);
+
+  --success: #00e676;
+  --success-glow: rgba(0, 230, 118, 0.25);
+  --warning: #ffab00;
+  --warning-glow: rgba(255, 171, 0, 0.25);
+  --danger: #ff3d47;
+  --danger-glow: rgba(255, 61, 71, 0.25);
+
+  --text-primary: #e0e6f0;
+  --text-secondary: #7a8ba0;
+  --text-muted: #455570;
+}
+
+[data-theme="dark"] body::before {
+  display: block;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+[data-theme="dark"] .header { box-shadow: none; }
+[data-theme="dark"] .results-table th, [data-theme="dark"] .ref-table th { background: var(--bg-header); }
+[data-theme="dark"] .side-tab:hover { background: rgba(255,255,255,0.03); }
+[data-theme="dark"] .side-tab.active { background: rgba(0,229,255,0.08); }
+[data-theme="dark"] .btn-primary { background: linear-gradient(135deg, #006070, #0090a8); box-shadow: 0 0 20px rgba(0,229,255,0.15); }
+[data-theme="dark"] .btn-danger { background: linear-gradient(135deg, #6e1018, #a01525); box-shadow: none; }
+[data-theme="dark"] .btn-warning { background: linear-gradient(135deg, #7a5c00, #b88600); box-shadow: none; }
+[data-theme="dark"] .btn-outline:hover:not(:disabled) { background: rgba(0,229,255,0.06); }
+[data-theme="dark"] .btn-ghost:hover { background: rgba(255,255,255,0.03); }
+[data-theme="dark"] .site-tag:hover { background: rgba(255,255,255,0.03); }
+[data-theme="dark"] .badge { background: var(--accent-dim); color: #000; }
+[data-theme="dark"] .upload-zone:hover { background: rgba(0,229,255,0.02); }
+[data-theme="dark"] .btn-ghost-sm:hover { background: transparent; }
+[data-theme="dark"] .cron-guide-card { border-color: rgba(0,229,255,0.2); background: transparent; }
+[data-theme="dark"] .cron-next-item.first { border-color: rgba(0,229,255,0.25); background: rgba(0,229,255,0.04); }
+[data-theme="dark"] .cron-next-item.first .cron-next-index { background: var(--accent-dim); color: #000; }
+[data-theme="dark"] .cron-preset-btn:hover { background: rgba(0,229,255,0.05); }
+[data-theme="dark"] .cron-syntax-row code { background: rgba(0,229,255,0.08); }
+[data-theme="dark"] .results-table tbody tr.match-success { background: rgba(0,230,118,0.04); }
+[data-theme="dark"] .results-table tbody tr.match-error { background: rgba(255,61,71,0.06); }
+[data-theme="dark"] .results-table tbody tr.status-failed { background: rgba(255,61,71,0.04); border-left-color: var(--danger-glow); }
+[data-theme="dark"] .results-table tbody tr.status-captcha { background: rgba(255,171,0,0.05); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--border); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* 深色模式下 Logo 反色显示 */
+[data-theme="dark"] .header-logo { filter: brightness(0) invert(1); opacity: 0.9; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

@@ -87,6 +87,7 @@ let historySnapshots = {};
 
 // ========== Init ==========
 document.addEventListener('DOMContentLoaded', async () => {
+  initTheme();
   initTabs();
   initSettingsSliders();
   initImportHandlers();
@@ -1157,4 +1158,28 @@ function formatPatrolTime(ms) {
   if (h > 0) return `${h}h${m % 60}m`;
   if (m > 0) return `${m}m${s % 60}s`;
   return `${s}s`;
+}
+
+// ========== 主题切换 ==========
+function initTheme() {
+  const btn = document.getElementById('btnTheme');
+  if (!btn) return;
+
+  // 从 storage 恢复主题
+  window.electronAPI.storage.get('appTheme').then(theme => {
+    applyTheme(theme || 'light');
+  }).catch(() => applyTheme('light'));
+
+  btn.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    window.electronAPI.storage.set('appTheme', next).catch(() => {});
+  });
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('btnTheme');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
 }
