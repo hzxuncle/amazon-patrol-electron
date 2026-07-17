@@ -36,7 +36,6 @@
         { "target": "nsis", "arch": ["x64"] },
         { "target": "zip",  "arch": ["x64"] }
       ],
-      "signAndEditExecutable": false,
       "icon": "assets/icons/icon.ico"
     },
     "mac": {
