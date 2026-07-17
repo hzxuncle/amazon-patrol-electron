@@ -357,6 +357,31 @@
             </div>
           </section>
           <section class="card">
+            <div class="card-header">
+              <span class="card-title">配送地设置</span>
+              <span class="card-hint">设置各站点的配送邮编，确保价格和库存按目标地区显示</span>
+            </div>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>🇺🇸 US 邮编</label>
+                <input type="text" id="zipUS" class="text-input" placeholder="10001" maxlength="10">
+                <span class="setting-hint">留空则不设置配送地</span>
+              </div>
+              <div class="setting-item">
+                <label>🇨🇦 CA 邮编</label>
+                <input type="text" id="zipCA" class="text-input" placeholder="M5V 3A8" maxlength="10">
+              </div>
+              <div class="setting-item">
+                <label>🇦🇺 AU 邮编</label>
+                <input type="text" id="zipAU" class="text-input" placeholder="2000" maxlength="10">
+              </div>
+              <div class="setting-item">
+                <label>🇲🇽 MX 邮编</label>
+                <input type="text" id="zipMX" class="text-input" placeholder="06600" maxlength="10">
+              </div>
+            </div>
+          </section>
+          <section class="card">
             <div class="card-header"><span class="card-title">通知设置</span></div>
             <div class="setting-item">
               <label>钉钉机器人 Webhook</label>

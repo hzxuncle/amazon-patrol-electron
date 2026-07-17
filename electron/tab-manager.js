@@ -101,9 +101,48 @@ async function injectAndScrape(win, asin, config) {
   return Promise.race([scrapePromise, timeoutPromise]);
 }
 
+// 通过 Amazon AJAX 接口设置配送地邮编，返回是否成功
+async function setDeliveryZip(win, site, zip) {
+  if (!zip) return false;
+  const siteUrl = getSiteUrl(site);
+  try {
+    const result = await win.webContents.executeJavaScript(`
+      (async function() {
+        try {
+          // 从页面获取 CSRF token
+          const tokenEl = document.querySelector('input[name="anti-csrftoken-a2z"]');
+          const token = tokenEl ? tokenEl.value : '';
+
+          const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              locationType: 'LOCATION_INPUT',
+              zipCode: '${zip}',
+              storeContext: 'generic',
+              deviceType: 'web',
+              pageType: 'Gateway',
+              actionSource: 'glow',
+              'anti-csrftoken-a2z': token
+            }).toString()
+          });
+          return resp.ok;
+        } catch(e) {
+          return false;
+        }
+      })()
+    `);
+    return result === true;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function openTabForTask(task, config) {
   const { asin, site } = task;
   const url = buildProductUrl(site, asin);
+  const zip = (config.deliveryZips || {})[site] || '';
 
   const showWindow = !!config.showScrapeWindow;
   const win = new BrowserWindow({
@@ -127,6 +166,16 @@ async function openTabForTask(task, config) {
   try {
     await win.loadURL(url);
     await waitForLoad(win);
+
+    // 设置配送地后重新加载，让价格/库存按目标邮编展示
+    if (zip) {
+      const ok = await setDeliveryZip(win, site, zip);
+      if (ok) {
+        await win.loadURL(url);
+        await waitForLoad(win);
+      }
+    }
+
     const result = await injectAndScrape(win, asin, config);
     result.site = site;
     result.index = task.index !== undefined ? task.index : null;

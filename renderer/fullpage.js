@@ -59,6 +59,10 @@ const dom = {
   dingtalkWebhook: $('#dingtalkWebhook'),
   dingtalkEnabled: $('#dingtalkEnabled'),
   showScrapeWindow: $('#showScrapeWindow'),
+  zipUS: $('#zipUS'),
+  zipCA: $('#zipCA'),
+  zipAU: $('#zipAU'),
+  zipMX: $('#zipMX'),
 
   // Status
   statusBadge: $('#statusBadge'),
@@ -126,6 +130,9 @@ function initSettingsSliders() {
   dom.dingtalkWebhook.addEventListener('input', saveSettings);
   dom.dingtalkEnabled.addEventListener('change', saveSettings);
   if (dom.showScrapeWindow) dom.showScrapeWindow.addEventListener('change', saveSettings);
+  ['zipUS','zipCA','zipAU','zipMX'].forEach(id => {
+    if (dom[id]) dom[id].addEventListener('input', saveSettings);
+  });
   dom.showHistoryDiff.addEventListener('change', () => {
     renderAllResults();
     saveSettings();
@@ -146,7 +153,13 @@ function getSettings() {
     sites: getSelectedSites(),
     showHistoryDiff: dom.showHistoryDiff.checked,
     enabledFields: getEnabledFields(),
-    showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false
+    showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false,
+    deliveryZips: {
+      'www.amazon.com':    dom.zipUS ? dom.zipUS.value.trim() : '',
+      'www.amazon.ca':     dom.zipCA ? dom.zipCA.value.trim() : '',
+      'www.amazon.com.au': dom.zipAU ? dom.zipAU.value.trim() : '',
+      'www.amazon.com.mx': dom.zipMX ? dom.zipMX.value.trim() : ''
+    }
   };
 }
 
@@ -195,6 +208,12 @@ async function loadSettings() {
       dom.fieldToggles.forEach(cb => { cb.checked = s.enabledFields.includes(cb.dataset.field); });
     }
     if (dom.showScrapeWindow) dom.showScrapeWindow.checked = s.showScrapeWindow || false;
+    if (s.deliveryZips) {
+      if (dom.zipUS) dom.zipUS.value = s.deliveryZips['www.amazon.com'] || '';
+      if (dom.zipCA) dom.zipCA.value = s.deliveryZips['www.amazon.ca'] || '';
+      if (dom.zipAU) dom.zipAU.value = s.deliveryZips['www.amazon.com.au'] || '';
+      if (dom.zipMX) dom.zipMX.value = s.deliveryZips['www.amazon.com.mx'] || '';
+    }
   }
 }
 
