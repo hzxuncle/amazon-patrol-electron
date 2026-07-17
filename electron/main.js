@@ -83,6 +83,22 @@ function onCronTrigger() {
   }
 }
 
+// ========== 单实例锁 ==========
+// 安装程序覆盖安装时会启动新实例，旧实例收到通知后自动退出，解决"无法关闭"问题
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  // 第二个实例启动（如安装程序触发），直接退出让安装继续
+  app.exit(0);
+} else {
+  app.on('second-instance', () => {
+    // 正常二次启动（如用户双击）：显示已有窗口
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // ========== 应用生命周期 ==========
 app.whenReady().then(() => {
   ipcHandlers.register();

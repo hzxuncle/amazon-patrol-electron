@@ -36,7 +36,8 @@
         { "target": "nsis", "arch": ["x64"] },
         { "target": "zip",  "arch": ["x64"] }
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "icon": "assets/icons/icon.ico"
     },
     "mac": {
       "target": [
@@ -47,7 +48,10 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "installerLanguages": ["zh_CN"],
+      "language": "2052"
     }
   }
 }
