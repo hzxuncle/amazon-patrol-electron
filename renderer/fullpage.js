@@ -242,6 +242,9 @@ async function loadPersistedState() {
     allResults = resultsData;
     renderAllResults();
     dom.btnExport.disabled = false;
+    // 用最后一条结果的时间戳作为"上次巡店"时间
+    const lastTs = allResults[allResults.length - 1]?.timestamp;
+    if (lastTs) setPatrolTimestamp('restored', lastTs);
   }
 
   // 恢复ASIN输入
@@ -439,6 +442,7 @@ async function startPatrol() {
     patrolRunning = true;
     updateUiRunning(td.tasks.length, allResults.length);
     startTimer();
+    setPatrolTimestamp('running');
   } else {
     alert('启动失败: ' + (res ? res.error : '未知错误'));
   }
@@ -580,6 +584,7 @@ function handleComplete(summary, results) {
   dom.progressStatus.textContent = '✓ 完成';
   dom.btnExport.disabled = false;
   dom.btnStart.innerHTML = '<span>▶</span> 开始巡店';
+  setPatrolTimestamp('done', summary.completedAt);
 
   // 加载最新历史快照
   window.electronAPI.storage.get('historySnapshots').then(d => {
@@ -999,6 +1004,25 @@ async function loadCronConfig() {
     if (config.expr) onCronExprInput();
   } catch (e) {
     // Service Worker 未就绪时静默忽略，表单保持默认值
+  }
+}
+
+function setPatrolTimestamp(state, isoStr) {
+  const el = document.getElementById('patrolTimestamp');
+  if (!el) return;
+  const fmt = (iso) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+  };
+  if (state === 'running') {
+    el.textContent = `▶ 本次巡店开始于 ${fmt(new Date().toISOString())}`;
+    el.style.color = 'var(--accent)';
+  } else if (state === 'done') {
+    el.textContent = `✓ 本次巡店完成于 ${fmt(isoStr)}`;
+    el.style.color = 'var(--success)';
+  } else if (state === 'restored') {
+    el.textContent = `↺ 上次巡店完成于 ${fmt(isoStr)}`;
+    el.style.color = 'var(--text-muted)';
   }
 }
 
