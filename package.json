@@ -31,6 +31,10 @@
       "renderer/**/*",
       "assets/**/*"
     ],
+    "asarUnpack": [
+      "renderer/content.js",
+      "renderer/selectors.js"
+    ],
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] },

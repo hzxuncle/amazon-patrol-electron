@@ -6,12 +6,18 @@ const fs = require('fs');
 
 const activeTabs = new Map();
 
+// asarUnpack 后文件在 app.asar.unpacked/ 而非 app.asar/ 内
+// 开发模式下路径不含 .asar，直接使用原路径
+function unpackedPath(p) {
+  return p.replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
+}
+
 const SELECTORS_JS = fs.readFileSync(
-  path.join(__dirname, '../renderer/selectors.js'), 'utf8'
+  unpackedPath(path.join(__dirname, '../renderer/selectors.js')), 'utf8'
 );
 
 const rawContent = fs.readFileSync(
-  path.join(__dirname, '../renderer/content.js'), 'utf8'
+  unpackedPath(path.join(__dirname, '../renderer/content.js')), 'utf8'
 );
 const CONTENT_BODY = rawContent
   .replace(/^[\s\S]*?\(function\s*\(\s*\)\s*\{/, '')
