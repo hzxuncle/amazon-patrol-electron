@@ -58,6 +58,7 @@ const dom = {
   scrapeTimeoutVal: $('#scrapeTimeoutVal'),
   dingtalkWebhook: $('#dingtalkWebhook'),
   dingtalkEnabled: $('#dingtalkEnabled'),
+  showScrapeWindow: $('#showScrapeWindow'),
 
   // Status
   statusBadge: $('#statusBadge'),
@@ -124,6 +125,7 @@ function initSettingsSliders() {
   });
   dom.dingtalkWebhook.addEventListener('input', saveSettings);
   dom.dingtalkEnabled.addEventListener('change', saveSettings);
+  if (dom.showScrapeWindow) dom.showScrapeWindow.addEventListener('change', saveSettings);
   dom.showHistoryDiff.addEventListener('change', () => {
     renderAllResults();
     saveSettings();
@@ -143,7 +145,8 @@ function getSettings() {
     dingtalkWebhook: dom.dingtalkEnabled.checked ? dom.dingtalkWebhook.value.trim() : '',
     sites: getSelectedSites(),
     showHistoryDiff: dom.showHistoryDiff.checked,
-    enabledFields: getEnabledFields()
+    enabledFields: getEnabledFields(),
+    showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false
   };
 }
 
@@ -191,6 +194,7 @@ async function loadSettings() {
     if (s.enabledFields && s.enabledFields.length > 0) {
       dom.fieldToggles.forEach(cb => { cb.checked = s.enabledFields.includes(cb.dataset.field); });
     }
+    if (dom.showScrapeWindow) dom.showScrapeWindow.checked = s.showScrapeWindow || false;
   }
 }
 

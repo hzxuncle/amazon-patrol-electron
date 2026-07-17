@@ -27,6 +27,11 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/fullpage.html'));
 
+  // 开发模式打开 DevTools，方便调试
+  if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) {
+    mainWindow.webContents.openDevTools();
+  }
+
   // 关闭时隐藏到托盘，不退出
   mainWindow.on('close', (e) => {
     e.preventDefault();

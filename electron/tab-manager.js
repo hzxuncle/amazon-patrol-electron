@@ -91,10 +91,12 @@ async function openTabForTask(task, config) {
   const { asin, site } = task;
   const url = `${getSiteUrl(site)}/dp/${asin}`;
 
+  const showWindow = !!config.showScrapeWindow;
   const win = new BrowserWindow({
-    show: false,
+    show: showWindow,
     width: 1280,
     height: 900,
+    title: showWindow ? `抓取: ${asin} @ ${site}` : undefined,
     webPreferences: {
       nodeIntegration: false,   // 关闭，避免 window.require 被 Amazon 检测
       contextIsolation: false,  // 关闭，让 executeJavaScript 能访问页面全局变量
