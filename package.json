@@ -56,7 +56,10 @@
       "allowElevation": true,
       "installerLanguages": ["zh_CN"],
       "language": "2052",
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "亚马逊巡店助手"
     }
   }
 }
