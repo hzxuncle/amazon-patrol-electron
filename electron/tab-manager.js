@@ -1,6 +1,6 @@
 'use strict';
 
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -10,16 +10,15 @@ const SELECTORS_JS = fs.readFileSync(
   path.join(__dirname, '../renderer/selectors.js'), 'utf8'
 );
 
-// 提取 content.js 的函数体（去掉 IIFE 包装和消息监听），供 executeJavaScript 直接调用
 const rawContent = fs.readFileSync(
   path.join(__dirname, '../renderer/content.js'), 'utf8'
 );
 const CONTENT_BODY = rawContent
-  .replace(/^[\s\S]*?\(function\s*\(\s*\)\s*\{/, '')    // 去掉 IIFE 开头
-  .replace(/\}\)\(\);?\s*$/, '')                          // 去掉 IIFE 结尾 })();
-  .replace(/^\s*'use strict';\s*\n/m, '')                 // 去掉 'use strict'（外层会加）
-  .replace(/chrome\.runtime\.onMessage\.addListener\([\s\S]*?\n  \}\);/, '') // 去掉消息监听
-  .replace(/^\s*console\.log\('[^']*Content script[^']*'\);\s*$/m, '');      // 去掉末尾 log
+  .replace(/^[\s\S]*?\(function\s*\(\s*\)\s*\{/, '')
+  .replace(/\}\)\(\);?\s*$/, '')
+  .replace(/^\s*'use strict';\s*\n/m, '')
+  .replace(/chrome\.runtime\.onMessage\.addListener\([\s\S]*?\n  \}\);/, '')
+  .replace(/^\s*console\.log\('[^']*Content script[^']*'\);\s*$/m, '');
 
 const SITE_URLS = {
   'www.amazon.ca':     'https://www.amazon.ca',
@@ -28,7 +27,6 @@ const SITE_URLS = {
   'www.amazon.com.mx': 'https://www.amazon.com.mx'
 };
 
-// 各站点强制语言参数，绕过 Amazon 按 IP 的地区重定向
 const SITE_LANG = {
   'www.amazon.ca':     'en_CA',
   'www.amazon.com':    'en_US',
@@ -36,8 +34,10 @@ const SITE_LANG = {
   'www.amazon.com.mx': 'es_MX'
 };
 
-// Electron 28 内置 Chrome 120，使用对应的真实 UA
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+// 记录已经初始化过配送地的站点，巡店期间每站点只设一次
+const initializedSites = new Set();
 
 function getSiteUrl(site) {
   return SITE_URLS[site] || `https://${site}`;
@@ -58,16 +58,69 @@ async function waitForLoad(win, maxWait = 15000) {
     const timer = setTimeout(resolve, maxWait);
     win.webContents.once('did-finish-load', () => {
       clearTimeout(timer);
-      setTimeout(resolve, 2000);
+      // 从 2000ms 降到 500ms，页面已加载完成后只需短暂等待动态内容
+      setTimeout(resolve, 500);
     });
   });
+}
+
+// 通过一个临时隐藏窗口为指定站点设置配送地，设置完毕关闭
+// session 共享 Cookie，后续所有同站点窗口自动继承配送地
+async function initDeliveryZip(site, zip) {
+  if (!zip || initializedSites.has(site)) return;
+  const siteUrl = getSiteUrl(site);
+
+  const win = new BrowserWindow({
+    show: false, width: 800, height: 600,
+    webPreferences: { nodeIntegration: false, contextIsolation: false, javascript: true }
+  });
+  win.webContents.setUserAgent(CHROME_UA);
+
+  try {
+    // 加载首页拿到 CSRF token（首页比商品页更稳定）
+    await win.loadURL(siteUrl + `?language=${SITE_LANG[site] || 'en_US'}`);
+    await waitForLoad(win);
+
+    const ok = await win.webContents.executeJavaScript(`
+      (async function() {
+        try {
+          const tokenEl = document.querySelector('input[name="anti-csrftoken-a2z"]');
+          const token = tokenEl ? tokenEl.value : '';
+          const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              locationType: 'LOCATION_INPUT',
+              zipCode: '${zip}',
+              storeContext: 'generic',
+              deviceType: 'web',
+              pageType: 'Gateway',
+              actionSource: 'glow',
+              'anti-csrftoken-a2z': token
+            }).toString()
+          });
+          return resp.ok;
+        } catch(e) { return false; }
+      })()
+    `);
+
+    if (ok) {
+      initializedSites.add(site);
+      console.log(`[TabManager] 配送地已设置: ${site} → ${zip}`);
+    } else {
+      console.warn(`[TabManager] 配送地设置失败: ${site}`);
+    }
+  } catch (e) {
+    console.warn(`[TabManager] initDeliveryZip error:`, e.message);
+  } finally {
+    if (!win.isDestroyed()) win.close();
+  }
 }
 
 async function injectAndScrape(win, asin, config) {
   const scrapeTimeout = config.scrapeTimeout || 25000;
 
-  // 将 selectors + content 函数体 + 直接调用 handleScrape 合成一个 async 脚本
-  // executeJavaScript 会等待返回的 Promise，直接拿到抓取结果
   const fullScript = `
 (async function() {
   'use strict';
@@ -101,48 +154,15 @@ async function injectAndScrape(win, asin, config) {
   return Promise.race([scrapePromise, timeoutPromise]);
 }
 
-// 通过 Amazon AJAX 接口设置配送地邮编，返回是否成功
-async function setDeliveryZip(win, site, zip) {
-  if (!zip) return false;
-  const siteUrl = getSiteUrl(site);
-  try {
-    const result = await win.webContents.executeJavaScript(`
-      (async function() {
-        try {
-          // 从页面获取 CSRF token
-          const tokenEl = document.querySelector('input[name="anti-csrftoken-a2z"]');
-          const token = tokenEl ? tokenEl.value : '';
-
-          const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              locationType: 'LOCATION_INPUT',
-              zipCode: '${zip}',
-              storeContext: 'generic',
-              deviceType: 'web',
-              pageType: 'Gateway',
-              actionSource: 'glow',
-              'anti-csrftoken-a2z': token
-            }).toString()
-          });
-          return resp.ok;
-        } catch(e) {
-          return false;
-        }
-      })()
-    `);
-    return result === true;
-  } catch (e) {
-    return false;
-  }
-}
-
 async function openTabForTask(task, config) {
   const { asin, site } = task;
   const url = buildProductUrl(site, asin);
   const zip = (config.deliveryZips || {})[site] || '';
+
+  // 每站点只初始化一次配送地（不阻塞，首个任务会等，后续直接跳过）
+  if (zip && !initializedSites.has(site)) {
+    await initDeliveryZip(site, zip);
+  }
 
   const showWindow = !!config.showScrapeWindow;
   const win = new BrowserWindow({
@@ -151,31 +171,19 @@ async function openTabForTask(task, config) {
     height: 900,
     title: showWindow ? `抓取: ${asin} @ ${site}` : undefined,
     webPreferences: {
-      nodeIntegration: false,   // 关闭，避免 window.require 被 Amazon 检测
-      contextIsolation: false,  // 关闭，让 executeJavaScript 能访问页面全局变量
+      nodeIntegration: false,
+      contextIsolation: false,
       javascript: true,
       webSecurity: true
     }
   });
 
-  // 使用真实 Chrome UA，去掉 Electron 标记
   win.webContents.setUserAgent(CHROME_UA);
-
   activeTabs.set(win.id, { asin, site, win });
 
   try {
     await win.loadURL(url);
     await waitForLoad(win);
-
-    // 设置配送地后重新加载，让价格/库存按目标邮编展示
-    if (zip) {
-      const ok = await setDeliveryZip(win, site, zip);
-      if (ok) {
-        await win.loadURL(url);
-        await waitForLoad(win);
-      }
-    }
-
     const result = await injectAndScrape(win, asin, config);
     result.site = site;
     result.index = task.index !== undefined ? task.index : null;
@@ -193,4 +201,9 @@ function closeAll() {
   activeTabs.clear();
 }
 
-module.exports = { openTabForTask, closeAll };
+// 巡店开始时重置，让新一轮巡店重新设置配送地（邮编可能已改）
+function resetSiteInit() {
+  initializedSites.clear();
+}
+
+module.exports = { openTabForTask, closeAll, resetSiteInit };

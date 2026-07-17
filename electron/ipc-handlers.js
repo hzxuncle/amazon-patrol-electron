@@ -310,6 +310,7 @@ function register() {
     retryMap = {};
     store.set('patrolConfig', config);
     store.set('patrolState', { running: true, totalCount, completedCount: 0 });
+    tabManager.resetSiteInit();
     broadcastLog(`🚀 巡店开始，共 ${tasks.length} 个任务，并发 ${config.concurrency || 2}`);
     processQueue(config);
     return { success: true, totalTasks: tasks.length };
