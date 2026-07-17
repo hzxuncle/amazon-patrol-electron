@@ -237,3 +237,115 @@ node-schedule 每分钟 tick
 - 钉钉推送需同时满足：启用 Webhook + 已导入参考数据
 - Mac 首次运行可能提示「无法验证开发者」，在系统偏好设置 → 安全性 → 允许运行即可
 - Windows 控制台中文乱码：执行 `chcp 65001` 后再运行
+
+---
+
+## 常见问题排查
+
+### 打包相关
+
+**Q：`npm run build:win` 报错"无法创建符号链接：客户端没有所需的特权"**
+
+winCodeSign 解压时需要创建 macOS 动态库的符号链接，Windows 默认用户没有此权限。
+
+解决方式：
+1. 清除损坏缓存：`rmdir /s /q "%LOCALAPPDATA%\electron-builder\Cache\winCodeSign"`
+2. 以**管理员身份**打开 PowerShell，再执行 `npm run build:win`
+
+---
+
+**Q：`npm run build:win` 报错"proxyconnect tcp: dial tcp 127.0.0.1:7897: connectex: No connection could be made"**
+
+electron-builder 下载 Electron 二进制时走了本地代理，但代理未启动。
+
+解决方式：在项目根目录新建 `.npmrc` 文件，内容：
+```
+ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
+```
+再清除缓存后重试：`rmdir /s /q "%APPDATA%\electron\Cache"`
+
+---
+
+**Q：打包完成但安装后应用图标仍显示 Electron 默认图标**
+
+原因：`package.json` 中设置了 `signAndEditExecutable: false`，该选项会同时跳过代码签名和图标嵌入。
+
+解决方式：改用 `"sign": null` 替代——只跳过代码签名，保留 rcedit 的图标嵌入：
+```json
+"win": {
+  "icon": "assets/icons/icon.ico",
+  "sign": null
+}
+```
+
+---
+
+**Q：打包报错"image icon.ico must be at least 256x256"**
+
+`.ico` 文件的第一帧尺寸不满足要求。
+
+解决方式：用 Python Pillow 重新生成，确保 256x256 在最前：
+```python
+from PIL import Image
+img = Image.open('assets/icons/icon256.png').convert('RGBA')
+sizes = [(256,256),(128,128),(64,64),(48,48),(32,32),(16,16)]
+imgs = [img.resize(s, Image.LANCZOS) for s in sizes]
+imgs[0].save('assets/icons/icon.ico', format='ICO', sizes=sizes, append_images=imgs[1:])
+```
+
+---
+
+### 安装相关
+
+**Q：安装 exe 时弹出"亚马逊巡店助手无法关闭，请手动关闭后重试"**
+
+安装程序检测到旧版本进程仍在运行（托盘模式常驻），无法覆盖文件。
+
+解决方式：右键托盘图标 → 退出，再重新安装。新版本已加入单实例锁（`app.requestSingleInstanceLock()`），安装程序启动时旧实例会自动退出，无需手动操作。
+
+---
+
+### 运行相关
+
+**Q：启动时报错"ENOENT: no such file or directory, open .../content.js"**
+
+`content.js` 或 `selectors.js` 被打包进 `app.asar` 虚拟档案，但 `fs.readFileSync` 无法在打包环境下读取路径中含 `.asar` 的文件。
+
+解决方式：在 `package.json` 的 `build` 配置中加入 `asarUnpack`，让这两个文件保持在真实文件系统：
+```json
+"asarUnpack": [
+  "renderer/content.js",
+  "renderer/selectors.js"
+]
+```
+
+---
+
+**Q：定时任务配置了 Cron 表达式但没有自动执行**
+
+常见原因：启用开关未打开（`cronConfig.enabled` 为 `false`）。
+
+排查步骤：
+1. 打开「定时」面板，确认顶部滑块已打开（显示「定时已启用」）
+2. 点击「保存定时配置」，确认按钮显示「已保存 ✓」
+3. 检查 `store.json` 中 `cronConfig.enabled` 是否为 `true`
+4. 确认巡店面板已填写 ASIN，定时触发读取的是 `asinInputCache` 键
+
+---
+
+**Q：巡店结果全部失败，价格/库存为空**
+
+常见原因：Electron 内嵌 Chromium 默认配送地为中国，Amazon 对中国 IP 展示不同内容。
+
+解决方式：设置面板 → 配送地设置，填入对应站点的邮编（US: `10001`，CA: `M5V 3A8`）。
+
+---
+
+**Q：Windows 控制台日志中文乱码**
+
+Node.js 输出 UTF-8，但 Windows 控制台默认 GBK 编码。
+
+解决方式：
+- 临时：在终端执行 `chcp 65001` 后再运行
+- 永久：PyCharm Terminal 设置 → Shell path 改为 `cmd.exe /K chcp 65001`
