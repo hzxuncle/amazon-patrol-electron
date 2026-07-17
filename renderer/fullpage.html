@@ -51,6 +51,14 @@
             <span class="side-tab-icon">⏱</span>
             <span>定时</span>
           </button>
+          <button class="side-tab" data-tab="log">
+            <span class="side-tab-icon">📋</span>
+            <span>日志</span>
+          </button>
+          <button class="side-tab" data-tab="history">
+            <span class="side-tab-icon">🕐</span>
+            <span>历史</span>
+          </button>
           <button class="side-tab" data-tab="settings">
             <span class="side-tab-icon">⚙</span>
             <span>设置</span>
@@ -310,6 +318,58 @@
               <li>需在 Chrome 设置中开启「关闭 Chrome 后继续运行后台应用」，否则关闭所有窗口后定时失效</li>
               <li>若巡店正在运行，定时触发会自动跳过该次执行</li>
             </ul>
+          </section>
+        </div>
+
+        <!-- ====== Tab: 日志 ====== -->
+        <div class="tab-panel scrollable" id="tab-log">
+          <section class="card" style="flex:1">
+            <div class="card-header">
+              <span class="card-title">执行日志</span>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span class="card-hint" id="logCount">0 条</span>
+                <button id="btnClearLog" class="btn-ghost-sm">清空</button>
+              </div>
+            </div>
+            <div id="logContainer" style="font-family:var(--font-mono);font-size:12px;max-height:calc(100vh - 180px);overflow-y:auto;background:var(--bg-input);border-radius:var(--radius-sm);padding:8px;">
+              <div id="logList" style="display:flex;flex-direction:column;gap:3px;">
+                <span style="color:var(--text-muted)">等待巡店启动...</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ====== Tab: 历史 ====== -->
+        <div class="tab-panel scrollable" id="tab-history">
+          <section class="card">
+            <div class="card-header">
+              <span class="card-title">近10次巡店记录</span>
+              <button id="btnClearPatrolHistory" class="btn-ghost-sm">清空历史</button>
+            </div>
+            <div id="historyList">
+              <div class="empty-state" style="padding:24px 0">
+                <span class="empty-icon">🕐</span>
+                <p>暂无历史记录</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 历史详情展开区 -->
+          <section class="card" id="historyDetailCard" style="display:none">
+            <div class="card-header">
+              <span class="card-title" id="historyDetailTitle">巡店详情</span>
+              <button id="btnCloseDetail" class="btn-ghost-sm">关闭</button>
+            </div>
+            <div class="table-scroll short" style="max-height:400px">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th>状态</th><th>站点</th><th>ASIN</th><th>售价</th><th>库存</th><th>卖家</th><th>错误信息</th>
+                  </tr>
+                </thead>
+                <tbody id="historyDetailBody"></tbody>
+              </table>
+            </div>
           </section>
         </div>
 

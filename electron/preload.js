@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const messageCallbacks = [];
 const storageChangeCallbacks = [];
+const logCallbacks = [];
 
 // 接收主进程推送（PATROL_UPDATE / PATROL_COMPLETE / CRON_AUTO_START）
 ipcRenderer.on('PATROL_UPDATE', (e, data) => {
@@ -17,6 +18,9 @@ ipcRenderer.on('CRON_AUTO_START', (e, data) => {
 });
 ipcRenderer.on('STORAGE_CHANGED', (e, changes) => {
   storageChangeCallbacks.forEach(cb => cb(changes));
+});
+ipcRenderer.on('PATROL_LOG', (e, entry) => {
+  logCallbacks.forEach(cb => cb(entry));
 });
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -37,5 +41,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 开机自启动
   getLoginItem: () => ipcRenderer.invoke('GET_LOGIN_ITEM'),
-  setLoginItem: (openAtLogin) => ipcRenderer.invoke('SET_LOGIN_ITEM', openAtLogin)
+  setLoginItem: (openAtLogin) => ipcRenderer.invoke('SET_LOGIN_ITEM', openAtLogin),
+
+  // 执行日志
+  onLog: (cb) => logCallbacks.push(cb),
+
+  // 巡店历史
+  getPatrolHistory: () => ipcRenderer.invoke('GET_PATROL_HISTORY'),
+  clearPatrolHistory: () => ipcRenderer.invoke('CLEAR_PATROL_HISTORY')
 });

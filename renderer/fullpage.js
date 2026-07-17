@@ -93,6 +93,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initActionHandlers();
   initFieldToggles();
   initCronTab();
+  initLogTab();
+  initHistoryTab();
   await loadPersistedState();
 
   window.electronAPI.onMessage(handleBgMessage);
@@ -584,6 +586,9 @@ function handleComplete(summary, results) {
     if (d) historySnapshots = d;
   });
 
+  // 刷新历史列表
+  loadPatrolHistory();
+
   // 更新重试按钮
   if (summary.retryable > 0) {
     dom.btnRetry.disabled = false;
@@ -1002,4 +1007,130 @@ function truncateTitle(s) {
   if (!s) return 'N/A';
   if (s.length <= 40) return s;
   return s.substring(0, 40) + '...';
+}
+
+// ========== 日志 Tab ==========
+const logEntries = [];
+const MAX_LOG = 500;
+
+function initLogTab() {
+  document.getElementById('btnClearLog').addEventListener('click', () => {
+    logEntries.length = 0;
+    renderLog();
+  });
+
+  if (window.electronAPI && window.electronAPI.onLog) {
+    window.electronAPI.onLog(entry => {
+      logEntries.push(entry);
+      if (logEntries.length > MAX_LOG) logEntries.shift();
+      appendLogEntry(entry);
+      document.getElementById('logCount').textContent = `${logEntries.length} 条`;
+    });
+  }
+}
+
+function appendLogEntry(entry) {
+  const list = document.getElementById('logList');
+  if (!list) return;
+  // 清除初始占位文字
+  if (list.children.length === 1 && list.children[0].tagName === 'SPAN') {
+    list.innerHTML = '';
+  }
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;line-height:1.5';
+  row.innerHTML = `<span style="color:var(--text-muted);flex-shrink:0">${esc(entry.time)}</span><span style="color:var(--text-primary)">${esc(entry.message)}</span>`;
+  list.appendChild(row);
+  // 自动滚到底部
+  const container = document.getElementById('logContainer');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function renderLog() {
+  const list = document.getElementById('logList');
+  if (!list) return;
+  if (!logEntries.length) {
+    list.innerHTML = '<span style="color:var(--text-muted)">等待巡店启动...</span>';
+    document.getElementById('logCount').textContent = '0 条';
+    return;
+  }
+  list.innerHTML = logEntries.map(e =>
+    `<div style="display:flex;gap:8px;align-items:flex-start;line-height:1.5"><span style="color:var(--text-muted);flex-shrink:0">${esc(e.time)}</span><span style="color:var(--text-primary)">${esc(e.message)}</span></div>`
+  ).join('');
+  document.getElementById('logCount').textContent = `${logEntries.length} 条`;
+}
+
+// ========== 历史 Tab ==========
+function initHistoryTab() {
+  document.getElementById('btnClearPatrolHistory').addEventListener('click', async () => {
+    if (!confirm('清空所有巡店历史记录？')) return;
+    await window.electronAPI.clearPatrolHistory();
+    renderPatrolHistory([]);
+  });
+  document.getElementById('btnCloseDetail').addEventListener('click', () => {
+    document.getElementById('historyDetailCard').style.display = 'none';
+  });
+  loadPatrolHistory();
+}
+
+async function loadPatrolHistory() {
+  if (!window.electronAPI || !window.electronAPI.getPatrolHistory) return;
+  const list = await window.electronAPI.getPatrolHistory();
+  renderPatrolHistory(list || []);
+}
+
+function renderPatrolHistory(list) {
+  const container = document.getElementById('historyList');
+  if (!container) return;
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:24px 0"><span class="empty-icon">🕐</span><p>暂无历史记录</p></div>';
+    return;
+  }
+  container.innerHTML = list.map((h, i) => {
+    const dt = new Date(h.completedAt);
+    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    const elapsed = formatPatrolTime(h.elapsed);
+    const badge = h.isRetry ? '<span style="color:var(--warning);font-size:11px">[重试]</span>' : '';
+    return `<div class="history-row" data-index="${i}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="showHistoryDetail(${i})">
+      <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);width:120px;flex-shrink:0">${esc(dateStr)}</span>
+      <span style="font-size:13px;color:var(--text-primary);flex:1">共 ${h.total} 个 ${badge}</span>
+      <span style="color:var(--success);font-size:12px">✅${h.success}</span>
+      <span style="color:var(--danger);font-size:12px">❌${h.failed}</span>
+      <span style="color:var(--text-muted);font-size:12px">${esc(elapsed)}</span>
+      <span style="color:var(--accent);font-size:12px">›</span>
+    </div>`;
+  }).join('');
+}
+
+function showHistoryDetail(index) {
+  window.electronAPI.getPatrolHistory().then(list => {
+    if (!list || !list[index]) return;
+    const h = list[index];
+    const dt = new Date(h.completedAt);
+    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+    document.getElementById('historyDetailTitle').textContent = `${dateStr} — 共${h.total}个`;
+    const SITE_LABELS = { 'www.amazon.ca':'CA','www.amazon.com':'US','www.amazon.com.au':'AU','www.amazon.com.mx':'MX' };
+    document.getElementById('historyDetailBody').innerHTML = (h.results || []).map(r => {
+      const icon = r.status === 'success' ? '✅' : r.status === 'captcha' ? '🔐' : '❌';
+      const site = SITE_LABELS[r.site] || r.site;
+      return `<tr>
+        <td>${icon}</td>
+        <td>${esc(site)}</td>
+        <td style="font-family:var(--font-mono)">${esc(r.asin)}</td>
+        <td>${esc(r.price || '')}</td>
+        <td>${esc(r.stock || '')}</td>
+        <td>${esc(r.seller || '')}</td>
+        <td style="color:var(--danger);font-size:11px">${esc(r.error || '')}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('historyDetailCard').style.display = 'block';
+    document.getElementById('historyDetailCard').scrollIntoView({ behavior: 'smooth' });
+  });
+}
+
+function formatPatrolTime(ms) {
+  if (!ms) return '';
+  const s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60);
+  if (h > 0) return `${h}h${m % 60}m`;
+  if (m > 0) return `${m}m${s % 60}s`;
+  return `${s}s`;
 }

@@ -48,6 +48,19 @@ function broadcastUpdate(result) {
       }
     });
   }
+  const icon = result.status === 'success' ? '✅' : result.status === 'captcha' ? '🔐' : '❌';
+  broadcastLog(`${icon} ${result.asin} @ ${getSiteLabel(result.site)} — ${result.status === 'success' ? `$${result.price || 'N/A'}` : result.error || result.status}`);
+}
+
+function broadcastLog(message) {
+  const entry = { time: new Date().toLocaleTimeString('zh-CN', { hour12: false }), message };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('PATROL_LOG', entry);
+  }
+}
+
+function getSiteLabel(h) {
+  return { 'www.amazon.ca': 'CA', 'www.amazon.com': 'US', 'www.amazon.com.au': 'AU', 'www.amazon.com.mx': 'MX' }[h] || h;
 }
 
 // ========== Node 16 fetch 替代 ==========
@@ -86,11 +99,14 @@ function processQueue(config) {
     activeWorkers++;
     while (activePatrol) {
       if (globalProcessed > 0 && globalProcessed % batchSize === 0 && taskQueue.length > 0) {
+        broadcastLog(`⏸ 批次休息 ${batchRest / 1000}s，已完成 ${globalProcessed} 个任务...`);
         await sleep(batchRest);
         if (!activePatrol) break;
       }
       const task = taskQueue.shift();
       if (!task) break;
+
+      broadcastLog(`🔍 开始抓取 ${task.asin} @ ${getSiteLabel(task.site)}（剩余队列 ${taskQueue.length}）`);
 
       try {
         const result = await tabManager.openTabForTask(task, config);
@@ -151,8 +167,11 @@ async function onPatrolComplete() {
   };
 
   saveHistorySnapshot();
+  savePatrolHistory(summary);
   activePatrol = null;
   store.set('patrolState', { running: false });
+
+  broadcastLog(`🏁 巡店完成 — 共 ${summary.total} | ✅${summary.success} | ❌${summary.failed} | 用时 ${formatTime(elapsed)}`);
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('PATROL_COMPLETE', { summary, results: completedResults });
@@ -191,6 +210,26 @@ function saveHistorySnapshot() {
     if (history[key].snapshots.length > 10) history[key].snapshots = history[key].snapshots.slice(-10);
   });
   store.set('historySnapshots', history);
+}
+
+// ========== 巡店历史记录（近10次） ==========
+function savePatrolHistory(summary) {
+  const list = store.get('patrolHistory') || [];
+  list.unshift({
+    completedAt: summary.completedAt,
+    total: summary.total,
+    success: summary.success,
+    failed: summary.failed,
+    captcha: summary.captcha,
+    elapsed: summary.elapsed,
+    isRetry: summary.isRetry || false,
+    results: completedResults.map(r => ({
+      asin: r.asin, site: r.site, status: r.status,
+      price: r.price, stock: r.stock, seller: r.seller,
+      error: r.error || ''
+    }))
+  });
+  store.set('patrolHistory', list.slice(0, 10));
 }
 
 // ========== 钉钉推送 ==========
@@ -271,6 +310,7 @@ function register() {
     retryMap = {};
     store.set('patrolConfig', config);
     store.set('patrolState', { running: true, totalCount, completedCount: 0 });
+    broadcastLog(`🚀 巡店开始，共 ${tasks.length} 个任务，并发 ${config.concurrency || 2}`);
     processQueue(config);
     return { success: true, totalTasks: tasks.length };
   });
@@ -314,6 +354,10 @@ function register() {
   ipcMain.handle('GET_RESULTS', () => ({ results: completedResults }));
 
   ipcMain.handle('GET_HISTORY', () => store.get('historySnapshots') || {});
+
+  ipcMain.handle('GET_PATROL_HISTORY', () => store.get('patrolHistory') || []);
+
+  ipcMain.handle('CLEAR_PATROL_HISTORY', () => { store.remove('patrolHistory'); return { success: true }; });
 
   ipcMain.handle('CLEAR_RESULTS', () => {
     completedResults = [];
