@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*.exe
+            dist/*.zip
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Generate macOS icon
+        run: |
+          mkdir icon.iconset
+          sips -z 16 16   assets/icons/icon256.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32   assets/icons/icon256.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32   assets/icons/icon256.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64   assets/icons/icon256.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128 assets/icons/icon256.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256 assets/icons/icon256.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 256 256 assets/icons/icon256.png --out icon.iconset/icon_256x256.png
+          iconutil -c icns icon.iconset -o assets/icons/icon.icns
+          rm -rf icon.iconset
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Mac
+        run: npm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Mac artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: |
+            dist/*.dmg
+            dist/*.zip
+
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows/*.exe
+            windows/*.zip
+            mac/*.dmg
+            mac/*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
