@@ -10,7 +10,7 @@ const SELECTORS_JS = fs.readFileSync(
   path.join(__dirname, '../renderer/selectors.js'), 'utf8'
 );
 const CONTENT_JS = fs.readFileSync(
-  path.join(__dirname, '../../amazon-patrol/content.js'), 'utf8'
+  path.join(__dirname, '../renderer/content.js'), 'utf8'
 );
 
 const SITE_URLS = {
