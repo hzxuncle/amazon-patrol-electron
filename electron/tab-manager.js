@@ -4,14 +4,22 @@ const { BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const activeTabs = new Map(); // winId -> { asin, site, win }
+const activeTabs = new Map();
 
 const SELECTORS_JS = fs.readFileSync(
   path.join(__dirname, '../renderer/selectors.js'), 'utf8'
 );
-const CONTENT_JS = fs.readFileSync(
+
+// 提取 content.js 的函数体（去掉 IIFE 包装和消息监听），供 executeJavaScript 直接调用
+const rawContent = fs.readFileSync(
   path.join(__dirname, '../renderer/content.js'), 'utf8'
 );
+const CONTENT_BODY = rawContent
+  .replace(/^[\s\S]*?\(function\s*\(\s*\)\s*\{/, '')    // 去掉 IIFE 开头
+  .replace(/\}\)\(\);?\s*$/, '')                          // 去掉 IIFE 结尾 })();
+  .replace(/^\s*'use strict';\s*\n/m, '')                 // 去掉 'use strict'（外层会加）
+  .replace(/chrome\.runtime\.onMessage\.addListener\([\s\S]*?\n  \}\);/, '') // 去掉消息监听
+  .replace(/^\s*console\.log\('[^']*Content script[^']*'\);\s*$/m, '');      // 去掉末尾 log
 
 const SITE_URLS = {
   'www.amazon.ca':     'https://www.amazon.ca',
@@ -20,8 +28,15 @@ const SITE_URLS = {
   'www.amazon.com.mx': 'https://www.amazon.com.mx'
 };
 
+// Electron 28 内置 Chrome 120，使用对应的真实 UA
+const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
 function getSiteUrl(site) {
   return SITE_URLS[site] || `https://${site}`;
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
 }
 
 async function waitForLoad(win, maxWait = 15000) {
@@ -29,68 +44,49 @@ async function waitForLoad(win, maxWait = 15000) {
     const timer = setTimeout(resolve, maxWait);
     win.webContents.once('did-finish-load', () => {
       clearTimeout(timer);
-      // 额外等待 2s 让动态内容渲染
       setTimeout(resolve, 2000);
     });
   });
 }
 
 async function injectAndScrape(win, asin, config) {
-  return new Promise((resolve, reject) => {
-    const { ipcMain } = require('electron');
-    const channel = `scrape-result-${win.id}`;
-    const scrapeTimeout = config.scrapeTimeout || 25000;
-    const timeout = setTimeout(() => {
-      ipcMain.removeHandler(channel);
-      reject(new Error('抓取超时'));
-    }, scrapeTimeout);
+  const scrapeTimeout = config.scrapeTimeout || 25000;
 
-    ipcMain.handleOnce(channel, (_event, result) => {
-      clearTimeout(timeout);
-      resolve(result);
+  // 将 selectors + content 函数体 + 直接调用 handleScrape 合成一个 async 脚本
+  // executeJavaScript 会等待返回的 Promise，直接拿到抓取结果
+  const fullScript = `
+(async function() {
+  'use strict';
+  try {
+    ${SELECTORS_JS}
+    ${CONTENT_BODY}
+    const result = await handleScrape({
+      action: 'SCRAPE_NOW',
+      asin: ${JSON.stringify(asin)},
+      maxRetries: ${config.maxRetries || 3},
+      retryDelay: ${config.retryDelay || 2000},
+      useStability: ${config.useStability !== false},
+      enabledFields: ${JSON.stringify(config.enabledFields || null)}
     });
+    return result;
+  } catch(e) {
+    return {
+      asin: ${JSON.stringify(asin)},
+      status: 'failed',
+      error: 'inject error: ' + e.message
+    };
+  }
+})()
+`;
 
-    // 将 chrome.runtime.onMessage.addListener(...) 替换为直接执行并通过 ipcRenderer 回传
-    const patchedContent = CONTENT_JS.replace(
-      /chrome\.runtime\.onMessage\.addListener\([\s\S]*?\n  \}\);/,
-      `(async () => {
-        try {
-          const result = await handleScrape({
-            action: 'SCRAPE_NOW',
-            asin: ${JSON.stringify(asin)},
-            maxRetries: ${config.maxRetries || 3},
-            retryDelay: ${config.retryDelay || 2000},
-            useStability: ${config.useStability !== false},
-            enabledFields: ${JSON.stringify(config.enabledFields || null)}
-          });
-          require('electron').ipcRenderer.invoke(${JSON.stringify(channel)}, result);
-        } catch (e) {
-          require('electron').ipcRenderer.invoke(${JSON.stringify(channel)}, {
-            asin: ${JSON.stringify(asin)},
-            status: 'failed',
-            error: 'content script error: ' + e.message
-          });
-        }
-      })();`
-    );
+  const scrapePromise = win.webContents.executeJavaScript(fullScript);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('抓取超时')), scrapeTimeout)
+  );
 
-    // 注入选择器，再注入（已打补丁的）content script
-    win.webContents.executeJavaScript(SELECTORS_JS)
-      .then(() => win.webContents.executeJavaScript(patchedContent))
-      .catch((e) => {
-        clearTimeout(timeout);
-        ipcMain.removeHandler(channel);
-        reject(e);
-      });
-  });
+  return Promise.race([scrapePromise, timeoutPromise]);
 }
 
-/**
- * openTabForTask — 打开隐藏抓取窗口，注入脚本，返回抓取结果
- * @param {{ asin: string, site: string, index?: number }} task
- * @param {object} config  — scrapeTimeout, maxRetries, retryDelay, useStability, enabledFields
- * @returns {Promise<object>} 抓取结果
- */
 async function openTabForTask(task, config) {
   const { asin, site } = task;
   const url = `${getSiteUrl(site)}/dp/${asin}`;
@@ -98,13 +94,17 @@ async function openTabForTask(task, config) {
   const win = new BrowserWindow({
     show: false,
     width: 1280,
-    height: 800,
+    height: 900,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false, // content.js 需直接访问 DOM，不经 preload
-      javascript: true
+      nodeIntegration: false,   // 关闭，避免 window.require 被 Amazon 检测
+      contextIsolation: false,  // 关闭，让 executeJavaScript 能访问页面全局变量
+      javascript: true,
+      webSecurity: true
     }
   });
+
+  // 使用真实 Chrome UA，去掉 Electron 标记
+  win.webContents.setUserAgent(CHROME_UA);
 
   activeTabs.set(win.id, { asin, site, win });
 
@@ -121,9 +121,6 @@ async function openTabForTask(task, config) {
   }
 }
 
-/**
- * closeAll — 关闭所有尚存活的抓取窗口
- */
 function closeAll() {
   for (const [, { win }] of activeTabs) {
     if (!win.isDestroyed()) win.close();
