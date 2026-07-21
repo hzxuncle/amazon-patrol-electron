@@ -101,6 +101,7 @@ if (!gotLock) {
 
 // ========== 应用生命周期 ==========
 app.whenReady().then(() => {
+  store.migrate();
   ipcHandlers.register();
   createWindow();
   createTray();
