@@ -73,7 +73,7 @@ const dom = {
 // ========== State ==========
 let patrolRunning = false;
 let patrolTimer = null;
-let referenceData = [];
+let referenceData = null;
 let allResults = [];
 let historySnapshots = {};
 
@@ -202,7 +202,15 @@ async function loadPersistedState() {
 
   // 恢复参考数据
   const refData = await window.electronAPI.storage.get('referenceData');
-  if (refData) { referenceData = refData; renderRefPreview(); }
+  if (refData) {
+    // 兼容旧格式（数组）
+    if (Array.isArray(refData)) {
+      referenceData = { importedAt: null, fileName: '（历史数据）', rows: refData };
+    } else {
+      referenceData = refData;
+    }
+    renderRefPreview();
+  }
 
   // 恢复历史快照
   const hist = await window.electronAPI.storage.get('historySnapshots');
@@ -264,43 +272,110 @@ function processFile(file) {
       if (typeof XLSX === 'undefined') { alert('Excel库加载中'); return; }
       const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      if (rows.length === 0) { alert('没有数据'); return; }
-      referenceData = rows.map(r => ({
-        asin: String(r['ASIN'] || r['asin'] || '').trim(),
-        site: String(r['站点'] || r['Site'] || r['site'] || '').trim(),
-        aliasName: String(r['常用名'] || r['Alias'] || r['alias'] || '').trim(),
-        expectedPrice: String(r['期望售价'] || r['Expected Price'] || r['expectedPrice'] || '').trim(),
-        expectedListPrice: String(r['期望划线价'] || r['Expected List Price'] || r['expectedListPrice'] || '').trim(),
-        expectedDealBadge: String(r['期望活动标'] || r['Expected Deal'] || r['expectedDeal'] || '').trim(),
-        expectedAcBadge: String(r['期望AC标'] || r['Expected AC'] || r['expectedAc'] || '').trim(),
-        expectedCoupon: String(r['期望Coupon'] || r['Expected Coupon'] || r['expectedCoupon'] || '').trim(),
-        expectedRating: String(r['期望星级'] || r['Expected Rating'] || r['expectedRating'] || '').trim(),
-        expectedReviews: String(r['期望评论数'] || r['Expected Reviews'] || r['expectedReviews'] || '').trim(),
-        expectedSeller: String(r['期望卖家'] || r['Expected Seller'] || r['expectedSeller'] || '').trim(),
-        expectedStock: String(r['期望库存'] || r['Expected Stock'] || r['expectedStock'] || '').trim()
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if (rawRows.length === 0) { alert('没有数据'); return; }
+
+      // 校验必须列
+      const sample = rawRows[0];
+      const hasAsin = 'ASIN' in sample || 'asin' in sample;
+      const hasSite = '站点' in sample || 'Site' in sample || 'site' in sample;
+      if (!hasAsin) { alert('导入失败：Excel 缺少 ASIN 列'); return; }
+      if (!hasSite) { alert('导入失败：Excel 缺少 站点 列（列名：站点 或 Site）'); return; }
+
+      const rows = rawRows.map(r => ({
+        asin:               String(r['ASIN'] || r['asin'] || '').trim(),
+        site:               String(r['站点'] || r['Site'] || r['site'] || '').trim(),
+        aliasName:          String(r['常用名'] || r['Alias'] || r['alias'] || '').trim(),
+        expectedPrice:      String(r['期望售价'] || r['Expected Price'] || r['expectedPrice'] || '').trim(),
+        expectedListPrice:  String(r['期望划线价'] || r['Expected List Price'] || r['expectedListPrice'] || '').trim(),
+        expectedDealBadge:  String(r['期望活动标'] || r['Expected Deal'] || r['expectedDeal'] || '').trim(),
+        expectedAcBadge:    String(r['期望AC标'] || r['Expected AC'] || r['expectedAc'] || '').trim(),
+        expectedCoupon:     String(r['期望Coupon'] || r['Expected Coupon'] || r['expectedCoupon'] || '').trim(),
+        expectedRating:     String(r['期望星级'] || r['Expected Rating'] || r['expectedRating'] || '').trim(),
+        expectedReviews:    String(r['期望评论数'] || r['Expected Reviews'] || r['expectedReviews'] || '').trim(),
+        expectedSeller:     String(r['期望卖家'] || r['Expected Seller'] || r['expectedSeller'] || '').trim(),
+        expectedStock:      String(r['期望库存'] || r['Expected Stock'] || r['expectedStock'] || '').trim(),
       })).filter(r => r.asin);
-      window.electronAPI.storage.set('referenceData', referenceData).catch(e => console.error('[Store] referenceData 保存失败:', e));
+
+      // 将站点简称转换为完整域名
+      const SITE_MAP = {
+        'US': 'www.amazon.com', 'CA': 'www.amazon.ca',
+        'AU': 'www.amazon.com.au', 'MX': 'www.amazon.com.mx',
+        'UK': 'www.amazon.co.uk', 'DE': 'www.amazon.de',
+        'FR': 'www.amazon.fr',    'IT': 'www.amazon.it',
+        'ES': 'www.amazon.es',    'JP': 'www.amazon.co.jp',
+      };
+      rows.forEach(r => {
+        if (r.site && !r.site.startsWith('www.')) {
+          r.site = SITE_MAP[r.site.toUpperCase()] || r.site;
+        }
+      });
+
+      const now = new Date().toISOString();
+      referenceData = { importedAt: now, fileName: file.name, rows };
+      window.electronAPI.storage.set('referenceData', referenceData)
+        .catch(e => console.error('[Store] referenceData 保存失败:', e));
       renderRefPreview();
+      autoFillAsinGroups(rows);
     } catch (err) { alert('解析失败: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 }
 
 function renderRefPreview() {
-  if (!referenceData.length) { dom.refCard.style.display = 'none'; return; }
+  if (!referenceData || !referenceData.rows || !referenceData.rows.length) {
+    dom.refCard.style.display = 'none';
+    document.getElementById('refImportInfo').style.display = 'none';
+    return;
+  }
+  // 信息栏
+  const info = document.getElementById('refImportInfo');
+  info.style.display = 'flex';
+  document.getElementById('refInfoFileName').textContent = referenceData.fileName || '';
+  document.getElementById('refInfoTime').textContent = referenceData.importedAt
+    ? new Date(referenceData.importedAt).toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
+    : '';
+  document.getElementById('refInfoCount').textContent = `共 ${referenceData.rows.length} 条`;
+
+  // 表格
   dom.refCard.style.display = 'block';
-  dom.refCount.textContent = `${referenceData.length}条`;
-  dom.refBody.innerHTML = referenceData.slice(0, 50).map(r =>
+  dom.refCount.textContent = `${referenceData.rows.length}条`;
+  dom.refBody.innerHTML = referenceData.rows.slice(0, 50).map(r =>
     `<tr><td>${esc(r.asin)}</td><td>${esc(r.site)}</td><td>${esc(r.aliasName||'')}</td><td>${esc(r.expectedPrice)}</td><td>${esc(r.expectedListPrice)}</td><td>${esc(r.expectedDealBadge||'')}</td><td>${esc(r.expectedAcBadge||'')}</td><td>${esc(r.expectedCoupon||'')}</td><td>${esc(r.expectedRating)}</td><td>${esc(r.expectedReviews)}</td><td>${esc(r.expectedSeller)}</td><td>${esc(r.expectedStock)}</td></tr>`
   ).join('');
 }
 
 function clearRef() {
   if (!confirm('清除所有参考数据？')) return;
-  referenceData = [];
-  window.electronAPI.storage.remove('referenceData').catch(e => console.error('[Store] referenceData 删除失败:', e));
+  referenceData = { importedAt: null, fileName: '', rows: [] };
+  window.electronAPI.storage.remove('referenceData').catch(() => {});
   dom.refCard.style.display = 'none';
+  document.getElementById('refImportInfo').style.display = 'none';
+}
+
+function autoFillAsinGroups(rows) {
+  // 按 site 分组
+  const grouped = {};
+  for (const r of rows) {
+    if (!r.asin || !r.site) continue;
+    if (!grouped[r.site]) grouped[r.site] = [];
+    if (!grouped[r.site].includes(r.asin)) grouped[r.site].push(r.asin);
+  }
+
+  const groups = Object.entries(grouped).map(([site, asins]) => ({
+    site, asins: asins.join('\n')
+  }));
+
+  if (!groups.length) return;
+
+  // 重新渲染分组卡片
+  const container = document.getElementById('siteGroups');
+  container.innerHTML = '';
+  for (const g of groups) renderGroupCard(g.site, g.asins);
+  saveGroupsToCache();
+
+  // 切换到巡店 Tab 提示
+  alert(`已自动填入 ${rows.length} 条 ASIN 到巡店面板（${groups.length} 个站点分组）`);
 }
 
 async function downloadTemplate() {
@@ -689,14 +764,16 @@ function handleComplete(summary, results) {
 
 // ========== Reference Compare ==========
 function findRef(asin, site) {
-  return referenceData.find(r => r.asin === asin && (!r.site || r.site === site || r.site.includes(site.split('.')[1])));
+  const rows = referenceData && referenceData.rows ? referenceData.rows : [];
+  return rows.find(r => r.asin === asin && (!r.site || r.site === site || r.site.includes(site.split('.')[1])));
 }
 function getAlias(asin, site) {
   const ref = findRef(asin, site);
   return ref ? ref.aliasName || '' : '';
 }
 function hasAliases() {
-  return referenceData.some(r => r.aliasName && r.aliasName.trim());
+  const rows = referenceData && referenceData.rows ? referenceData.rows : [];
+  return rows.some(r => r.aliasName && r.aliasName.trim());
 }
 
 function cmpField(actual, expected, field) {
