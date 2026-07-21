@@ -367,7 +367,7 @@ function renderGroupCard(site, asins) {
     const val = `www.${s.domain}`;
     const disabled = usedSites.has(val) && val !== site ? 'disabled' : '';
     const selected = val === site ? 'selected' : '';
-    return `<option value="${val}" ${selected} ${disabled}>${s.country} (${s.domain})</option>`;
+    return `<option value="${val}" ${selected} ${disabled}>${esc(s.country)} (${esc(s.domain)})</option>`;
   }).join('');
 
   card.innerHTML = `
@@ -406,7 +406,7 @@ function refreshAllGroupOptions() {
       const val = `www.${s.domain}`;
       const disabled = usedSites.has(val) && val !== currentVal ? 'disabled' : '';
       const selected = val === currentVal ? 'selected' : '';
-      return `<option value="${val}" ${selected} ${disabled}>${s.country} (${s.domain})</option>`;
+      return `<option value="${val}" ${selected} ${disabled}>${esc(s.country)} (${esc(s.domain)})</option>`;
     }).join('');
   });
   updateDeleteButtons();
