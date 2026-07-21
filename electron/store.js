@@ -29,7 +29,7 @@ function filePath(fileName) {
 }
 
 function loadFile(fileName) {
-  if (_caches[fileName]) return _caches[fileName];
+  if (fileName in _caches) return _caches[fileName];
   try {
     const fp = filePath(fileName);
     if (fs.existsSync(fp)) {
@@ -88,12 +88,17 @@ function migrate() {
   if (!fs.existsSync(oldPath)) return;
   try {
     const old = JSON.parse(fs.readFileSync(oldPath, 'utf8'));
+    // Collect all keys by file first, then save each file once
+    const filesToSave = new Set();
     for (const [key, fileName] of Object.entries(FILE_MAP)) {
       if (key in old && old[key] !== undefined) {
+        // Skip asinInputCache if it's the legacy string format — handled below
+        if (key === 'asinInputCache' && typeof old[key] === 'string') continue;
         loadFile(fileName)[key] = old[key];
-        saveFile(fileName);
+        filesToSave.add(fileName);
       }
     }
+    for (const fileName of filesToSave) saveFile(fileName);
     // 旧 asinInputCache 是字符串，新格式是数组；无法还原站点信息，清空让用户重配
     const oldCache = old['asinInputCache'];
     if (typeof oldCache === 'string' && oldCache.trim()) {
