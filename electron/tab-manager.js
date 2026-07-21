@@ -113,7 +113,7 @@ async function initDeliveryZip(site, zip) {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
               locationType: 'LOCATION_INPUT',
-              zipCode: '${zip}',
+              zipCode: ${JSON.stringify(zip)},
               storeContext: 'generic',
               deviceType: 'web',
               pageType: 'Gateway',

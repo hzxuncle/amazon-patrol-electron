@@ -203,7 +203,7 @@ async function onPatrolComplete() {
   // 钉钉推送
   const patrolSettings = store.get('patrolSettings');
   if (patrolSettings && patrolSettings.dingtalkWebhook) {
-    const references = store.get('referenceData') || [];
+    const references = (store.get('referenceData') || {}).rows || [];
     if (references.length > 0) sendDingTalk(summary, patrolSettings.dingtalkWebhook);
   }
 }
@@ -268,7 +268,7 @@ function mismatchText(a,e) {
 
 async function sendDingTalk(summary, webhookUrl) {
   if (!webhookUrl) return;
-  const references = store.get('referenceData') || [];
+  const references = (store.get('referenceData') || {}).rows || [];
   function findRef(r) {
     return references.find(ref => ref.asin===r.asin &&
       (!ref.site||ref.site===r.site||ref.site.includes(r.site.split('.')[1])));

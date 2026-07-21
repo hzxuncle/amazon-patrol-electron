@@ -72,11 +72,16 @@ const dom = {
 
 // ========== Constants ==========
 const SITE_MAP = {
-  'US': 'www.amazon.com', 'CA': 'www.amazon.ca',
+  'US': 'www.amazon.com',    'CA': 'www.amazon.ca',
   'AU': 'www.amazon.com.au', 'MX': 'www.amazon.com.mx',
-  'UK': 'www.amazon.co.uk', 'DE': 'www.amazon.de',
-  'FR': 'www.amazon.fr',    'IT': 'www.amazon.it',
-  'ES': 'www.amazon.es',    'JP': 'www.amazon.co.jp',
+  'UK': 'www.amazon.co.uk',  'DE': 'www.amazon.de',
+  'FR': 'www.amazon.fr',     'IT': 'www.amazon.it',
+  'ES': 'www.amazon.es',     'NL': 'www.amazon.nl',
+  'SE': 'www.amazon.se',     'PL': 'www.amazon.pl',
+  'BE': 'www.amazon.com.be', 'JP': 'www.amazon.co.jp',
+  'IN': 'www.amazon.in',     'SG': 'www.amazon.sg',
+  'BR': 'www.amazon.com.br', 'AE': 'www.amazon.ae',
+  'SA': 'www.amazon.sa',     'TR': 'www.amazon.com.tr',
 };
 
 // ========== State ==========
@@ -1035,8 +1040,11 @@ function startTimer() {
 function stopTimer() { if (patrolTimer) { clearInterval(patrolTimer); patrolTimer = null; } }
 
 // ========== Utils ==========
-function getSiteLabel(h) {
-  return { 'www.amazon.ca':'CA','www.amazon.com':'US','www.amazon.com.au':'AU','www.amazon.com.mx':'MX' }[h] || h;
+function getSiteLabel(domain) {
+  const found = enabledSites.find(s => `www.${s.domain}` === domain);
+  if (found) return found.country;
+  const m = domain.match(/amazon\.(.+)$/);
+  return m ? m[1].toUpperCase() : domain;
 }
 
 function fmtTime(ms) {
