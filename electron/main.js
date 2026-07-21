@@ -5,6 +5,7 @@ const path = require('path');
 const ipcHandlers = require('./ipc-handlers');
 const scheduler = require('./scheduler');
 const store = require('./store');
+const { buildDefaultSites } = require('./sites-data');
 
 let mainWindow = null;
 let tray = null;
@@ -100,8 +101,16 @@ if (!gotLock) {
 }
 
 // ========== 应用生命周期 ==========
+function initSites() {
+  if (!store.get('sites')) {
+    store.set('sites', buildDefaultSites());
+    console.log('[Main] sites.json 初始化完成');
+  }
+}
+
 app.whenReady().then(() => {
   store.migrate();
+  initSites();
   ipcHandlers.register();
   createWindow();
   createTray();

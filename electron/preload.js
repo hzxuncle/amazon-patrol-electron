@@ -48,5 +48,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 巡店历史
   getPatrolHistory: () => ipcRenderer.invoke('GET_PATROL_HISTORY'),
-  clearPatrolHistory: () => ipcRenderer.invoke('CLEAR_PATROL_HISTORY')
+  clearPatrolHistory: () => ipcRenderer.invoke('CLEAR_PATROL_HISTORY'),
+
+  // 站点管理
+  getSites: () => ipcRenderer.invoke('GET_SITES'),
+  saveSites: (sites) => ipcRenderer.invoke('SAVE_SITES', sites)
 });

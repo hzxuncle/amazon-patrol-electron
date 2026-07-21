@@ -404,6 +404,15 @@ function register() {
     store.set('openAtLogin', openAtLogin);
     return { success: true };
   });
+
+  ipcMain.handle('GET_SITES', () => {
+    return store.get('sites') || require('./sites-data').buildDefaultSites();
+  });
+
+  ipcMain.handle('SAVE_SITES', (e, sites) => {
+    store.set('sites', sites);
+    return { success: true };
+  });
 }
 
 module.exports = { register, setMainWindow };
