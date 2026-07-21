@@ -60,27 +60,43 @@ function createTray() {
 }
 
 // ========== 定时触发巡店 ==========
+function buildDeliveryZipsForCron(sites) {
+  const zips = {};
+  for (const s of sites) {
+    if (s.enabled && s.zip) zips[`www.${s.domain}`] = s.zip;
+  }
+  return zips;
+}
+
 function onCronTrigger() {
-  const rawInput = store.get('asinInputCache') || '';
-  const asins = [...new Set(
-    rawInput.split(/[\n,，]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-Z0-9]{10}$/.test(s))
-  )];
-  const patrolConfig = store.get('patrolConfig') || {
-    concurrency: 2, pageInterval: 4000, intervalJitter: 2000,
-    batchSize: 20, batchRest: 30000, scrapeTimeout: 25000,
-    maxRetries: 3, retryDelay: 2000, sites: ['www.amazon.ca']
-  };
-  const sites = patrolConfig.sites || ['www.amazon.ca'];
-  if (!asins.length || !sites.length) {
-    console.log('[Main] Cron 触发但无有效 ASIN，跳过');
+  const rawCache = store.get('asinInputCache') || [];
+  const settings = store.get('patrolSettings') || {};
+  const sites = store.get('sites') || [];
+  const deliveryZips = buildDeliveryZipsForCron(sites);
+
+  // asinInputCache 现为数组格式 [{site, asins}]
+  const tasks = [];
+  let idx = 0;
+  for (const group of rawCache) {
+    if (!group.site || !group.asins) continue;
+    const asins = [...new Set(
+      group.asins.split(/[\n,，]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-Z0-9]{10}$/.test(s))
+    )];
+    for (const asin of asins) {
+      tasks.push({ asin, site: group.site, index: idx++ });
+    }
+  }
+
+  if (!tasks.length) {
+    console.log('[Main] Cron 触发但无有效任务，跳过');
     return;
   }
-  const tasks = [];
-  asins.forEach((asin, idx) => sites.forEach(site => tasks.push({ asin, site, index: idx })));
+
+  const config = { ...settings, deliveryZips };
   console.log(`[Main] Cron 触发巡店，${tasks.length} 个任务`);
 
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('CRON_AUTO_START', { tasks, config: { ...patrolConfig, keepExisting: false, totalCount: tasks.length } });
+    mainWindow.webContents.send('CRON_AUTO_START', { tasks, config });
   }
 }
 

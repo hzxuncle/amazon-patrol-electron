@@ -26,18 +26,27 @@ const CONTENT_BODY = rawContent
   .replace(/chrome\.runtime\.onMessage\.addListener\([\s\S]*?\n  \}\);/, '')
   .replace(/^\s*console\.log\('[^']*Content script[^']*'\);\s*$/m, '');
 
-const SITE_URLS = {
-  'www.amazon.ca':     'https://www.amazon.ca',
-  'www.amazon.com':    'https://www.amazon.com',
-  'www.amazon.com.au': 'https://www.amazon.com.au',
-  'www.amazon.com.mx': 'https://www.amazon.com.mx'
-};
-
-const SITE_LANG = {
-  'www.amazon.ca':     'en_CA',
-  'www.amazon.com':    'en_US',
-  'www.amazon.com.au': 'en_AU',
-  'www.amazon.com.mx': 'es_MX'
+const SITE_LANG_MAP = {
+  'amazon.com':    'en_US',
+  'amazon.ca':     'en_CA',
+  'amazon.co.uk':  'en_GB',
+  'amazon.de':     'de_DE',
+  'amazon.fr':     'fr_FR',
+  'amazon.it':     'it_IT',
+  'amazon.es':     'es_ES',
+  'amazon.nl':     'nl_NL',
+  'amazon.se':     'sv_SE',
+  'amazon.pl':     'pl_PL',
+  'amazon.com.be': 'fr_BE',
+  'amazon.co.jp':  'ja_JP',
+  'amazon.com.au': 'en_AU',
+  'amazon.in':     'en_IN',
+  'amazon.sg':     'en_SG',
+  'amazon.com.mx': 'es_MX',
+  'amazon.com.br': 'pt_BR',
+  'amazon.ae':     'en_AE',
+  'amazon.sa':     'ar_SA',
+  'amazon.com.tr': 'tr_TR',
 };
 
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -46,12 +55,18 @@ const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 const initializedSites = new Set();
 
 function getSiteUrl(site) {
-  return SITE_URLS[site] || `https://${site}`;
+  return `https://${site}`;
+}
+
+function getSiteLang(site) {
+  // site 是完整域名如 www.amazon.ca，提取 amazon.ca 查表
+  const key = site.replace(/^www\./, '');
+  return SITE_LANG_MAP[key] || 'en_US';
 }
 
 function buildProductUrl(site, asin) {
   const base = getSiteUrl(site);
-  const lang = SITE_LANG[site] || 'en_US';
+  const lang = getSiteLang(site);
   return `${base}/dp/${asin}?language=${lang}`;
 }
 
@@ -84,7 +99,7 @@ async function initDeliveryZip(site, zip) {
 
   try {
     // 加载首页拿到 CSRF token（首页比商品页更稳定）
-    await win.loadURL(siteUrl + `?language=${SITE_LANG[site] || 'en_US'}`);
+    await win.loadURL(siteUrl + `?language=${getSiteLang(site)}`);
     await waitForLoad(win);
 
     const ok = await win.webContents.executeJavaScript(`

@@ -25,8 +25,18 @@ function getDefaultConfig() {
     concurrency: 2, pageInterval: 4000, intervalJitter: 2000,
     batchSize: 20, batchRest: 30000, scrapeTimeout: 25000,
     maxRetries: 3, retryDelay: 2000,
-    dingtalkWebhook: '', sites: ['www.amazon.ca']
+    dingtalkWebhook: '',
   };
+}
+
+function buildDeliveryZips(sites) {
+  const zips = {};
+  for (const s of sites) {
+    if (s.enabled && s.zip) {
+      zips[`www.${s.domain}`] = s.zip;
+    }
+  }
+  return zips;
 }
 
 function formatTime(ms) {
@@ -59,8 +69,13 @@ function broadcastLog(message) {
   }
 }
 
-function getSiteLabel(h) {
-  return { 'www.amazon.ca': 'CA', 'www.amazon.com': 'US', 'www.amazon.com.au': 'AU', 'www.amazon.com.mx': 'MX' }[h] || h;
+function getSiteLabel(domain) {
+  const sites = store.get('sites') || [];
+  const found = sites.find(s => `www.${s.domain}` === domain || s.domain === domain);
+  if (found) return found.country;
+  // 降级：从域名提取简称
+  const m = domain.match(/amazon\.(.+)$/);
+  return m ? m[1].toUpperCase() : domain;
 }
 
 // ========== Node 16 fetch 替代 ==========
@@ -186,10 +201,10 @@ async function onPatrolComplete() {
   } catch (e) {}
 
   // 钉钉推送
-  const patrolConfig = store.get('patrolConfig');
-  if (patrolConfig && patrolConfig.dingtalkWebhook) {
+  const patrolSettings = store.get('patrolSettings');
+  if (patrolSettings && patrolSettings.dingtalkWebhook) {
     const references = store.get('referenceData') || [];
-    if (references.length > 0) sendDingTalk(summary, patrolConfig.dingtalkWebhook);
+    if (references.length > 0) sendDingTalk(summary, patrolSettings.dingtalkWebhook);
   }
 }
 
@@ -250,9 +265,6 @@ function mismatchText(a,e) {
   const at=String(a||'').trim().toLowerCase(), et=String(e).trim().toLowerCase();
   return at!==et&&!at.includes(et)&&!et.includes(at);
 }
-function getSiteLabel(h) {
-  return {'www.amazon.ca':'CA','www.amazon.com':'US','www.amazon.com.au':'AU','www.amazon.com.mx':'MX'}[h]||h;
-}
 
 async function sendDingTalk(summary, webhookUrl) {
   if (!webhookUrl) return;
@@ -301,14 +313,16 @@ async function sendDingTalk(summary, webhookUrl) {
 // ========== IPC 注册 ==========
 function register() {
   ipcMain.handle('START_PATROL', async (e, payload) => {
-    const { tasks, config, totalCount, keepExisting } = payload;
+    const { tasks, config: rendererConfig, totalCount, keepExisting } = payload;
     if (activePatrol) return { error: '巡店正在进行中' };
     if (!keepExisting) completedResults = [];
+    // 从 sites.json 实时读取邮编，不依赖渲染进程传入
+    const sites = store.get('sites') || [];
+    const config = { ...rendererConfig, deliveryZips: buildDeliveryZips(sites) };
     activePatrol = { tasks: [...tasks], config, errors: [], keepExisting, totalCount };
     taskQueue = [...tasks];
     startTime = Date.now();
     retryMap = {};
-    store.set('patrolConfig', config);
     store.set('patrolState', { running: true, totalCount, completedCount: 0 });
     tabManager.resetSiteInit();
     broadcastLog(`🚀 巡店开始，共 ${tasks.length} 个任务，并发 ${config.concurrency || 2}`);
@@ -331,7 +345,10 @@ function register() {
     );
     if (!failedItems.length) return { error: '没有可重试的失败项', retryable: 0 };
     const retryTasks = failedItems.map((r, idx) => ({ asin: r.asin, site: r.site, index: idx }));
-    const config = store.get('patrolConfig') || getDefaultConfig();
+    const settings = store.get('patrolSettings') || getDefaultConfig();
+    const sitesList = store.get('sites') || [];
+    const deliveryZips = buildDeliveryZips(sitesList);
+    const config = { ...settings, deliveryZips };
     const retryConfig = { ...config, concurrency: Math.min(config.concurrency||2,2), pageInterval: Math.max(config.pageInterval||4000,6000) };
     const failedKeys = new Set(failedItems.map(r=>`${r.asin}_${r.site}`));
     completedResults = completedResults.filter(r=>!failedKeys.has(`${r.asin}_${r.site}`));
