@@ -1,38 +1,45 @@
-# Task 7 Report: main.js — 主进程入口
+# Task 7: getSettings() 清理 + patrolSettings 中 sites/deliveryZips 移除
 
-**Status:** DONE
+## Status: DONE
 
-## 实现内容
+## Verification Results
 
-创建了 `electron/main.js`，实现主进程所有生命周期功能：
+**Checked:** `renderer/fullpage.js`
 
-### 主窗口 (`createWindow`)
-- BrowserWindow 1400×900，最小 1000×600
-- 加载 `renderer/fullpage.html`（`path.join(__dirname, '../renderer/fullpage.html')`）
-- preload 指向 `path.join(__dirname, 'preload.js')`
-- `contextIsolation: true`，`nodeIntegration: false`
-- `close` 事件：`e.preventDefault()` + `mainWindow.hide()`（隐藏到托盘，不退出）
-- 调用 `ipcHandlers.setMainWindow(mainWindow)`
+### getSettings() — Lines 145-160
+**Status:** ✓ CLEAN (no `sites` or `deliveryZips` fields)
 
-### 系统托盘 (`createTray`)
-- 图标：`assets/icons/icon16.png`
-- 左键单击：`show` + `focus` 主窗口
-- 右键菜单：「显示窗口」和「退出」（`app.exit(0)`）
+Current implementation returns:
+- concurrency, pageInterval, intervalJitter, batchSize, batchRest, scrapeTimeout, maxRetries, retryDelay
+- dingtalkWebhook, showHistoryDiff, enabledFields, showScrapeWindow
 
-### 定时触发 (`onCronTrigger`)
-- 读取 `store.get('asinInputCache')` 解析 ASIN 列表
-- 读取 `store.get('patrolConfig')` 或使用默认配置
-- 构建 tasks 数组（asin × site 笛卡尔积）
-- 向 `mainWindow.webContents.send('CRON_AUTO_START', { tasks, config })` 发送
+No references to `sites` or `deliveryZips`.
 
-### 应用生命周期
-- `app.whenReady()`：注册 IPC、创建窗口与托盘、设置 scheduler 回调、启动 scheduler、恢复 openAtLogin 设置
-- `window-all-closed`：不调用 `app.quit()`（托盘模式）
-- `activate`：显示主窗口（macOS Dock 点击）
+### loadSettings() — Lines 187-205
+**Status:** ✓ CLEAN (no site/zip restore logic)
 
-## 验证
+Current implementation restores:
+- concurrency, pageInterval, batchSize, batchRest, scrapeTimeout settings
+- dingtalkWebhook, dingtalkEnabled, showHistoryDiff, enabledFields, showScrapeWindow
 
-```
-node --check electron/main.js → OK
-所有关键符号：createWindow/createTray/onCronTrigger/scheduler.start/ipcHandlers.register → OK
-```
+No references to:
+- `dom.siteCheckboxes`
+- `dom.zipUS`, `dom.zipCA`, `dom.zipAU`, `dom.zipMX`
+- Any zip input restoration logic
+
+### DOM Object — Lines 10-71
+**Status:** ✓ CLEAN (no removed DOM element references)
+
+No references to:
+- `dom.siteCheckboxes`
+- `dom.zipUS`, `dom.zipCA`, `dom.zipAU`, `dom.zipMX`
+- `dom.asinInput`
+
+## Cleanup Completed In Earlier Tasks
+- Task 3: Removed zip inputs from HTML and removed `getSelectedSites()` function
+- Task 5: Removed `dom.asinInput` and `dom.siteCheckboxes` DOM element references
+
+## Conclusion
+All required cleanup is complete. The `getSettings()` and `loadSettings()` functions are clean and fully functional. Site management is now handled exclusively through `sites.json`, and delivery zips are stored per-site in that file (not in patrolSettings).
+
+Commit: Verification commit created documenting that cleanup is already complete.
