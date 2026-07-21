@@ -72,15 +72,8 @@
 
           <!-- 控制栏 -->
           <section class="control-bar">
-            <div class="control-left">
-              <textarea id="asinInput" class="asin-input" placeholder="输入ASIN，每行一个或逗号分隔&#10;B082W886W9&#10;B09QWFWTTL&#10;B0GSQQSSD3" rows="3"></textarea>
-              <div class="site-tags">
-                <label class="site-tag" title="加拿大站"><input type="checkbox" value="www.amazon.ca" checked> 🇨🇦 CA</label>
-                <label class="site-tag" title="美国站"><input type="checkbox" value="www.amazon.com"> 🇺🇸 US</label>
-                <label class="site-tag" title="澳洲站"><input type="checkbox" value="www.amazon.com.au"> 🇦🇺 AU</label>
-                <label class="site-tag" title="墨西哥站"><input type="checkbox" value="www.amazon.com.mx"> 🇲🇽 MX</label>
-              </div>
-            </div>
+            <div class="site-groups" id="siteGroups"></div>
+            <button id="btnAddGroup" class="btn btn-outline btn-add-group">＋ 新增站点</button>
             <div class="control-right">
               <button id="btnStart" class="btn btn-primary btn-lg">
                 <span>▶</span> 开始巡店

@@ -13,10 +13,6 @@ const dom = {
   sideTabs: $$('.side-tab'),
   tabPanels: $$('.tab-panel'),
 
-  // Input
-  asinInput: $('#asinInput'),
-  siteCheckboxes: $$('.site-tags input[type="checkbox"]'),
-
   // Buttons
   btnStart: $('#btnStart'),
   btnStop: $('#btnStop'),
@@ -93,6 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLogTab();
   initHistoryTab();
   await initSitesTab();
+  await initSiteGroups();
   await loadPersistedState();
 
   window.electronAPI.onMessage(handleBgMessage);
@@ -147,7 +144,6 @@ function getSettings() {
     maxRetries: 3,
     retryDelay: 2000,
     dingtalkWebhook: dom.dingtalkEnabled.checked ? dom.dingtalkWebhook.value.trim() : '',
-    sites: getSelectedSites(),
     showHistoryDiff: dom.showHistoryDiff.checked,
     enabledFields: getEnabledFields(),
     showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false
@@ -191,19 +187,12 @@ async function loadSettings() {
     dom.dingtalkWebhook.value = s.dingtalkWebhook || '';
     dom.dingtalkEnabled.checked = !!s.dingtalkWebhook;
     dom.showHistoryDiff.checked = s.showHistoryDiff || false;
-    if (s.sites && s.sites.length > 0) {
-      dom.siteCheckboxes.forEach(cb => { cb.checked = s.sites.includes(cb.value); });
-    }
     // 恢复字段勾选
     if (s.enabledFields && s.enabledFields.length > 0) {
       dom.fieldToggles.forEach(cb => { cb.checked = s.enabledFields.includes(cb.dataset.field); });
     }
     if (dom.showScrapeWindow) dom.showScrapeWindow.checked = s.showScrapeWindow || false;
   }
-}
-
-function getSelectedSites() {
-  return [...dom.siteCheckboxes].filter(cb => cb.checked).map(cb => cb.value);
 }
 
 // ========== Persistence ==========
@@ -229,15 +218,6 @@ async function loadPersistedState() {
     const lastTs = allResults[allResults.length - 1]?.timestamp;
     if (lastTs) setPatrolTimestamp('restored', lastTs);
   }
-
-  // 恢复ASIN输入
-  const inputData = await window.electronAPI.storage.get('asinInputCache');
-  if (inputData) { dom.asinInput.value = inputData; }
-
-  // 监听ASIN输入变化
-  dom.asinInput.addEventListener('input', () => {
-    window.electronAPI.storage.set('asinInputCache', dom.asinInput.value).catch(e => console.error('[Store] asinInputCache 保存失败:', e));
-  });
 
   // 恢复巡店状态
   const state = await window.electronAPI.storage.get('patrolState');
@@ -346,25 +326,148 @@ function initActionHandlers() {
   dom.btnClear.addEventListener('click', clearResults);
 }
 
-function parseAsins() {
-  return [...new Set(
-    dom.asinInput.value.trim()
-      .split(/[\n,，]+/)
-      .map(a => a.trim().toUpperCase())
-      .filter(a => /^[A-Z0-9]{10}$/.test(a))
-  )];
+// ========== 站点分组卡片 ==========
+let enabledSites = []; // [{domain, country, ...}] — 从 sites.json 读取 enabled=true 的站点
+
+async function initSiteGroups() {
+  const allSites = await window.electronAPI.getSites();
+  enabledSites = allSites.filter(s => s.enabled);
+
+  const cached = await window.electronAPI.storage.get('asinInputCache');
+  const groups = Array.isArray(cached) && cached.length
+    ? cached
+    : [{ site: enabledSites[0] ? `www.${enabledSites[0].domain}` : 'www.amazon.ca', asins: '' }];
+
+  const container = document.getElementById('siteGroups');
+  container.innerHTML = '';
+  for (const g of groups) renderGroupCard(g.site, g.asins);
+
+  document.getElementById('btnAddGroup').addEventListener('click', () => {
+    const usedSites = getUsedSites();
+    const next = enabledSites.find(s => !usedSites.has(`www.${s.domain}`));
+    if (!next) { alert('所有已启用站点均已添加'); return; }
+    renderGroupCard(`www.${next.domain}`, '');
+    saveGroupsToCache();
+  });
+}
+
+function getUsedSites() {
+  return new Set(
+    [...document.querySelectorAll('.site-group-select')].map(s => s.value)
+  );
+}
+
+function renderGroupCard(site, asins) {
+  const container = document.getElementById('siteGroups');
+  const card = document.createElement('div');
+  card.className = 'site-group-card';
+
+  const usedSites = getUsedSites();
+  const options = enabledSites.map(s => {
+    const val = `www.${s.domain}`;
+    const disabled = usedSites.has(val) && val !== site ? 'disabled' : '';
+    const selected = val === site ? 'selected' : '';
+    return `<option value="${val}" ${selected} ${disabled}>${s.country} (${s.domain})</option>`;
+  }).join('');
+
+  card.innerHTML = `
+    <div class="site-group-header">
+      <select class="site-group-select">${options}</select>
+      <button class="site-group-delete" title="删除此站点">✕</button>
+    </div>
+    <textarea class="site-group-textarea" placeholder="每行一个ASIN&#10;B08XYZ1234&#10;B09ABC5678">${esc(asins)}</textarea>
+  `;
+
+  const select = card.querySelector('.site-group-select');
+  const textarea = card.querySelector('.site-group-textarea');
+  const deleteBtn = card.querySelector('.site-group-delete');
+
+  select.addEventListener('change', () => {
+    refreshAllGroupOptions();
+    saveGroupsToCache();
+  });
+  textarea.addEventListener('input', () => saveGroupsToCache());
+  deleteBtn.addEventListener('click', () => {
+    if (document.querySelectorAll('.site-group-card').length <= 1) return;
+    card.remove();
+    refreshAllGroupOptions();
+    saveGroupsToCache();
+  });
+
+  container.appendChild(card);
+  updateDeleteButtons();
+}
+
+function refreshAllGroupOptions() {
+  const usedSites = getUsedSites();
+  document.querySelectorAll('.site-group-select').forEach(select => {
+    const currentVal = select.value;
+    select.innerHTML = enabledSites.map(s => {
+      const val = `www.${s.domain}`;
+      const disabled = usedSites.has(val) && val !== currentVal ? 'disabled' : '';
+      const selected = val === currentVal ? 'selected' : '';
+      return `<option value="${val}" ${selected} ${disabled}>${s.country} (${s.domain})</option>`;
+    }).join('');
+  });
+  updateDeleteButtons();
+}
+
+function updateDeleteButtons() {
+  const cards = document.querySelectorAll('.site-group-card');
+  cards.forEach(card => {
+    card.querySelector('.site-group-delete').disabled = cards.length <= 1;
+  });
+}
+
+function saveGroupsToCache() {
+  const groups = [...document.querySelectorAll('.site-group-card')].map(card => ({
+    site: card.querySelector('.site-group-select').value,
+    asins: card.querySelector('.site-group-textarea').value,
+  }));
+  window.electronAPI.storage.set('asinInputCache', groups).catch(() => {});
+}
+
+function readGroupsFromDom() {
+  return [...document.querySelectorAll('.site-group-card')].map(card => ({
+    site: card.querySelector('.site-group-select').value,
+    asins: card.querySelector('.site-group-textarea').value.trim(),
+  }));
 }
 
 function buildTasks() {
-  const asins = parseAsins();
-  if (!asins.length) { alert('请输入有效ASIN'); return null; }
-  if (asins.length > 100) { alert(`最多100个，当前${asins.length}个`); return null; }
-  const sites = getSelectedSites();
-  if (!sites.length) { alert('至少选一个站点'); return null; }
-
+  const groups = readGroupsFromDom();
   const tasks = [];
-  asins.forEach((asin, idx) => sites.forEach(site => tasks.push({ asin, site, index: idx })));
-  return { tasks, asinCount: asins.length, siteCount: sites.length };
+  let idx = 0;
+
+  for (const group of groups) {
+    const { site, asins } = group;
+    if (!asins) {
+      const siteFound = enabledSites.find(s => `www.${s.domain}` === site);
+      const label = siteFound ? siteFound.country : site;
+      alert(`[${label}] 站点 ASIN 不能为空`);
+      return null;
+    }
+    const asinList = [...new Set(
+      asins.split(/[\n,，]+/).map(a => a.trim().toUpperCase()).filter(a => a)
+    )];
+    const invalid = asinList.filter(a => !/^[A-Z0-9]{10}$/.test(a));
+    if (invalid.length) {
+      const siteFound = enabledSites.find(s => `www.${s.domain}` === site);
+      const label = siteFound ? siteFound.country : site;
+      alert(`[${label}] 包含无效 ASIN：${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '...' : ''}`);
+      return null;
+    }
+    if (asinList.length > 100) {
+      alert(`单站点最多100个ASIN，当前${asinList.length}个`);
+      return null;
+    }
+    for (const asin of asinList) {
+      tasks.push({ asin, site, index: idx++ });
+    }
+  }
+
+  if (!tasks.length) { alert('请输入有效ASIN'); return null; }
+  return { tasks, totalCount: tasks.length };
 }
 
 async function startPatrol() {
@@ -408,12 +511,9 @@ async function startPatrol() {
 
   const isContinue = hasExisting && remainingTasks.length < td.tasks.length;
   const msg = isContinue
-    ? `继续巡店: 剩余 ${remainingTasks.length} 个未完成任务 (共 ${td.tasks.length})`
-    : `${td.asinCount}个ASIN × ${td.siteCount}个站点 = ${td.tasks.length}个页面\n并发:${config.concurrency} | 间隔:${config.pageInterval/1000}秒\n确认开始？`;
+    ? `继续巡店: 剩余 ${remainingTasks.length} 个未完成任务 (共 ${td.totalCount})`
+    : `共 ${td.totalCount} 个任务\n并发:${config.concurrency} | 间隔:${config.pageInterval/1000}秒\n确认开始？`;
   if (!confirm(msg)) return;
-
-  // 保存ASIN输入
-  window.electronAPI.storage.set('asinInputCache', dom.asinInput.value).catch(e => console.error('[Store] asinInputCache 保存失败:', e));
 
   const res = await window.electronAPI.sendMessage('START_PATROL', {
     tasks: remainingTasks,
