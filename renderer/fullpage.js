@@ -70,6 +70,15 @@ const dom = {
   btnToggleNone: $('#btnToggleNone')
 };
 
+// ========== Constants ==========
+const SITE_MAP = {
+  'US': 'www.amazon.com', 'CA': 'www.amazon.ca',
+  'AU': 'www.amazon.com.au', 'MX': 'www.amazon.com.mx',
+  'UK': 'www.amazon.co.uk', 'DE': 'www.amazon.de',
+  'FR': 'www.amazon.fr',    'IT': 'www.amazon.it',
+  'ES': 'www.amazon.es',    'JP': 'www.amazon.co.jp',
+};
+
 // ========== State ==========
 let patrolRunning = false;
 let patrolTimer = null;
@@ -298,13 +307,6 @@ function processFile(file) {
       })).filter(r => r.asin);
 
       // 将站点简称转换为完整域名
-      const SITE_MAP = {
-        'US': 'www.amazon.com', 'CA': 'www.amazon.ca',
-        'AU': 'www.amazon.com.au', 'MX': 'www.amazon.com.mx',
-        'UK': 'www.amazon.co.uk', 'DE': 'www.amazon.de',
-        'FR': 'www.amazon.fr',    'IT': 'www.amazon.it',
-        'ES': 'www.amazon.es',    'JP': 'www.amazon.co.jp',
-      };
       rows.forEach(r => {
         if (r.site && !r.site.startsWith('www.')) {
           r.site = SITE_MAP[r.site.toUpperCase()] || r.site;
@@ -333,7 +335,11 @@ function renderRefPreview() {
   info.style.display = 'flex';
   document.getElementById('refInfoFileName').textContent = referenceData.fileName || '';
   document.getElementById('refInfoTime').textContent = referenceData.importedAt
-    ? new Date(referenceData.importedAt).toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
+    ? (() => {
+      const d = new Date(referenceData.importedAt);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    })()
     : '';
   document.getElementById('refInfoCount').textContent = `共 ${referenceData.rows.length} 条`;
 
