@@ -168,7 +168,7 @@ amazon-patrol-electron/
 node-schedule 每分钟 tick
   → CronParser.matchesCron 命中
   → main.js onCronTrigger()
-    → 读取 asinInputCache + patrolConfig
+    → 读取 asinInputCache（站点分组数组）+ patrolSettings
     → mainWindow.webContents.send('CRON_AUTO_START')
       → fullpage.js 自动调用 startPatrol()
 ```
@@ -243,7 +243,10 @@ node-schedule 每分钟 tick
     }
   ],
   "lastUpdate": 1721234567890,
-  "asinInputCache": "B08XYZ1234\nB09ABC5678"
+  "asinInputCache": [
+    { "site": "www.amazon.com", "asins": "B08XYZ1234\nB09ABC5678" },
+    { "site": "www.amazon.ca",  "asins": "B0CABC1234\nB0DABC5678" }
+  ]
 }
 ```
 
