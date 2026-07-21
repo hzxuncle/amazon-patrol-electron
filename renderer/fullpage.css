@@ -540,7 +540,7 @@ body::before { display: none; }
 .site-group-select:focus { outline: none; border-color: var(--accent); }
 .site-group-delete { margin-left: auto; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
 .site-group-delete:hover { background: var(--bg-hover, rgba(255,0,0,0.1)); color: var(--danger, #ff4d4f); }
-.site-group-delete:disabled { opacity: 0.3; cursor: not-allowed; }
+.site-group-delete:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
 .site-group-textarea { width: 100%; min-height: 72px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 6px 8px; font-size: 12px; font-family: var(--font-mono); resize: vertical; box-sizing: border-box; }
 .site-group-textarea:focus { outline: none; border-color: var(--accent); }
 .site-group-textarea.error { border-color: var(--danger, #ff4d4f); }
