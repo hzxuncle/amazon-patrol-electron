@@ -53,6 +53,10 @@
             <span class="side-tab-icon">🕐</span>
             <span>历史</span>
           </button>
+          <button class="side-tab" data-tab="sites">
+            <span class="side-tab-icon">🌐</span>
+            <span>站点</span>
+          </button>
           <button class="side-tab" data-tab="settings">
             <span class="side-tab-icon">⚙</span>
             <span>设置</span>
@@ -227,30 +231,27 @@
             <div class="card-header"><span class="card-title">配置步骤</span></div>
             <ol class="cron-guide-steps">
               <li><span class="cron-step-num">1</span><span>先切换到「<strong>巡店</strong>」面板，在输入框填好 ASIN 并勾选目标站点，定时触发时会读取这份数据</span></li>
-              <li><span class="cron-step-num">2</span><span>回到「定时」面板，在下方输入 Cron 表达式，或点快捷预设按钮</span></li>
+              <li><span class="cron-step-num">2</span><span>回到「定时」面板，输入 Cron 表达式或点快捷预设按钮</span></li>
               <li><span class="cron-step-num">3</span><span>确认表达式输入框右侧出现 <span class="cron-step-badge-ok">✓ 有效</span>，「未来5次执行时间」列表显示出具体时间</span></li>
-              <li><span class="cron-step-num">4</span><span>打开顶部「启用开关」（滑块变蓝，标签变为「定时已启用」）</span></li>
-              <li><span class="cron-step-num">5</span><span>点击「<strong>保存定时配置</strong>」按钮，显示「已保存 ✓」即完成</span></li>
+              <li><span class="cron-step-num">4</span><span>点击「<strong>保存 Cron 表达式</strong>」按钮，显示「已保存 ✓」</span></li>
+              <li><span class="cron-step-num">5</span><span>拨动标题旁的启用开关（滑块变蓝），定时任务立即生效</span></li>
             </ol>
           </section>
 
           <section class="card">
             <div class="card-header">
               <span class="card-title">定时巡店</span>
-              <span class="card-hint">基于 Cron 表达式，每分钟检查一次是否触发</span>
-            </div>
-
-            <!-- 启用开关 -->
-            <div class="cron-enable-row">
-              <label class="cron-toggle-wrap">
-                <input type="checkbox" id="cronEnabled">
-                <span class="cron-toggle-slider"></span>
-              </label>
-              <span class="cron-enable-label" id="cronEnableLabel">定时未启用</span>
+              <div class="cron-enable-row">
+                <label class="cron-toggle-wrap">
+                  <input type="checkbox" id="cronEnabled">
+                  <span class="cron-toggle-slider"></span>
+                </label>
+                <span class="cron-enable-label" id="cronEnableLabel">定时未启用</span>
+              </div>
             </div>
 
             <!-- 表达式输入 -->
-            <div class="setting-item" style="margin-top:16px">
+            <div class="setting-item" style="margin-top:4px">
               <label>Cron 表达式
                 <span class="cron-format-hint">分 时 日 月 周（共5个字段）</span>
               </label>
@@ -290,7 +291,7 @@
               </div>
             </div>
 
-            <button id="btnSaveCron" class="btn btn-primary" style="margin-top:16px">保存定时配置</button>
+            <button id="btnSaveCron" class="btn btn-primary" style="margin-top:16px">保存 Cron 表达式</button>
           </section>
 
           <!-- 未来执行时间预览 -->
@@ -368,6 +369,37 @@
           </section>
         </div>
 
+        <!-- ====== Tab: 站点管理 ====== -->
+        <div class="tab-panel scrollable" id="tab-sites">
+          <section class="card">
+            <div class="card-header">
+              <span class="card-title">站点管理</span>
+              <span class="card-hint">启用的站点将出现在巡店面板的站点选择中</span>
+            </div>
+            <div class="sites-toolbar">
+              <button id="btnResetZips" class="btn btn-outline">恢复默认邮编</button>
+              <button id="btnSaveSites" class="btn btn-primary">保存</button>
+            </div>
+            <div class="table-container">
+              <div class="table-scroll">
+                <table class="sites-table">
+                  <thead>
+                    <tr>
+                      <th>启用</th>
+                      <th>地区</th>
+                      <th>国家</th>
+                      <th>站点域名</th>
+                      <th>邮编</th>
+                      <th>格式说明</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sitesTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+
         <!-- ====== Tab: 设置 ====== -->
         <div class="tab-panel scrollable" id="tab-settings">
           <section class="card">
@@ -412,29 +444,8 @@
             </div>
           </section>
           <section class="card">
-            <div class="card-header">
-              <span class="card-title">配送地设置</span>
-              <span class="card-hint">设置各站点的配送邮编，确保价格和库存按目标地区显示</span>
-            </div>
-            <div class="settings-grid">
-              <div class="setting-item">
-                <label>🇺🇸 US 邮编</label>
-                <input type="text" id="zipUS" class="text-input" placeholder="10001" maxlength="10">
-                <span class="setting-hint">留空则不设置配送地</span>
-              </div>
-              <div class="setting-item">
-                <label>🇨🇦 CA 邮编</label>
-                <input type="text" id="zipCA" class="text-input" placeholder="M5V 3A8" maxlength="10">
-              </div>
-              <div class="setting-item">
-                <label>🇦🇺 AU 邮编</label>
-                <input type="text" id="zipAU" class="text-input" placeholder="2000" maxlength="10">
-              </div>
-              <div class="setting-item">
-                <label>🇲🇽 MX 邮编</label>
-                <input type="text" id="zipMX" class="text-input" placeholder="06600" maxlength="10">
-              </div>
-            </div>
+            <div class="card-header"><span class="card-title">配送地设置</span></div>
+            <p class="setting-hint" style="padding:8px 0">请前往「站点」Tab 管理各站点邮编。</p>
           </section>
           <section class="card">
             <div class="card-header"><span class="card-title">通知设置</span></div>

@@ -423,8 +423,8 @@ body::before { display: none; }
 
 /* ===== Cron Tab ===== */
 .cron-enable-row {
-  display: flex; align-items: center; gap: 14px;
-  padding: 12px 0 4px;
+  display: flex; align-items: center; gap: 10px;
+  margin-left: auto;
 }
 
 /* toggle switch */
@@ -536,6 +536,16 @@ body::before { display: none; }
 .cron-guide-steps li strong { color: var(--text-primary); }
 .cron-step-num { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-dim); color: #000; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
 .cron-step-badge-ok { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; color: var(--success); background: rgba(0,230,118,0.12); border: 1px solid rgba(0,230,118,0.3); }
+
+/* ===== 站点管理页 ===== */
+.sites-toolbar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+.sites-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sites-table th { background: var(--bg-card); color: var(--text-muted); font-weight: 500; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+.sites-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-light, rgba(255,255,255,0.05)); vertical-align: middle; }
+.sites-table tr:hover td { background: var(--bg-hover, rgba(255,255,255,0.03)); }
+.sites-table .zip-input { width: 120px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; padding: 4px 8px; font-size: 12px; font-family: var(--font-mono); }
+.sites-table .zip-input:focus { outline: none; border-color: var(--accent); }
+.zip-format-hint { font-size: 11px; color: var(--text-muted); }
 
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

@@ -59,10 +59,6 @@ const dom = {
   dingtalkWebhook: $('#dingtalkWebhook'),
   dingtalkEnabled: $('#dingtalkEnabled'),
   showScrapeWindow: $('#showScrapeWindow'),
-  zipUS: $('#zipUS'),
-  zipCA: $('#zipCA'),
-  zipAU: $('#zipAU'),
-  zipMX: $('#zipMX'),
 
   // Status
   statusBadge: $('#statusBadge'),
@@ -96,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCronTab();
   initLogTab();
   initHistoryTab();
+  await initSitesTab();
   await loadPersistedState();
 
   window.electronAPI.onMessage(handleBgMessage);
@@ -133,9 +130,6 @@ function initSettingsSliders() {
   dom.dingtalkWebhook.addEventListener('input', saveSettings);
   dom.dingtalkEnabled.addEventListener('change', saveSettings);
   if (dom.showScrapeWindow) dom.showScrapeWindow.addEventListener('change', saveSettings);
-  ['zipUS','zipCA','zipAU','zipMX'].forEach(id => {
-    if (dom[id]) dom[id].addEventListener('input', saveSettings);
-  });
   dom.showHistoryDiff.addEventListener('change', () => {
     renderAllResults();
     saveSettings();
@@ -156,13 +150,7 @@ function getSettings() {
     sites: getSelectedSites(),
     showHistoryDiff: dom.showHistoryDiff.checked,
     enabledFields: getEnabledFields(),
-    showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false,
-    deliveryZips: {
-      'www.amazon.com':    dom.zipUS ? dom.zipUS.value.trim() : '',
-      'www.amazon.ca':     dom.zipCA ? dom.zipCA.value.trim() : '',
-      'www.amazon.com.au': dom.zipAU ? dom.zipAU.value.trim() : '',
-      'www.amazon.com.mx': dom.zipMX ? dom.zipMX.value.trim() : ''
-    }
+    showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false
   };
 }
 
@@ -211,12 +199,6 @@ async function loadSettings() {
       dom.fieldToggles.forEach(cb => { cb.checked = s.enabledFields.includes(cb.dataset.field); });
     }
     if (dom.showScrapeWindow) dom.showScrapeWindow.checked = s.showScrapeWindow || false;
-    if (s.deliveryZips) {
-      if (dom.zipUS) dom.zipUS.value = s.deliveryZips['www.amazon.com'] || '';
-      if (dom.zipCA) dom.zipCA.value = s.deliveryZips['www.amazon.ca'] || '';
-      if (dom.zipAU) dom.zipAU.value = s.deliveryZips['www.amazon.com.au'] || '';
-      if (dom.zipMX) dom.zipMX.value = s.deliveryZips['www.amazon.com.mx'] || '';
-    }
   }
 }
 
@@ -880,6 +862,68 @@ function fmtTime(ms) {
   return `${String(m).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 }
 
+// ========== 站点管理页 ==========
+let sitesData = [];
+
+const sitesDom = {
+  tableBody: () => document.getElementById('sitesTableBody'),
+  btnSave:   () => document.getElementById('btnSaveSites'),
+  btnReset:  () => document.getElementById('btnResetZips'),
+};
+
+async function initSitesTab() {
+  sitesData = await window.electronAPI.getSites();
+  renderSitesTable();
+  sitesDom.btnSave().addEventListener('click', saveSites);
+  sitesDom.btnReset().addEventListener('click', resetZips);
+}
+
+function renderSitesTable() {
+  sitesDom.tableBody().innerHTML = sitesData.map((s, i) => `
+    <tr>
+      <td>
+        <label class="cron-toggle-wrap" title="${s.enabled ? '点击禁用' : '点击启用'}">
+          <input type="checkbox" class="site-enable-chk" data-index="${i}" ${s.enabled ? 'checked' : ''}>
+          <span class="cron-toggle-slider"></span>
+        </label>
+      </td>
+      <td>${esc(s.region)}</td>
+      <td>${esc(s.country)}</td>
+      <td><code style="font-size:12px">${esc(s.domain)}</code></td>
+      <td><input type="text" class="zip-input" data-index="${i}" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample)}"></td>
+      <td><span class="zip-format-hint">${esc(s.zipFormat)}</span></td>
+    </tr>
+  `).join('');
+
+  // 启用开关实时保存
+  sitesDom.tableBody().querySelectorAll('.site-enable-chk').forEach(chk => {
+    chk.addEventListener('change', async () => {
+      const idx = parseInt(chk.dataset.index);
+      sitesData[idx].enabled = chk.checked;
+      await window.electronAPI.saveSites(sitesData);
+    });
+  });
+}
+
+async function saveSites() {
+  // 从输入框读取最新邮编值
+  sitesDom.tableBody().querySelectorAll('.zip-input').forEach(input => {
+    const idx = parseInt(input.dataset.index);
+    sitesData[idx].zip = input.value.trim();
+  });
+  await window.electronAPI.saveSites(sitesData);
+  const btn = sitesDom.btnSave();
+  btn.textContent = '已保存 ✓';
+  setTimeout(() => { btn.textContent = '保存'; }, 2000);
+}
+
+async function resetZips() {
+  if (!confirm('将所有邮编恢复为默认示例值？')) return;
+  sitesData = sitesData.map(s => ({ ...s, zip: s.zipExample }));
+  await window.electronAPI.saveSites(sitesData);
+  renderSitesTable();
+}
+
 // ========== Cron Tab ==========
 
 const cronDom = {
@@ -933,10 +977,12 @@ function onCronExprInput() {
   }
 }
 
-function onCronEnabledChange() {
+async function onCronEnabledChange() {
   const on = cronDom.enabled.checked;
   cronDom.enableLabel.textContent = on ? '定时已启用' : '定时未启用';
   cronDom.enableLabel.className = 'cron-enable-label' + (on ? ' active' : '');
+  const current = await window.electronAPI.storage.get('cronConfig') || {};
+  await window.electronAPI.sendMessage('SAVE_CRON_CONFIG', { expr: current.expr || '', enabled: on });
 }
 
 function renderNextTimes(times) {
@@ -970,15 +1016,13 @@ async function saveCronConfig() {
   const expr = cronDom.expr.value.trim();
   const enabled = cronDom.enabled.checked;
 
-  if (enabled && !expr) {
-    alert('启用定时时必须填写 Cron 表达式');
+  if (!expr) {
+    alert('请先填写 Cron 表达式');
     return;
   }
 
-  if (expr) {
-    const v = CronParser.validateCron(expr);
-    if (!v.valid) { alert('Cron 表达式无效：' + v.error); return; }
-  }
+  const v = CronParser.validateCron(expr);
+  if (!v.valid) { alert('Cron 表达式无效：' + v.error); return; }
 
   const btn = cronDom.saveBtn;
   btn.disabled = true;
@@ -987,7 +1031,7 @@ async function saveCronConfig() {
     const config = { enabled, expr };
     await window.electronAPI.sendMessage('SAVE_CRON_CONFIG', config);
     btn.textContent = '已保存 ✓';
-    setTimeout(() => { btn.textContent = '保存定时配置'; btn.disabled = false; }, 2000);
+    setTimeout(() => { btn.textContent = '保存 Cron 表达式'; btn.disabled = false; }, 2000);
   } catch (e) {
     btn.textContent = '保存失败';
     btn.disabled = false;
