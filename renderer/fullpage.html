@@ -102,6 +102,13 @@
             <label class="field-toggle"><input type="checkbox" data-field="parentAsin" checked> 父体</label>
             <label class="field-toggle"><input type="checkbox" data-field="title" checked> 标题</label>
             <label class="field-toggle"><input type="checkbox" data-field="url" checked> URL</label>
+            <label class="field-toggle"><input type="checkbox" data-field="bsrMain" checked> BSR大类</label>
+            <label class="field-toggle"><input type="checkbox" data-field="bsrSub" checked> BSR小类</label>
+            <label class="field-toggle"><input type="checkbox" data-field="dateFirstAvailable" checked> 上架时间</label>
+            <label class="field-toggle"><input type="checkbox" data-field="modelNumber"> 型号</label>
+            <label class="field-toggle"><input type="checkbox" data-field="dimensions"> 尺寸重量</label>
+            <label class="field-toggle"><input type="checkbox" data-field="manufacturer"> 制造商</label>
+            <label class="field-toggle"><input type="checkbox" data-field="batteries"> 电池</label>
             <span class="toggle-actions">
               <button id="btnToggleAll" class="btn-ghost-sm">全选</button>
               <button id="btnToggleNone" class="btn-ghost-sm">全不选</button>
@@ -158,12 +165,19 @@
                     <th class="col-seller">卖家</th>
                     <th class="col-stock">库存</th>
                     <th class="col-parent">父体</th>
+                    <th class="col-bsr-main">BSR大类</th>
+                    <th class="col-bsr-sub">BSR小类</th>
+                    <th class="col-date-first">上架时间</th>
+                    <th class="col-model">型号</th>
+                    <th class="col-dimensions">尺寸重量</th>
+                    <th class="col-manufacturer">制造商</th>
+                    <th class="col-batteries">电池</th>
                     <th class="col-history" id="colHistory">上次</th>
                   </tr>
                 </thead>
                 <tbody id="resultsBody">
                   <tr class="empty-row">
-                    <td colspan="16">
+                    <td colspan="23">
                       <div class="empty-state">
                         <span class="empty-icon">◎</span>
                         <p>点击「开始巡店」查看结果</p>
@@ -182,13 +196,6 @@
             <div class="card-header">
               <span class="card-title">导入参考数据</span>
               <span class="card-hint">上传Excel预设参考值，巡店时自动对比标红</span>
-            </div>
-            <div id="refImportInfo" class="ref-import-info" style="display:none">
-              <span id="refInfoFileName" class="ref-info-filename"></span>
-              <span class="ref-info-sep">|</span>
-              <span id="refInfoTime" class="ref-info-time"></span>
-              <span class="ref-info-sep">|</span>
-              <span id="refInfoCount" class="ref-info-count"></span>
             </div>
             <div class="import-row">
               <div class="upload-zone" id="uploadZone">
@@ -209,6 +216,14 @@
             <div class="card-header">
               <span class="card-title">已导入参考数据</span>
               <span id="refCount" class="badge">0条</span>
+            </div>
+            <div id="refLastImportBar" class="ref-last-import-bar">
+              <span class="ref-last-import-label">最近一次导入：</span>
+              <span id="refLastFileName" class="ref-last-filename"></span>
+              <span class="ref-last-sep">|</span>
+              <span id="refLastTime"></span>
+              <span class="ref-last-sep">|</span>
+              <span id="refLastCount"></span>
             </div>
             <div class="table-scroll short">
               <table class="ref-table">
@@ -385,6 +400,7 @@
                 <table class="sites-table">
                   <thead>
                     <tr>
+                      <th style="width:32px;text-align:center">#</th>
                       <th>启用</th>
                       <th>地区</th>
                       <th>国家</th>

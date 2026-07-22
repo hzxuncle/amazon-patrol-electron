@@ -286,9 +286,8 @@ body::before { display: none; }
 .table-scroll { height: 100%; overflow: auto; }
 .table-scroll.short { max-height: 300px; }
 
-.results-table, .ref-table {
-  width: auto; border-collapse: collapse; font-size: 12px; white-space: nowrap; table-layout: fixed;
-}
+.results-table { width: auto; border-collapse: collapse; font-size: 12px; white-space: nowrap; table-layout: fixed; }
+.ref-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
 .results-table thead { position: sticky; top: 0; z-index: 3; }
 .results-table th, .ref-table th {
   background: #f0f1f8; color: var(--text-secondary);
@@ -321,6 +320,13 @@ body::before { display: none; }
 .col-seller { width: 70px; overflow: hidden; text-overflow: ellipsis; }
 .col-stock  { width: 66px; overflow: hidden; text-overflow: ellipsis; }
 .col-parent { width: 78px; overflow: hidden; text-overflow: ellipsis; }
+.col-bsr-main    { width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.col-bsr-sub     { width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.col-date-first  { width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.col-model       { width: 100px; overflow: hidden; text-overflow: ellipsis; }
+.col-dimensions  { width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.col-manufacturer{ width: 100px; overflow: hidden; text-overflow: ellipsis; }
+.col-batteries   { width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .col-history { width: 66px; overflow: hidden; text-overflow: ellipsis; }
 
 /* 行状态 */
@@ -547,6 +553,7 @@ body::before { display: none; }
 .btn-add-group { width: 100%; margin-bottom: 8px; }
 
 /* ===== 参考数据导入信息栏 ===== */
-.ref-import-info { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-input); border-radius: 6px; margin-bottom: 12px; font-size: 12px; color: var(--text-muted); }
-.ref-info-filename { color: var(--text-primary); font-weight: 500; }
-.ref-info-sep { opacity: 0.4; }
+.ref-last-import-bar { display: flex; align-items: center; gap: 8px; padding: 6px 0 10px; font-size: 12px; color: var(--success); }
+.ref-last-import-label { opacity: 0.8; }
+.ref-last-filename { font-weight: 600; }
+.ref-last-sep { opacity: 0.4; }
