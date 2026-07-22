@@ -390,7 +390,7 @@
       }
       if (isEnabled('modelNumber')) {
         const raw = productDetails['Item model number'] || productDetails['Model Number'] || '';
-        result.modelNumber = raw.replace(/Item model number[\s\S]*?:\s*/i, '').trim();
+        result.modelNumber = raw.replace(/Item model number[\s\S]*?:\s*/i, '').replace(/Model Number[\s\S]*?:\s*/i, '').trim();
       }
       if (isEnabled('dimensions')) {
         const raw = productDetails['Product Dimensions'] || productDetails['Item Dimensions'] || '';
