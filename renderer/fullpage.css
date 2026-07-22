@@ -597,3 +597,22 @@ body::before { display: none; }
   font-size: 11px;
 }
 .product-info-table td:last-child { color: var(--text-primary); }
+
+/* ===== 站点管理行内编辑 ===== */
+.site-edit-input {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--accent);
+  color: var(--text-primary); border-radius: 4px; padding: 3px 6px;
+  font-size: 12px; font-family: var(--font-mono); box-sizing: border-box;
+}
+.site-edit-input:focus { outline: none; }
+.site-row-editing td { background: rgba(91,94,219,0.04); }
+.btn-site-op {
+  font-size: 11px; padding: 2px 7px; cursor: pointer;
+  background: none; border: 1px solid var(--border);
+  color: var(--text-secondary); border-radius: 4px; margin-right: 3px;
+  transition: all 0.15s;
+}
+.btn-site-op:hover { border-color: var(--accent); color: var(--accent); }
+.btn-site-op.danger:hover { border-color: var(--danger); color: var(--danger); }
+.btn-site-op.confirm { border-color: var(--success); color: var(--success); }
+.btn-site-op.confirm:hover { background: rgba(0,168,84,0.08); }
