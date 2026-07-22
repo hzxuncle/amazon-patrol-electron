@@ -114,4 +114,71 @@ function migrate() {
   }
 }
 
-module.exports = { get, set, remove, getAll, migrate };
+function migrateSiteCodes() {
+  const sites = get('sites') || [];
+  if (!sites.length) return;
+
+  // domain → code 映射（www.amazon.ca → CA，amazon.ca → CA）
+  const domainToCode = {};
+  sites.forEach(s => {
+    if (s.code && s.domain) {
+      domainToCode[s.domain] = s.code;
+      domainToCode[`www.${s.domain}`] = s.code;
+    }
+  });
+
+  function toCode(siteValue) {
+    if (!siteValue) return siteValue;
+    // 已经是 code（不含点）则直接返回
+    if (!siteValue.includes('.')) return siteValue.toUpperCase();
+    return domainToCode[siteValue] || siteValue;
+  }
+
+  let changed = false;
+
+  // 迁移 asinInputCache
+  const cache = get('asinInputCache');
+  if (Array.isArray(cache)) {
+    const migrated = cache.map(g => ({ ...g, site: toCode(g.site) }));
+    const needsUpdate = migrated.some((g, i) => g.site !== cache[i].site);
+    if (needsUpdate) { set('asinInputCache', migrated); changed = true; }
+  }
+
+  // 迁移 referenceData.rows[].site
+  const refData = get('referenceData');
+  if (refData && Array.isArray(refData.rows)) {
+    const migratedRows = refData.rows.map(r => ({ ...r, site: toCode(r.site) }));
+    const needsUpdate = migratedRows.some((r, i) => r.site !== refData.rows[i].site);
+    if (needsUpdate) { set('referenceData', { ...refData, rows: migratedRows }); changed = true; }
+  }
+
+  // 迁移 historySnapshots key（B01N1UX8RW_www.amazon.ca → B01N1UX8RW_CA）
+  const snapshots = get('historySnapshots');
+  if (snapshots && typeof snapshots === 'object') {
+    const newSnapshots = {};
+    let snapshotChanged = false;
+    for (const [key, val] of Object.entries(snapshots)) {
+      const parts = key.split('_');
+      if (parts.length < 2) { newSnapshots[key] = val; continue; }
+      const asin = parts[0];
+      const siteRaw = parts.slice(1).join('_');
+      const siteCode = toCode(siteRaw);
+      const newKey = `${asin}_${siteCode}`;
+      newSnapshots[newKey] = { ...val, site: siteCode };
+      if (newKey !== key) snapshotChanged = true;
+    }
+    if (snapshotChanged) { set('historySnapshots', newSnapshots); changed = true; }
+  }
+
+  // 迁移 patrolResults[].site
+  const results = get('patrolResults');
+  if (Array.isArray(results)) {
+    const migrated = results.map(r => ({ ...r, site: toCode(r.site) }));
+    const needsUpdate = migrated.some((r, i) => r.site !== results[i].site);
+    if (needsUpdate) { set('patrolResults', migrated); changed = true; }
+  }
+
+  if (changed) console.log('[Store] 站点 code 迁移完成');
+}
+
+module.exports = { get, set, remove, getAll, migrate, migrateSiteCodes };
