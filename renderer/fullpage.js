@@ -332,25 +332,23 @@ function processFile(file) {
 function renderRefPreview() {
   if (!referenceData || !referenceData.rows || !referenceData.rows.length) {
     dom.refCard.style.display = 'none';
-    document.getElementById('refImportInfo').style.display = 'none';
     return;
   }
-  // 信息栏
-  const info = document.getElementById('refImportInfo');
-  info.style.display = 'flex';
-  document.getElementById('refInfoFileName').textContent = referenceData.fileName || '';
-  document.getElementById('refInfoTime').textContent = referenceData.importedAt
-    ? (() => {
-      const d = new Date(referenceData.importedAt);
-      const pad = n => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    })()
-    : '';
-  document.getElementById('refInfoCount').textContent = `共 ${referenceData.rows.length} 条`;
 
-  // 表格
   dom.refCard.style.display = 'block';
   dom.refCount.textContent = `${referenceData.rows.length}条`;
+
+  // 最近一次导入信息栏
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('refLastFileName').textContent = referenceData.fileName || '';
+  document.getElementById('refLastTime').textContent = referenceData.importedAt
+    ? (() => {
+        const d = new Date(referenceData.importedAt);
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      })()
+    : '';
+  document.getElementById('refLastCount').textContent = `共 ${referenceData.rows.length} 条`;
+
   dom.refBody.innerHTML = referenceData.rows.slice(0, 50).map(r =>
     `<tr><td>${esc(r.asin)}</td><td>${esc(r.site)}</td><td>${esc(r.aliasName||'')}</td><td>${esc(r.expectedPrice)}</td><td>${esc(r.expectedListPrice)}</td><td>${esc(r.expectedDealBadge||'')}</td><td>${esc(r.expectedAcBadge||'')}</td><td>${esc(r.expectedCoupon||'')}</td><td>${esc(r.expectedRating)}</td><td>${esc(r.expectedReviews)}</td><td>${esc(r.expectedSeller)}</td><td>${esc(r.expectedStock)}</td></tr>`
   ).join('');
@@ -361,7 +359,6 @@ function clearRef() {
   referenceData = { importedAt: null, fileName: '', rows: [] };
   window.electronAPI.storage.remove('referenceData').catch(() => {});
   dom.refCard.style.display = 'none';
-  document.getElementById('refImportInfo').style.display = 'none';
 }
 
 function autoFillAsinGroups(rows) {
@@ -885,6 +882,7 @@ function getRowClass(result) {
 }
 
 function renderAllResults() {
+  const enabled = getEnabledFields();
   const showAlias = hasAliases();
   const colSpan = showAlias ? 16 : 15;
 
@@ -899,6 +897,16 @@ function renderAllResults() {
   $('#colAliasHdr').style.display = showAlias ? '' : 'none';
   const showHistory = dom.showHistoryDiff.checked;
   dom.colHistory.style.display = showHistory ? '' : 'none';
+
+  const colClassMap = {
+    bsrMain: 'col-bsr-main', bsrSub: 'col-bsr-sub',
+    dateFirstAvailable: 'col-date-first', modelNumber: 'col-model',
+    dimensions: 'col-dimensions', manufacturer: 'col-manufacturer', batteries: 'col-batteries'
+  };
+  Object.entries(colClassMap).forEach(([field, cls]) => {
+    const th = document.querySelector(`th.${cls}`);
+    if (th) th.style.display = enabled.includes(field) ? '' : 'none';
+  });
 
   dom.resultsBody.innerHTML = allResults.map(r => {
     const ref = findRef(r.asin, r.site);
@@ -922,6 +930,13 @@ function renderAllResults() {
         <td class="col-seller" title="${esc(r.seller || '')}">${renderField(r.seller, ref ? ref.expectedSeller : '', 'seller')}</td>
         <td class="col-stock" title="${esc(r.stock || '')}">${renderField(r.stock, ref ? ref.expectedStock : '', 'stock')}</td>
         <td class="col-parent" title="${esc(r.parentAsin || '')}">${esc(r.parentAsin || 'N/A')}</td>
+        ${enabled.includes('bsrMain') ? `<td class="col-bsr-main" title="${esc(r.bsrMain || '')}">${esc(r.bsrMain || '')}</td>` : ''}
+        ${enabled.includes('bsrSub') ? `<td class="col-bsr-sub" title="${esc(r.bsrSub || '')}">${esc(r.bsrSub || '')}</td>` : ''}
+        ${enabled.includes('dateFirstAvailable') ? `<td class="col-date-first">${esc(r.dateFirstAvailable || '')}</td>` : ''}
+        ${enabled.includes('modelNumber') ? `<td class="col-model">${esc(r.modelNumber || '')}</td>` : ''}
+        ${enabled.includes('dimensions') ? `<td class="col-dimensions" title="${esc(r.dimensions || '')}">${esc(r.dimensions || '')}</td>` : ''}
+        ${enabled.includes('manufacturer') ? `<td class="col-manufacturer">${esc(r.manufacturer || '')}</td>` : ''}
+        ${enabled.includes('batteries') ? `<td class="col-batteries" title="${esc(r.batteries || '')}">${esc(r.batteries || '')}</td>` : ''}
         <td class="col-history">${showHistory ? renderHistoryDiff(r) : ''}</td>
       </tr>
     `;
@@ -955,6 +970,13 @@ async function exportExcel() {
     { key: 'seller', label: '卖家', refField: 'expectedSeller' },
     { key: 'stock', label: '库存', refField: 'expectedStock' },
     { key: 'parentAsin', label: '父体ASIN', enabledField: 'parentAsin' },
+    { key: 'bsrMain',            label: 'BSR大类',   enabledField: 'bsrMain' },
+    { key: 'bsrSub',             label: 'BSR小类',   enabledField: 'bsrSub' },
+    { key: 'dateFirstAvailable', label: '上架时间',  enabledField: 'dateFirstAvailable' },
+    { key: 'modelNumber',        label: '型号',      enabledField: 'modelNumber' },
+    { key: 'dimensions',         label: '尺寸重量',  enabledField: 'dimensions' },
+    { key: 'manufacturer',       label: '制造商',    enabledField: 'manufacturer' },
+    { key: 'batteries',          label: '电池',      enabledField: 'batteries' },
     { key: 'url', label: 'URL', enabledField: 'url' },
     { key: 'timestamp', label: '时间' }
   ];
@@ -1070,18 +1092,24 @@ async function initSitesTab() {
 }
 
 function renderSitesTable() {
-  sitesDom.tableBody().innerHTML = sitesData.map((s, i) => `
+  // 已启用排前面，组内保持原顺序；序号按显示顺序从 1 开始
+  const sorted = sitesData
+    .map((s, i) => ({ ...s, _origIdx: i }))
+    .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));
+
+  sitesDom.tableBody().innerHTML = sorted.map((s, seq) => `
     <tr>
+      <td style="color:var(--text-muted);font-size:11px;text-align:center;width:32px">${seq + 1}</td>
       <td>
         <label class="cron-toggle-wrap" title="${s.enabled ? '点击禁用' : '点击启用'}">
-          <input type="checkbox" class="site-enable-chk" data-index="${i}" ${s.enabled ? 'checked' : ''}>
+          <input type="checkbox" class="site-enable-chk" data-index="${s._origIdx}" ${s.enabled ? 'checked' : ''}>
           <span class="cron-toggle-slider"></span>
         </label>
       </td>
       <td>${esc(s.region)}</td>
       <td>${esc(s.country)}</td>
       <td><code style="font-size:12px">${esc(s.domain)}</code></td>
-      <td><input type="text" class="zip-input" data-index="${i}" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample)}"></td>
+      <td><input type="text" class="zip-input" data-index="${s._origIdx}" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample)}"></td>
       <td><span class="zip-format-hint">${esc(s.zipFormat)}</span></td>
     </tr>
   `).join('');
@@ -1092,6 +1120,8 @@ function renderSitesTable() {
       const idx = parseInt(chk.dataset.index);
       sitesData[idx].enabled = chk.checked;
       await window.electronAPI.saveSites(sitesData);
+      syncEnabledSites();
+      renderSitesTable();
     });
   });
 }
@@ -1103,9 +1133,15 @@ async function saveSites() {
     sitesData[idx].zip = input.value.trim();
   });
   await window.electronAPI.saveSites(sitesData);
+  syncEnabledSites();
   const btn = sitesDom.btnSave();
   btn.textContent = '已保存 ✓';
   setTimeout(() => { btn.textContent = '保存'; }, 2000);
+}
+
+function syncEnabledSites() {
+  enabledSites = sitesData.filter(s => s.enabled);
+  refreshAllGroupOptions();
 }
 
 async function resetZips() {
