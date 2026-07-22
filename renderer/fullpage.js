@@ -71,18 +71,11 @@ const dom = {
 };
 
 // ========== Constants ==========
-const SITE_MAP = {
-  'US': 'www.amazon.com',    'CA': 'www.amazon.ca',
-  'AU': 'www.amazon.com.au', 'MX': 'www.amazon.com.mx',
-  'UK': 'www.amazon.co.uk',  'DE': 'www.amazon.de',
-  'FR': 'www.amazon.fr',     'IT': 'www.amazon.it',
-  'ES': 'www.amazon.es',     'NL': 'www.amazon.nl',
-  'SE': 'www.amazon.se',     'PL': 'www.amazon.pl',
-  'BE': 'www.amazon.com.be', 'JP': 'www.amazon.co.jp',
-  'IN': 'www.amazon.in',     'SG': 'www.amazon.sg',
-  'BR': 'www.amazon.com.br', 'AE': 'www.amazon.ae',
-  'SA': 'www.amazon.sa',     'TR': 'www.amazon.com.tr',
-};
+function buildSiteMap() {
+  const map = {};
+  sitesData.forEach(s => { if (s.code) map[s.code.toUpperCase()] = `www.${s.domain}`; });
+  return map;
+}
 
 // ========== State ==========
 let patrolRunning = false;
@@ -313,9 +306,10 @@ function processFile(file) {
       })).filter(r => r.asin);
 
       // 将站点简称转换为完整域名
+      const siteMap = buildSiteMap();
       rows.forEach(r => {
         if (r.site && !r.site.startsWith('www.')) {
-          r.site = SITE_MAP[r.site.toUpperCase()] || r.site;
+          r.site = siteMap[r.site.toUpperCase()] || r.site;
         }
       });
 
@@ -391,7 +385,7 @@ async function downloadTemplate() {
   if (typeof XLSX === 'undefined') { alert('Excel库加载中'); return; }
   const ws = XLSX.utils.aoa_to_sheet([
     ['ASIN','站点','常用名','期望售价','期望划线价','期望活动标','期望AC标','期望Coupon','期望星级','期望评论数','期望卖家','期望库存'],
-    ['B082W886W9','www.amazon.ca','手机壳','29.99','39.99','Limited-time deal','Amazon\'s Choice','Save 10%','4.5','2000','Amazon','In Stock']
+    ['B082W886W9','CA','手机壳','29.99','39.99','Limited-time deal','Amazon\'s Choice','Save 10%','4.5','2000','Amazon','In Stock']
   ]);
   ws['!cols'] = [{wch:14},{wch:18},{wch:16},{wch:12},{wch:12},{wch:16},{wch:30},{wch:16},{wch:10},{wch:10},{wch:15},{wch:12}];
   const wb = XLSX.utils.book_new();
@@ -774,7 +768,7 @@ function handleComplete(summary, results) {
 // ========== Reference Compare ==========
 function findRef(asin, site) {
   const rows = referenceData && referenceData.rows ? referenceData.rows : [];
-  return rows.find(r => r.asin === asin && (!r.site || r.site === site || r.site.includes(site.split('.')[1])));
+  return rows.find(r => r.asin === asin && r.site === site);
 }
 function getAlias(asin, site) {
   const ref = findRef(asin, site);
@@ -1099,8 +1093,8 @@ function stopTimer() { if (patrolTimer) { clearInterval(patrolTimer); patrolTime
 
 // ========== Utils ==========
 function getSiteLabel(domain) {
-  const found = enabledSites.find(s => `www.${s.domain}` === domain);
-  if (found) return found.country;
+  const found = sitesData.find(s => `www.${s.domain}` === domain || s.domain === domain);
+  if (found) return found.code || found.country;
   const m = domain.match(/amazon\.(.+)$/);
   return m ? m[1].toUpperCase() : domain;
 }
@@ -1125,6 +1119,7 @@ async function initSitesTab() {
   renderSitesTable();
   sitesDom.btnSave().addEventListener('click', saveSites);
   sitesDom.btnReset().addEventListener('click', resetZips);
+  document.getElementById('btnAddSite').addEventListener('click', addSiteRow);
 }
 
 function renderSitesTable() {
@@ -1134,7 +1129,7 @@ function renderSitesTable() {
     .sort((a, b) => (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0));
 
   sitesDom.tableBody().innerHTML = sorted.map((s, seq) => `
-    <tr>
+    <tr data-index="${s._origIdx}">
       <td style="color:var(--text-muted);font-size:11px;text-align:center;width:32px">${seq + 1}</td>
       <td>
         <label class="cron-toggle-wrap" title="${s.enabled ? '点击禁用' : '点击启用'}">
@@ -1142,11 +1137,16 @@ function renderSitesTable() {
           <span class="cron-toggle-slider"></span>
         </label>
       </td>
-      <td>${esc(s.region)}</td>
-      <td>${esc(s.country)}</td>
-      <td><code style="font-size:12px">${esc(s.domain)}</code></td>
-      <td><input type="text" class="zip-input" data-index="${s._origIdx}" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample)}"></td>
-      <td><span class="zip-format-hint">${esc(s.zipFormat)}</span></td>
+      <td><code style="font-size:12px">${esc(s.code || '')}</code></td>
+      <td>${esc(s.region || '')}</td>
+      <td>${esc(s.country || '')}</td>
+      <td><code style="font-size:12px">${esc(s.domain || '')}</code></td>
+      <td><input type="text" class="zip-input" data-index="${s._origIdx}" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample || '')}"></td>
+      <td><span class="zip-format-hint">${esc(s.zipFormat || '')}</span></td>
+      <td>
+        <button class="btn-site-op" onclick="editSiteRow(${s._origIdx})">编辑</button>
+        <button class="btn-site-op danger" onclick="deleteSite(${s._origIdx})">删除</button>
+      </td>
     </tr>
   `).join('');
 
@@ -1160,6 +1160,142 @@ function renderSitesTable() {
       renderSitesTable();
     });
   });
+}
+
+function editSiteRow(idx) {
+  // 关闭已有编辑行（不保存）
+  const existing = sitesDom.tableBody().querySelector('.site-row-editing');
+  if (existing) existing.remove();  // 新增行直接删除；已有行还原
+  renderSitesTable();
+
+  const s = sitesData[idx];
+  const rows = sitesDom.tableBody().querySelectorAll('tr');
+  // 找到对应行（data-index 匹配）
+  const row = [...rows].find(r => r.dataset.index === String(idx));
+  if (!row) return;
+
+  row.classList.add('site-row-editing');
+  row.innerHTML = `
+    <td style="color:var(--text-muted);font-size:11px;text-align:center"></td>
+    <td>
+      <label class="cron-toggle-wrap">
+        <input type="checkbox" class="site-enable-chk-edit" ${s.enabled ? 'checked' : ''}>
+        <span class="cron-toggle-slider"></span>
+      </label>
+    </td>
+    <td><input class="site-edit-input site-edit-code" value="${esc(s.code || '')}" maxlength="5" placeholder="US"></td>
+    <td><input class="site-edit-input site-edit-region" value="${esc(s.region || '')}" placeholder="北美"></td>
+    <td><input class="site-edit-input site-edit-country" value="${esc(s.country || '')}" placeholder="美国"></td>
+    <td><input class="site-edit-input site-edit-domain" value="${esc(s.domain || '')}" placeholder="amazon.com"></td>
+    <td><input class="site-edit-input site-edit-zip" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample || '')}"></td>
+    <td><input class="site-edit-input site-edit-zipformat" value="${esc(s.zipFormat || '')}" placeholder="5位数字"></td>
+    <td>
+      <button class="btn-site-op confirm" onclick="confirmSiteEdit(${idx})">确认</button>
+      <button class="btn-site-op" onclick="cancelSiteEdit()">取消</button>
+    </td>
+  `;
+}
+
+async function confirmSiteEdit(idx) {
+  const row = sitesDom.tableBody().querySelector('.site-row-editing');
+  if (!row) return;
+
+  const code    = row.querySelector('.site-edit-code').value.trim().toUpperCase();
+  const region  = row.querySelector('.site-edit-region').value.trim();
+  const country = row.querySelector('.site-edit-country').value.trim();
+  const domain  = row.querySelector('.site-edit-domain').value.trim().replace(/^www\./, '');
+  const zip     = row.querySelector('.site-edit-zip').value.trim();
+  const zipFormat = row.querySelector('.site-edit-zipformat').value.trim();
+  const enabled = row.querySelector('.site-enable-chk-edit').checked;
+
+  if (!code || !/^[A-Z0-9]{1,5}$/.test(code)) { alert('二字码必填，仅限 1-5 位大写字母或数字'); return; }
+  if (!domain) { alert('站点域名必填'); return; }
+  if (!country) { alert('国家名称必填'); return; }
+
+  // 唯一性校验（排除自身）
+  const codeConflict = sitesData.some((s, i) => i !== idx && s.code && s.code.toUpperCase() === code);
+  if (codeConflict) { alert(`二字码 ${code} 已存在`); return; }
+  const domainConflict = sitesData.some((s, i) => i !== idx && s.domain === domain);
+  if (domainConflict) { alert(`域名 ${domain} 已存在`); return; }
+
+  sitesData[idx] = { ...sitesData[idx], code, region, country, domain, zip, zipFormat, enabled };
+  await window.electronAPI.saveSites(sitesData);
+  syncEnabledSites();
+  renderSitesTable();
+}
+
+function cancelSiteEdit() {
+  renderSitesTable();
+}
+
+function addSiteRow() {
+  // 关闭已有编辑行
+  const existing = sitesDom.tableBody().querySelector('.site-row-editing');
+  if (existing) existing.remove();
+  renderSitesTable();
+
+  // 新增临时站点占位（idx = sitesData.length，新增时再 push）
+  const newIdx = sitesData.length;
+  const newRow = document.createElement('tr');
+  newRow.className = 'site-row-editing';
+  newRow.dataset.index = String(newIdx);
+  newRow.innerHTML = `
+    <td style="color:var(--text-muted);font-size:11px;text-align:center">新</td>
+    <td>
+      <label class="cron-toggle-wrap">
+        <input type="checkbox" class="site-enable-chk-edit" checked>
+        <span class="cron-toggle-slider"></span>
+      </label>
+    </td>
+    <td><input class="site-edit-input site-edit-code" value="" maxlength="5" placeholder="NZ"></td>
+    <td><input class="site-edit-input site-edit-region" value="" placeholder="亚太"></td>
+    <td><input class="site-edit-input site-edit-country" value="" placeholder="新西兰"></td>
+    <td><input class="site-edit-input site-edit-domain" value="" placeholder="amazon.co.nz"></td>
+    <td><input class="site-edit-input site-edit-zip" value="" placeholder="1010"></td>
+    <td><input class="site-edit-input site-edit-zipformat" value="" placeholder="4位数字"></td>
+    <td>
+      <button class="btn-site-op confirm" onclick="confirmAddSite()">确认</button>
+      <button class="btn-site-op" onclick="cancelSiteEdit()">取消</button>
+    </td>
+  `;
+  sitesDom.tableBody().appendChild(newRow);
+}
+
+async function confirmAddSite() {
+  const row = sitesDom.tableBody().querySelector('.site-row-editing');
+  if (!row) return;
+
+  const code    = row.querySelector('.site-edit-code').value.trim().toUpperCase();
+  const region  = row.querySelector('.site-edit-region').value.trim();
+  const country = row.querySelector('.site-edit-country').value.trim();
+  const domain  = row.querySelector('.site-edit-domain').value.trim().replace(/^www\./, '');
+  const zip     = row.querySelector('.site-edit-zip').value.trim();
+  const zipFormat = row.querySelector('.site-edit-zipformat').value.trim();
+  const enabled = row.querySelector('.site-enable-chk-edit').checked;
+
+  if (!code || !/^[A-Z0-9]{1,5}$/.test(code)) { alert('二字码必填，仅限 1-5 位大写字母或数字'); return; }
+  if (!domain) { alert('站点域名必填'); return; }
+  if (!country) { alert('国家名称必填'); return; }
+
+  const codeConflict = sitesData.some(s => s.code && s.code.toUpperCase() === code);
+  if (codeConflict) { alert(`二字码 ${code} 已存在`); return; }
+  const domainConflict = sitesData.some(s => s.domain === domain);
+  if (domainConflict) { alert(`域名 ${domain} 已存在`); return; }
+
+  sitesData.push({ code, region, country, domain, zip, zipExample: zip, zipFormat, enabled });
+  await window.electronAPI.saveSites(sitesData);
+  syncEnabledSites();
+  renderSitesTable();
+}
+
+async function deleteSite(idx) {
+  const s = sitesData[idx];
+  const label = `${s.code || s.domain} - ${s.country || s.domain}`;
+  if (!confirm(`删除站点 [${label}]？此操作不可恢复。`)) return;
+  sitesData.splice(idx, 1);
+  await window.electronAPI.saveSites(sitesData);
+  syncEnabledSites();
+  renderSitesTable();
 }
 
 async function saveSites() {
