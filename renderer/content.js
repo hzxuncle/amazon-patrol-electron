@@ -232,35 +232,56 @@
   }
 
   function extractProductDetails() {
-    const details = {};
-    // 支持两种常见 Product Details 容器
-    const rows = document.querySelectorAll(
-      '#detailBullets_feature_div li, ' +
-      '#productDetails_techSpec_section_1 tr, ' +
-      '#productDetails_detailBullets_sections1 tr'
-    );
-    rows.forEach(row => {
-      const keyEl = row.querySelector('.a-text-bold, th');
-      const valEl = row.querySelector('span:not(.a-text-bold), td');
-      if (!keyEl || !valEl) return;
-      // 清理 Amazon 特有的双向控制字符和多余空白
-      const key = keyEl.textContent.replace(/[‏‎‪-‮:：]/g, '').trim();
-      const val = valEl.textContent.replace(/\s+/g, ' ').trim();
-      if (key && val) details[key] = val;
-    });
-    return details;
-  }
+    const result = {};
 
-  function parseBsr(bsrRaw) {
-    if (!bsrRaw) return { main: '', sub: '' };
-    // 大类：第一个 #数字 in 分类名（不含括号链接文字）
-    const mainMatch = bsrRaw.match(/#[\d,]+ in [^(#\n]+/);
-    const main = mainMatch ? mainMatch[0].trim().replace(/\s+/g, ' ') : '';
-    // 小类：ul 里的第一个子分类排名
-    const subMatch = bsrRaw.match(/#[\d,]+ in [^(#\n]+/g);
-    // subMatch[0] 是大类，subMatch[1] 是第一个小类（如果有）
-    const sub = subMatch && subMatch.length > 1 ? subMatch[1].trim().replace(/\s+/g, ' ') : '';
-    return { main, sub };
+    // 结构一：prodDetTable（主流，CA/US/AU/MX/JP 等站点）
+    const sections = document.querySelectorAll(
+      '#productDetails_feature_div .a-expander-section-container'
+    );
+    sections.forEach(section => {
+      const titleEl = section.querySelector('.a-expander-prompt');
+      if (!titleEl) return;
+      const title = titleEl.textContent.trim();
+      const rows = section.querySelectorAll('.prodDetTable tr');
+      if (!rows.length) return;
+      const sectionData = {};
+      rows.forEach(row => {
+        const keyEl = row.querySelector('th.prodDetSectionEntry');
+        const valEl = row.querySelector('td.prodDetAttrValue');
+        if (!keyEl || !valEl) return;
+        const key = keyEl.textContent.replace(/\s+/g, ' ').trim();
+        const val = valEl.textContent.replace(/\s+/g, ' ').trim();
+        if (!key || !val) return;
+        // 跳过评价行（含评分脚本或"out of 5 stars"）
+        if (val.includes('out of 5 stars') || val.includes('P.when') ||
+            key.includes('おすすめ度') || key.includes('Opinión media') ||
+            key.includes('Customer Reviews')) return;
+        sectionData[key] = val;
+      });
+      if (Object.keys(sectionData).length > 0) result[title] = sectionData;
+    });
+
+    // 結構二：detailBullets（部分商品有，作为补充）
+    const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
+    if (bulletRows.length) {
+      const sectionData = {};
+      bulletRows.forEach(row => {
+        const keyEl = row.querySelector('.a-text-bold');
+        const valEl = row.querySelector('span:not(.a-text-bold)');
+        if (!keyEl || !valEl) return;
+        const key = keyEl.textContent.replace(/[‏‎‏‎:：]/g, '').replace(/\s+/g, ' ').trim();
+        const val = valEl.textContent.replace(/\s+/g, ' ').trim();
+        if (!key || !val) return;
+        if (val.includes('out of 5 stars') || val.includes('P.when') ||
+            key.includes('Customer Reviews')) return;
+        sectionData[key] = val;
+      });
+      if (Object.keys(sectionData).length > 0) {
+        result['Product Details'] = Object.assign(result['Product Details'] || {}, sectionData);
+      }
+    }
+
+    return result;
   }
 
   async function scrapePageData(options = {}) {
@@ -289,13 +310,7 @@
       dealBadge: 'N/A',
       acBadge: 'N/A',
       coupon: 'N/A',
-      bsrMain: '',
-      bsrSub: '',
-      dateFirstAvailable: '',
-      modelNumber: '',
-      dimensions: '',
-      manufacturer: '',
-      batteries: '',
+      productInfo: {},
       url: window.location.href,
       timestamp: new Date().toISOString(),
       status: 'success',
@@ -375,34 +390,9 @@
         result.listPrice = '';
       }
 
-      // Product Details 区块（BSR/上架时间/型号等）
-      const productDetails = extractProductDetails();
-
-      if (isEnabled('bsrMain') || isEnabled('bsrSub')) {
-        const bsr = parseBsr(productDetails['Best Sellers Rank'] || productDetails['Best Sellers Rank:'] || '');
-        if (isEnabled('bsrMain')) result.bsrMain = bsr.main;
-        if (isEnabled('bsrSub')) result.bsrSub = bsr.sub;
-      }
-      if (isEnabled('dateFirstAvailable')) {
-        const raw = productDetails['Date First Available'] || '';
-        // 清理键名污染（值里可能重复含键名）
-        result.dateFirstAvailable = raw.replace(/Date First Available[\s\S]*?:\s*/i, '').trim();
-      }
-      if (isEnabled('modelNumber')) {
-        const raw = productDetails['Item model number'] || productDetails['Model Number'] || '';
-        result.modelNumber = raw.replace(/Item model number[\s\S]*?:\s*/i, '').replace(/Model Number[\s\S]*?:\s*/i, '').trim();
-      }
-      if (isEnabled('dimensions')) {
-        const raw = productDetails['Product Dimensions'] || productDetails['Item Dimensions'] || '';
-        result.dimensions = raw.replace(/Product Dimensions[\s\S]*?:\s*/i, '').replace(/Item Dimensions[\s\S]*?:\s*/i, '').trim();
-      }
-      if (isEnabled('manufacturer')) {
-        const raw = productDetails['Manufacturer'] || '';
-        result.manufacturer = raw.replace(/Manufacturer[\s\S]*?:\s*/i, '').trim();
-      }
-      if (isEnabled('batteries')) {
-        const raw = productDetails['Batteries'] || '';
-        result.batteries = raw.replace(/Batteries[\s\S]*?:\s*/i, '').trim();
+      // Product information 区块（原样存储所有站点数据）
+      if (isEnabled('productInfo')) {
+        result.productInfo = extractProductDetails();
       }
 
       // 父体ASIN
