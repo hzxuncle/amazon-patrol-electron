@@ -72,7 +72,7 @@ function broadcastLog(message) {
 function getSiteLabel(domain) {
   const sites = store.get('sites') || [];
   const found = sites.find(s => `www.${s.domain}` === domain || s.domain === domain);
-  if (found) return found.country;
+  if (found) return found.code || found.country;
   // 降级：从域名提取简称
   const m = domain.match(/amazon\.(.+)$/);
   return m ? m[1].toUpperCase() : domain;
