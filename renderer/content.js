@@ -182,6 +182,8 @@
       { match: /limited[\s-]*time\s*deal/i, label: 'Limited-time deal' },
       { match: /deal\s+selling\s+fast/i, label: 'Deal selling fast' },
       { match: /ends\sin\s/i, label: rawText },
+      // 纯倒计时格式 HH:MM:SS 或 MM:SS（来自 .detailpage-dealBadge-countdown-timer）
+      { match: /^\d{2}:\d{2}(:\d{2})?$/, label: `Ends in ${rawText}` },
       { match: /lightning\s*deal/i, label: 'Lightning Deal' },
       { match: /big\s*deal/i, label: 'Big Deal' },
       { match: /deal\s*of\s*the\s*day/i, label: 'Deal of the Day' },
@@ -229,6 +231,38 @@
     return '';
   }
 
+  function extractProductDetails() {
+    const details = {};
+    // 支持两种常见 Product Details 容器
+    const rows = document.querySelectorAll(
+      '#detailBullets_feature_div li, ' +
+      '#productDetails_techSpec_section_1 tr, ' +
+      '#productDetails_detailBullets_sections1 tr'
+    );
+    rows.forEach(row => {
+      const keyEl = row.querySelector('.a-text-bold, th');
+      const valEl = row.querySelector('span:not(.a-text-bold), td');
+      if (!keyEl || !valEl) return;
+      // 清理 Amazon 特有的双向控制字符和多余空白
+      const key = keyEl.textContent.replace(/[‏‎‪-‮:：]/g, '').trim();
+      const val = valEl.textContent.replace(/\s+/g, ' ').trim();
+      if (key && val) details[key] = val;
+    });
+    return details;
+  }
+
+  function parseBsr(bsrRaw) {
+    if (!bsrRaw) return { main: '', sub: '' };
+    // 大类：第一个 #数字 in 分类名（不含括号链接文字）
+    const mainMatch = bsrRaw.match(/#[\d,]+ in [^(#\n]+/);
+    const main = mainMatch ? mainMatch[0].trim().replace(/\s+/g, ' ') : '';
+    // 小类：ul 里的第一个子分类排名
+    const subMatch = bsrRaw.match(/#[\d,]+ in [^(#\n]+/g);
+    // subMatch[0] 是大类，subMatch[1] 是第一个小类（如果有）
+    const sub = subMatch && subMatch.length > 1 ? subMatch[1].trim().replace(/\s+/g, ' ') : '';
+    return { main, sub };
+  }
+
   async function scrapePageData(options = {}) {
     const hostname = getSite();
     const useStability = options.useStability !== false;
@@ -255,6 +289,13 @@
       dealBadge: 'N/A',
       acBadge: 'N/A',
       coupon: 'N/A',
+      bsrMain: '',
+      bsrSub: '',
+      dateFirstAvailable: '',
+      modelNumber: '',
+      dimensions: '',
+      manufacturer: '',
+      batteries: '',
       url: window.location.href,
       timestamp: new Date().toISOString(),
       status: 'success',
@@ -326,6 +367,42 @@
           const unavailable = document.body.innerText.includes('Currently unavailable');
           result.stock = unavailable ? 'Out of Stock' : 'N/A';
         }
+      }
+
+      // 缺货时价格无效，清空避免抓到推荐商品轮播的价格
+      if (result.stock === 'Out of Stock') {
+        result.price = '';
+        result.listPrice = '';
+      }
+
+      // Product Details 区块（BSR/上架时间/型号等）
+      const productDetails = extractProductDetails();
+
+      if (isEnabled('bsrMain') || isEnabled('bsrSub')) {
+        const bsr = parseBsr(productDetails['Best Sellers Rank'] || productDetails['Best Sellers Rank:'] || '');
+        if (isEnabled('bsrMain')) result.bsrMain = bsr.main;
+        if (isEnabled('bsrSub')) result.bsrSub = bsr.sub;
+      }
+      if (isEnabled('dateFirstAvailable')) {
+        const raw = productDetails['Date First Available'] || '';
+        // 清理键名污染（值里可能重复含键名）
+        result.dateFirstAvailable = raw.replace(/Date First Available[\s\S]*?:\s*/i, '').trim();
+      }
+      if (isEnabled('modelNumber')) {
+        const raw = productDetails['Item model number'] || productDetails['Model Number'] || '';
+        result.modelNumber = raw.replace(/Item model number[\s\S]*?:\s*/i, '').trim();
+      }
+      if (isEnabled('dimensions')) {
+        const raw = productDetails['Product Dimensions'] || productDetails['Item Dimensions'] || '';
+        result.dimensions = raw.replace(/Product Dimensions[\s\S]*?:\s*/i, '').replace(/Item Dimensions[\s\S]*?:\s*/i, '').trim();
+      }
+      if (isEnabled('manufacturer')) {
+        const raw = productDetails['Manufacturer'] || '';
+        result.manufacturer = raw.replace(/Manufacturer[\s\S]*?:\s*/i, '').trim();
+      }
+      if (isEnabled('batteries')) {
+        const raw = productDetails['Batteries'] || '';
+        result.batteries = raw.replace(/Batteries[\s\S]*?:\s*/i, '').trim();
       }
 
       // 父体ASIN
