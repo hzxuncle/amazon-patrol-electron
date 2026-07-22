@@ -768,7 +768,7 @@ function handleComplete(summary, results) {
 // ========== Reference Compare ==========
 function findRef(asin, site) {
   const rows = referenceData && referenceData.rows ? referenceData.rows : [];
-  return rows.find(r => r.asin === asin && r.site === site);
+  return rows.find(r => r.asin === asin && (!r.site || r.site === site));
 }
 function getAlias(asin, site) {
   const ref = findRef(asin, site);
@@ -1164,9 +1164,7 @@ function renderSitesTable() {
 
 function editSiteRow(idx) {
   // 关闭已有编辑行（不保存）
-  const existing = sitesDom.tableBody().querySelector('.site-row-editing');
-  if (existing) existing.remove();  // 新增行直接删除；已有行还原
-  renderSitesTable();
+  renderSitesTable(); // 关闭任何已有编辑行（不保存），重新渲染
 
   const s = sitesData[idx];
   const rows = sitesDom.tableBody().querySelectorAll('tr');
