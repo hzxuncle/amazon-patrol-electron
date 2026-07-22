@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initCronTab();
   initLogTab();
   initHistoryTab();
+  initProductInfoOverlay();
   await initSitesTab();
   await initSiteGroups();
   await loadPersistedState();
@@ -898,15 +899,8 @@ function renderAllResults() {
   const showHistory = dom.showHistoryDiff.checked;
   dom.colHistory.style.display = showHistory ? '' : 'none';
 
-  const colClassMap = {
-    bsrMain: 'col-bsr-main', bsrSub: 'col-bsr-sub',
-    dateFirstAvailable: 'col-date-first', modelNumber: 'col-model',
-    dimensions: 'col-dimensions', manufacturer: 'col-manufacturer', batteries: 'col-batteries'
-  };
-  Object.entries(colClassMap).forEach(([field, cls]) => {
-    const th = document.querySelector(`th.${cls}`);
-    if (th) th.style.display = enabled.includes(field) ? '' : 'none';
-  });
+  const piTh = document.querySelector('th.col-product-info');
+  if (piTh) piTh.style.display = enabled.includes('productInfo') ? '' : 'none';
 
   dom.resultsBody.innerHTML = allResults.map(r => {
     const ref = findRef(r.asin, r.site);
@@ -930,13 +924,7 @@ function renderAllResults() {
         <td class="col-seller" title="${esc(r.seller || '')}">${renderField(r.seller, ref ? ref.expectedSeller : '', 'seller')}</td>
         <td class="col-stock" title="${esc(r.stock || '')}">${renderField(r.stock, ref ? ref.expectedStock : '', 'stock')}</td>
         <td class="col-parent" title="${esc(r.parentAsin || '')}">${esc(r.parentAsin || 'N/A')}</td>
-        ${enabled.includes('bsrMain') ? `<td class="col-bsr-main" title="${esc(r.bsrMain || '')}">${esc(r.bsrMain || '')}</td>` : ''}
-        ${enabled.includes('bsrSub') ? `<td class="col-bsr-sub" title="${esc(r.bsrSub || '')}">${esc(r.bsrSub || '')}</td>` : ''}
-        ${enabled.includes('dateFirstAvailable') ? `<td class="col-date-first">${esc(r.dateFirstAvailable || '')}</td>` : ''}
-        ${enabled.includes('modelNumber') ? `<td class="col-model">${esc(r.modelNumber || '')}</td>` : ''}
-        ${enabled.includes('dimensions') ? `<td class="col-dimensions" title="${esc(r.dimensions || '')}">${esc(r.dimensions || '')}</td>` : ''}
-        ${enabled.includes('manufacturer') ? `<td class="col-manufacturer">${esc(r.manufacturer || '')}</td>` : ''}
-        ${enabled.includes('batteries') ? `<td class="col-batteries" title="${esc(r.batteries || '')}">${esc(r.batteries || '')}</td>` : ''}
+        ${enabled.includes('productInfo') ? `<td class="col-product-info">${r.productInfo && Object.keys(r.productInfo).length ? `<button class="btn-product-info" data-asin="${esc(r.asin)}" data-site="${esc(r.site)}">查看</button>` : ''}</td>` : ''}
         <td class="col-history">${showHistory ? renderHistoryDiff(r) : ''}</td>
       </tr>
     `;
@@ -945,6 +933,61 @@ function renderAllResults() {
   const success = allResults.filter(r => r.status === 'success').length;
   const failed = allResults.filter(r => r.status !== 'success').length;
   dom.resultsSummary.textContent = `共${allResults.length}条 | ✅${success} | ❌${failed}`;
+}
+
+// ========== 产品信息浮层 ==========
+function initProductInfoOverlay() {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-product-info');
+    if (btn) {
+      const asin = btn.dataset.asin;
+      const site = btn.dataset.site;
+      const r = allResults.find(r => r.asin === asin && r.site === site);
+      if (r && r.productInfo) showProductInfoOverlay(r);
+      return;
+    }
+    if (e.target.closest('.product-info-overlay') && !e.target.closest('.product-info-modal')) {
+      closeProductInfoOverlay();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeProductInfoOverlay();
+  });
+}
+
+function showProductInfoOverlay(r) {
+  closeProductInfoOverlay();
+  const sections = Object.entries(r.productInfo);
+  if (!sections.length) return;
+
+  const sectionsHtml = sections.map(([title, data]) => {
+    const rows = Object.entries(data).map(([k, v]) =>
+      `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`
+    ).join('');
+    return `
+      <div class="product-info-section-title">${esc(title)}</div>
+      <table class="product-info-table"><tbody>${rows}</tbody></table>
+    `;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'product-info-overlay';
+  overlay.id = 'productInfoOverlay';
+  overlay.innerHTML = `
+    <div class="product-info-modal">
+      <div class="product-info-modal-header">
+        <span>产品信息 — ${esc(r.asin)} @ ${getSiteLabel(r.site)}</span>
+        <button class="product-info-modal-close" onclick="closeProductInfoOverlay()">×</button>
+      </div>
+      <div class="product-info-modal-body">${sectionsHtml}</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeProductInfoOverlay() {
+  const el = document.getElementById('productInfoOverlay');
+  if (el) el.remove();
 }
 
 // ========== Excel Export (HTML-based .xls, red font for mismatches, no borders) ==========
@@ -970,13 +1013,6 @@ async function exportExcel() {
     { key: 'seller', label: '卖家', refField: 'expectedSeller' },
     { key: 'stock', label: '库存', refField: 'expectedStock' },
     { key: 'parentAsin', label: '父体ASIN', enabledField: 'parentAsin' },
-    { key: 'bsrMain',            label: 'BSR大类',   enabledField: 'bsrMain' },
-    { key: 'bsrSub',             label: 'BSR小类',   enabledField: 'bsrSub' },
-    { key: 'dateFirstAvailable', label: '上架时间',  enabledField: 'dateFirstAvailable' },
-    { key: 'modelNumber',        label: '型号',      enabledField: 'modelNumber' },
-    { key: 'dimensions',         label: '尺寸重量',  enabledField: 'dimensions' },
-    { key: 'manufacturer',       label: '制造商',    enabledField: 'manufacturer' },
-    { key: 'batteries',          label: '电池',      enabledField: 'batteries' },
     { key: 'url', label: 'URL', enabledField: 'url' },
     { key: 'timestamp', label: '时间' }
   ];
