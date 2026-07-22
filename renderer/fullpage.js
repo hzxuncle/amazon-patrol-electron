@@ -884,7 +884,7 @@ function getRowClass(result) {
 function renderAllResults() {
   const enabled = getEnabledFields();
   const showAlias = hasAliases();
-  const colSpan = showAlias ? 16 : 15;
+  const colSpan = document.querySelectorAll('#resultsTable thead th:not([style*="display: none"]):not([style*="display:none"])').length || (showAlias ? 16 : 15);
 
   if (!allResults.length) {
     dom.resultsBody.innerHTML = `<tr class="empty-row"><td colspan="${colSpan}"><div class="empty-state"><span class="empty-icon">◎</span><p>点击「开始巡店」查看结果</p></div></td></tr>`;
