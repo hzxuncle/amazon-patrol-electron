@@ -325,7 +325,7 @@ async function sendDingTalk(summary, webhookUrl) {
 
   siteMap.forEach((items, site) => {
     const siteLabel = getSiteLabel(site);
-    const siteInfo = sites.find(s => `www.${s.domain}` === site);
+    const siteInfo = sites.find(s => s.code === site);
     const domain = siteInfo ? siteInfo.domain : site;
     text += `\n---\n\n#### ${siteLabel} · ${domain}\n`;
 
