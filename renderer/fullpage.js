@@ -71,12 +71,6 @@ const dom = {
   btnToggleNone: $('#btnToggleNone')
 };
 
-// ========== Constants ==========
-function buildSiteMap() {
-  const map = {};
-  sitesData.forEach(s => { if (s.code) map[s.code.toUpperCase()] = `www.${s.domain}`; });
-  return map;
-}
 
 // ========== State ==========
 let patrolRunning = false;
