@@ -49,18 +49,44 @@ const SITE_LANG_MAP = {
   'amazon.com.tr': 'tr_TR',
 };
 
+const { BUILTIN_SITES } = require('./sites-data');
+
+// code → { domain, lang } 映射，优先用内置数据
+const CODE_TO_DOMAIN = {};
+const CODE_TO_LANG = {};
+BUILTIN_SITES.forEach(s => {
+  if (s.code) {
+    CODE_TO_DOMAIN[s.code] = s.domain;
+    // SITE_LANG_MAP 的 key 是 amazon.xxx，直接查
+    CODE_TO_LANG[s.code] = SITE_LANG_MAP[s.domain] || 'en_US';
+  }
+});
+
+function getDomainByCode(code) {
+  return CODE_TO_DOMAIN[code] || null;
+}
+
+function getLangByCode(code) {
+  return CODE_TO_LANG[code] || 'en_US';
+}
+
 const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 // 记录已经初始化过配送地的站点，巡店期间每站点只设一次
 const initializedSites = new Set();
 
-function getSiteUrl(site) {
-  return `https://${site}`;
+function getSiteUrl(code) {
+  const domain = getDomainByCode(code);
+  if (domain) return `https://www.${domain}`;
+  // 兼容旧格式：如果传入的是域名
+  if (code.includes('.')) return `https://${code.startsWith('www.') ? code : 'www.' + code}`;
+  return `https://www.amazon.${code.toLowerCase()}`;
 }
 
-function getSiteLang(site) {
-  // site 是完整域名如 www.amazon.ca，提取 amazon.ca 查表
-  const key = site.replace(/^www\./, '');
+function getSiteLang(code) {
+  if (!code.includes('.')) return getLangByCode(code);
+  // 兼容旧格式域名
+  const key = code.replace(/^www\./, '');
   return SITE_LANG_MAP[key] || 'en_US';
 }
 
