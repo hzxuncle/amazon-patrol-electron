@@ -136,6 +136,10 @@ amazon-patrol-electron/
 
 ## 技术架构
 
+> **抓取引擎架构设计文档**：[docs/scraper-architecture.md](docs/scraper-architecture.md)
+>
+> 记录了抓取引擎按站点拆分的设计决策、职责分工、实测数据和新增站点流程。
+
 ### 与 Chrome 扩展版的对比
 
 | 模块 | Chrome 扩展 | Electron 版 |
