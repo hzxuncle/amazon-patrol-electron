@@ -146,11 +146,11 @@ function initSettingsSliders() {
     renderAllResults();
     saveSettings();
   });
-  dom.enableRefCompare.addEventListener('change', () => {
+  dom.enableRefCompare.addEventListener('change', async () => {
     if (dom.enableRefCompare.checked) {
       const hasRef = referenceData && referenceData.rows && referenceData.rows.length > 0;
       if (!hasRef) {
-        alert('请先在「参考数据」Tab 导入参考数据');
+        await showAlert('提示', '请先在「参考数据」Tab 导入参考数据');
         dom.enableRefCompare.checked = false;
         return;
       }
@@ -173,12 +173,7 @@ function getSettings() {
     dingtalkWebhook: dom.dingtalkEnabled ? (dom.dingtalkEnabled.checked ? dom.dingtalkWebhook.value.trim() : '') : '',
     enableGroupNotify:   dom.enableGroupNotify   ? dom.enableGroupNotify.checked   : false,
     enablePersonalNotify:dom.enablePersonalNotify ? dom.enablePersonalNotify.checked : false,
-    dingtalkPersonal: {
-      appKey:    dom.dingtalkAppKey    ? dom.dingtalkAppKey.value.trim()    : '',
-      appSecret: dom.dingtalkAppSecret ? dom.dingtalkAppSecret.value.trim() : '',
-      agentId:   dom.dingtalkAgentId   ? dom.dingtalkAgentId.value.trim()   : '',
-      userIds:   dom.dingtalkUserIds   ? dom.dingtalkUserIds.value.trim()   : '',
-    },
+    // dingtalkPersonal 凭证不存本地，通过 getPersonalNotifyConfig() 实时读取
     showHistoryDiff: dom.showHistoryDiff.checked,
     enableRefCompare: dom.enableRefCompare ? dom.enableRefCompare.checked : false,
     enabledFields: getEnabledFields(),
@@ -224,11 +219,9 @@ async function loadSettings() {
     if (dom.dingtalkEnabled) dom.dingtalkEnabled.checked = !!s.dingtalkWebhook;
     if (dom.enableGroupNotify)    dom.enableGroupNotify.checked    = s.enableGroupNotify    || false;
     if (dom.enablePersonalNotify) dom.enablePersonalNotify.checked = s.enablePersonalNotify || false;
-    if (s.dingtalkPersonal) {
-      if (dom.dingtalkAppKey)    dom.dingtalkAppKey.value    = s.dingtalkPersonal.appKey    || '';
-      if (dom.dingtalkAppSecret) dom.dingtalkAppSecret.value = s.dingtalkPersonal.appSecret || '';
-      if (dom.dingtalkAgentId)   dom.dingtalkAgentId.value   = s.dingtalkPersonal.agentId   || '';
-      if (dom.dingtalkUserIds)   dom.dingtalkUserIds.value   = s.dingtalkPersonal.userIds   || '';
+    // dingtalkPersonal 凭证不从本地恢复，需用户每次填写
+    if (s.dingtalkPersonal && s.dingtalkPersonal.userIds) {
+      if (dom.dingtalkUserIds) dom.dingtalkUserIds.value = s.dingtalkPersonal.userIds || '';
     }
     dom.showHistoryDiff.checked = s.showHistoryDiff || false;
     if (dom.enableRefCompare) dom.enableRefCompare.checked = s.enableRefCompare || false;
@@ -312,20 +305,20 @@ function initImportHandlers() {
 
 function processFile(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
-      if (typeof XLSX === 'undefined') { alert('Excel库加载中'); return; }
+      if (typeof XLSX === 'undefined') { await showAlert('提示', 'Excel库加载中'); return; }
       const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      if (rawRows.length === 0) { alert('没有数据'); return; }
+      if (rawRows.length === 0) { await showAlert('导入失败', '没有数据'); return; }
 
       // 校验必须列
       const sample = rawRows[0];
       const hasAsin = 'ASIN' in sample || 'asin' in sample;
       const hasSite = '站点' in sample || 'Site' in sample || 'site' in sample;
-      if (!hasAsin) { alert('导入失败：Excel 缺少 ASIN 列'); return; }
-      if (!hasSite) { alert('导入失败：Excel 缺少 站点 列（列名：站点 或 Site）'); return; }
+      if (!hasAsin) { await showAlert('导入失败', '导入失败：Excel 缺少 ASIN 列'); return; }
+      if (!hasSite) { await showAlert('导入失败', '导入失败：Excel 缺少 站点 列（列名：站点 或 Site）'); return; }
 
       const rows = rawRows.map(r => ({
         asin:               String(r['ASIN'] || r['asin'] || '').trim(),
@@ -361,7 +354,7 @@ function processFile(file) {
         .catch(e => console.error('[Store] referenceData 保存失败:', e));
       renderRefPreview();
       autoFillAsinGroups(rows);
-    } catch (err) { alert('解析失败: ' + err.message); }
+    } catch (err) { await showAlert('导入失败', '解析失败: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -391,8 +384,9 @@ function renderRefPreview() {
   ).join('');
 }
 
-function clearRef() {
-  if (!confirm('清除所有参考数据？')) return;
+async function clearRef() {
+  const ok = await showConfirmDialog('清除参考数据', ['所有参考数据将被清除，此操作不可恢复。'], '清除', '取消');
+  if (!ok) return;
   referenceData = { importedAt: null, fileName: '', rows: [] };
   window.electronAPI.storage.remove('referenceData').catch(() => {});
   dom.refCard.style.display = 'none';
@@ -435,11 +429,11 @@ async function autoFillAsinGroups(rows) {
   for (const g of groups) renderGroupCard(g.site, g.asins);
   saveGroupsToCache();
 
-  alert(`已自动填入 ${rows.length} 条 ASIN 到巡店面板（${groups.length} 个站点分组）`);
+  await showAlert('导入成功', `已自动填入 ${rows.length} 条 ASIN 到巡店面板（${groups.length} 个站点分组）`);
 }
 
 async function downloadTemplate() {
-  if (typeof XLSX === 'undefined') { alert('Excel库加载中'); return; }
+  if (typeof XLSX === 'undefined') { await showAlert('提示', 'Excel库加载中'); return; }
   const ws = XLSX.utils.aoa_to_sheet([
     ['ASIN','站点','常用名','期望售价','期望划线价','期望活动标','期望AC标','期望Coupon','期望星级','期望评论数','期望卖家','期望库存'],
     ['B082W886W9','CA','手机壳','29.99','39.99','Limited-time deal','Amazon\'s Choice','Save 10%','4.5','2000','Amazon','In Stock']
@@ -477,10 +471,10 @@ async function initSiteGroups() {
   container.innerHTML = '';
   for (const g of groups) renderGroupCard(g.site, g.asins);
 
-  document.getElementById('btnAddGroup').addEventListener('click', () => {
+  document.getElementById('btnAddGroup').addEventListener('click', async () => {
     const usedSites = getUsedSites();
     const next = enabledSites.find(s => !usedSites.has(s.code));
-    if (!next) { alert('所有已启用站点均已添加'); return; }
+    if (!next) { await showAlert('提示', '所有已启用站点均已添加'); return; }
     renderGroupCard(next.code, '');
     saveGroupsToCache();
   });
@@ -569,7 +563,7 @@ function readGroupsFromDom() {
   }));
 }
 
-function buildTasks() {
+async function buildTasks() {
   const groups = readGroupsFromDom();
   const tasks = [];
   let idx = 0;
@@ -579,7 +573,7 @@ function buildTasks() {
     if (!asins) {
       const siteFound = enabledSites.find(s => s.code === site);
       const label = siteFound ? siteFound.country : site;
-      alert(`[${label}] 站点 ASIN 不能为空`);
+      await showAlert('校验失败', `[${label}] 站点 ASIN 不能为空`);
       return null;
     }
     const asinList = [...new Set(
@@ -589,11 +583,11 @@ function buildTasks() {
     if (invalid.length) {
       const siteFound = enabledSites.find(s => s.code === site);
       const label = siteFound ? siteFound.country : site;
-      alert(`[${label}] 包含无效 ASIN：${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '...' : ''}`);
+      await showAlert('校验失败', `[${label}] 包含无效 ASIN：${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '...' : ''}`);
       return null;
     }
     if (asinList.length > 100) {
-      alert(`单站点最多100个ASIN，当前${asinList.length}个`);
+      await showAlert('校验失败', `单站点最多100个ASIN，当前${asinList.length}个`);
       return null;
     }
     for (const asin of asinList) {
@@ -601,15 +595,22 @@ function buildTasks() {
     }
   }
 
-  if (!tasks.length) { alert('请输入有效ASIN'); return null; }
+  if (!tasks.length) { await showAlert('校验失败', '请输入有效ASIN'); return null; }
   return { tasks, totalCount: tasks.length };
 }
 
 async function startPatrol() {
-  const td = buildTasks();
+  const td = await buildTasks();
   if (!td) return;
 
   const config = getSettings();
+  // 凭证不存本地，每次启动时从 DOM 实时读取附入 config（主进程内存持有，不落盘）
+  config.dingtalkPersonal = {
+    appKey:    dom.dingtalkAppKey    ? dom.dingtalkAppKey.value.trim()    : '',
+    appSecret: dom.dingtalkAppSecret ? dom.dingtalkAppSecret.value.trim() : '',
+    agentId:   dom.dingtalkAgentId   ? dom.dingtalkAgentId.value.trim()   : '',
+    userIds:   dom.dingtalkUserIds   ? dom.dingtalkUserIds.value.trim()   : '',
+  };
 
   // 检查是否有未完成的任务 (已停止但还有结果)
   const hasExisting = allResults.length > 0;
@@ -619,20 +620,11 @@ async function startPatrol() {
   const newKeys = new Set(td.tasks.map(t => `${t.asin}_${t.site}`));
 
   // 检测任务是否变化
+  let taskChanged = false;
   if (hasExisting) {
     const onlyInOld = [...existingKeys].filter(k => !newKeys.has(k));
     const onlyInNew = [...newKeys].filter(k => !existingKeys.has(k));
-    if (onlyInOld.length > 0 || onlyInNew.length > 0) {
-      const changed = onlyInNew.length > 0 || onlyInOld.length > 0;
-      if (changed && !confirm(
-        `⚠️ 任务列表已变更！\n\n` +
-        (onlyInNew.length ? `新增: ${onlyInNew.length} 个\n` : '') +
-        (onlyInOld.length ? `移除: ${onlyInOld.length} 个\n` : '') +
-        `\n是否丢弃已有结果重新巡店？`
-      )) return;
-      // 用户确认重新巡店
-      allResults = [];
-    }
+    taskChanged = onlyInOld.length > 0 || onlyInNew.length > 0;
   }
 
   // 过滤出未完成的任务
@@ -640,15 +632,26 @@ async function startPatrol() {
   const remainingTasks = td.tasks.filter(t => !completedKeys.has(`${t.asin}_${t.site}`));
 
   if (remainingTasks.length === 0 && allResults.length >= td.tasks.length) {
-    alert('所有任务均已完成');
+    await showAlert('提示', '所有任务均已完成');
     return;
   }
 
-  const isContinue = hasExisting && remainingTasks.length < td.tasks.length;
-  const msg = isContinue
-    ? `继续巡店: 剩余 ${remainingTasks.length} 个未完成任务 (共 ${td.totalCount})`
-    : `共 ${td.totalCount} 个任务\n并发:${config.concurrency} | 间隔:${config.pageInterval/1000}秒\n确认开始？`;
-  if (!confirm(msg)) return;
+  const isContinue = hasExisting && !taskChanged && remainingTasks.length < td.tasks.length;
+
+  // 构建确认对话框信息
+  const confirmLines = [];
+  if (taskChanged) confirmLines.push('任务列表已变更，已有结果将被清除');
+  if (isContinue) {
+    confirmLines.push(`继续上次巡店，剩余 ${remainingTasks.length} / ${td.totalCount} 个任务`);
+  } else {
+    confirmLines.push(`共 ${td.totalCount} 个任务`);
+    confirmLines.push(`并发 ${config.concurrency} · 间隔 ${config.pageInterval/1000}s`);
+  }
+
+  const confirmed = await showConfirmDialog('开始巡店', confirmLines, '开始', '取消');
+  if (!confirmed) return;
+
+  if (taskChanged) allResults = [];
 
   const res = await window.electronAPI.sendMessage('START_PATROL', {
     tasks: remainingTasks,
@@ -662,7 +665,7 @@ async function startPatrol() {
     startTimer();
     setPatrolTimestamp('running');
   } else {
-    alert('启动失败: ' + (res ? res.error : '未知错误'));
+    await showAlert('启动失败', '启动失败: ' + (res ? res.error : '未知错误'));
   }
 }
 
@@ -680,7 +683,7 @@ async function retryFailed() {
     updateUiRunning(allResults.length + res.retryCount, allResults.length);
     startTimer();
   } else {
-    alert(res ? (res.error || '无可重试项') : '失败');
+    await showAlert('提示', res ? (res.error || '无可重试项') : '失败');
   }
 }
 
@@ -988,6 +991,61 @@ function renderAllResults() {
 }
 
 // ========== 产品信息浮层 ==========
+// ========== 通用对话框 ==========
+function showAlert(title, message) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'product-info-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-dialog">
+        <div class="confirm-dialog-header"><span>${esc(title)}</span></div>
+        <div class="confirm-dialog-body"><p>${esc(message)}</p></div>
+        <div class="confirm-dialog-footer">
+          <button class="btn btn-primary confirm-ok">确定</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const close = () => { overlay.remove(); resolve(); };
+    overlay.querySelector('.confirm-ok').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Enter') { close(); document.removeEventListener('keydown', onKey); }
+    });
+  });
+}
+
+// ========== 通用确认对话框 ==========
+function showConfirmDialog(title, lines, confirmText = '确认', cancelText = '取消') {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'product-info-overlay';
+    overlay.id = 'confirmDialogOverlay';
+    overlay.innerHTML = `
+      <div class="confirm-dialog">
+        <div class="confirm-dialog-header">
+          <span>${esc(title)}</span>
+        </div>
+        <div class="confirm-dialog-body">
+          ${lines.map(l => `<p>${esc(l)}</p>`).join('')}
+        </div>
+        <div class="confirm-dialog-footer">
+          <button class="btn btn-ghost confirm-cancel">${esc(cancelText)}</button>
+          <button class="btn btn-primary confirm-ok">${esc(confirmText)}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.confirm-ok').addEventListener('click', () => { overlay.remove(); resolve(true); });
+    overlay.querySelector('.confirm-cancel').addEventListener('click', () => { overlay.remove(); resolve(false); });
+    overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(false); } });
+    document.addEventListener('keydown', function onKey(e) {
+      if (e.key === 'Escape') { overlay.remove(); resolve(false); document.removeEventListener('keydown', onKey); }
+      if (e.key === 'Enter') { overlay.remove(); resolve(true); document.removeEventListener('keydown', onKey); }
+    });
+  });
+}
+
 function initProductInfoOverlay() {
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.btn-product-info');
@@ -1044,7 +1102,7 @@ function closeProductInfoOverlay() {
 
 // ========== Excel Export (HTML-based .xls, red font for mismatches, no borders) ==========
 async function exportExcel() {
-  if (!allResults.length) { alert('无结果'); return; }
+  if (!allResults.length) { await showAlert('提示', '无结果'); return; }
 
   const sorted = [...allResults].sort((a, b) => (a.index || 0) - (b.index || 0));
   const enabled = getEnabledFields();
@@ -1267,15 +1325,15 @@ async function confirmSiteEdit(idx) {
   const zipFormat = row.querySelector('.site-edit-zipformat').value.trim();
   const enabled = row.querySelector('.site-enable-chk-edit').checked;
 
-  if (!code || !/^[A-Z0-9]{1,5}$/.test(code)) { alert('二字码必填，仅限 1-5 位大写字母或数字'); return; }
-  if (!domain) { alert('站点域名必填'); return; }
-  if (!country) { alert('国家名称必填'); return; }
+  if (!code || !/^[A-Z0-9]{1,5}$/.test(code)) { await showAlert('校验失败', '二字码必填，仅限 1-5 位大写字母或数字'); return; }
+  if (!domain) { await showAlert('校验失败', '站点域名必填'); return; }
+  if (!country) { await showAlert('校验失败', '国家名称必填'); return; }
 
   // 唯一性校验（排除自身）
   const codeConflict = sitesData.some((s, i) => i !== idx && s.code && s.code.toUpperCase() === code);
-  if (codeConflict) { alert(`二字码 ${code} 已存在`); return; }
+  if (codeConflict) { await showAlert('校验失败', `二字码 ${code} 已存在`); return; }
   const domainConflict = sitesData.some((s, i) => i !== idx && s.domain === domain);
-  if (domainConflict) { alert(`域名 ${domain} 已存在`); return; }
+  if (domainConflict) { await showAlert('校验失败', `域名 ${domain} 已存在`); return; }
 
   sitesData[idx] = { ...sitesData[idx], code, region, country, domain, zip, zipFormat, enabled };
   await window.electronAPI.saveSites(sitesData);
@@ -1332,14 +1390,14 @@ async function confirmAddSite() {
   const zipFormat = row.querySelector('.site-edit-zipformat').value.trim();
   const enabled = row.querySelector('.site-enable-chk-edit').checked;
 
-  if (!code || !/^[A-Z0-9]{1,5}$/.test(code)) { alert('二字码必填，仅限 1-5 位大写字母或数字'); return; }
-  if (!domain) { alert('站点域名必填'); return; }
-  if (!country) { alert('国家名称必填'); return; }
+  if (!code || !/^[A-Z0-9]{1,5}$/.test(code)) { await showAlert('校验失败', '二字码必填，仅限 1-5 位大写字母或数字'); return; }
+  if (!domain) { await showAlert('校验失败', '站点域名必填'); return; }
+  if (!country) { await showAlert('校验失败', '国家名称必填'); return; }
 
   const codeConflict = sitesData.some(s => s.code && s.code.toUpperCase() === code);
-  if (codeConflict) { alert(`二字码 ${code} 已存在`); return; }
+  if (codeConflict) { await showAlert('校验失败', `二字码 ${code} 已存在`); return; }
   const domainConflict = sitesData.some(s => s.domain === domain);
-  if (domainConflict) { alert(`域名 ${domain} 已存在`); return; }
+  if (domainConflict) { await showAlert('校验失败', `域名 ${domain} 已存在`); return; }
 
   sitesData.push({ code, region, country, domain, zip, zipExample: zip, zipFormat, enabled });
   await window.electronAPI.saveSites(sitesData);
@@ -1350,7 +1408,8 @@ async function confirmAddSite() {
 async function deleteSite(idx) {
   const s = sitesData[idx];
   const label = `${s.code || s.domain} - ${s.country || s.domain}`;
-  if (!confirm(`删除站点 [${label}]？此操作不可恢复。`)) return;
+  const ok = await showConfirmDialog('删除站点', [`确认删除 ${label}？此操作不可恢复。`], '删除', '取消');
+  if (!ok) return;
   sitesData.splice(idx, 1);
   await window.electronAPI.saveSites(sitesData);
   syncEnabledSites();
@@ -1376,7 +1435,8 @@ function syncEnabledSites() {
 }
 
 async function resetZips() {
-  if (!confirm('将所有邮编恢复为默认示例值？')) return;
+  const ok = await showConfirmDialog('恢复默认邮编', ['所有站点邮编将恢复为默认示例值。'], '恢复', '取消');
+  if (!ok) return;
   sitesData = sitesData.map(s => ({ ...s, zip: s.zipExample }));
   await window.electronAPI.saveSites(sitesData);
   renderSitesTable();
@@ -1475,12 +1535,12 @@ async function saveCronConfig() {
   const enabled = cronDom.enabled.checked;
 
   if (!expr) {
-    alert('请先填写 Cron 表达式');
+    await showAlert('校验失败', '请先填写 Cron 表达式');
     return;
   }
 
   const v = CronParser.validateCron(expr);
-  if (!v.valid) { alert('Cron 表达式无效：' + v.error); return; }
+  if (!v.valid) { await showAlert('校验失败', 'Cron 表达式无效：' + v.error); return; }
 
   const btn = cronDom.saveBtn;
   btn.disabled = true;
@@ -1493,7 +1553,7 @@ async function saveCronConfig() {
   } catch (e) {
     btn.textContent = '保存失败';
     btn.disabled = false;
-    alert('保存失败：' + (e.message || '后台无响应，请刷新页面重试'));
+    await showAlert('保存失败', '保存失败：' + (e.message || '后台无响应，请刷新页面重试'));
   }
 }
 
@@ -1589,7 +1649,8 @@ function renderLog() {
 // ========== 历史 Tab ==========
 function initHistoryTab() {
   document.getElementById('btnClearPatrolHistory').addEventListener('click', async () => {
-    if (!confirm('清空所有巡店历史记录？')) return;
+    const ok = await showConfirmDialog('清空历史', ['所有巡店历史记录将被清除，此操作不可恢复。'], '清空', '取消');
+    if (!ok) return;
     await window.electronAPI.clearPatrolHistory();
     renderPatrolHistory([]);
   });
