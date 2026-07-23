@@ -119,6 +119,20 @@
                     <span class="cron-toggle-slider"></span>
                   </label>
                 </div>
+                <div class="config-switch-row">
+                  <span class="config-switch-label">群通知</span>
+                  <label class="cron-toggle-wrap">
+                    <input type="checkbox" id="enableGroupNotify">
+                    <span class="cron-toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="config-switch-row">
+                  <span class="config-switch-label">个人通知</span>
+                  <label class="cron-toggle-wrap">
+                    <input type="checkbox" id="enablePersonalNotify">
+                    <span class="cron-toggle-slider"></span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -481,13 +495,34 @@
           </section>
           <section class="card">
             <div class="card-header"><span class="card-title">通知设置</span></div>
+
+            <div class="card-subtitle">群通知</div>
             <div class="setting-item">
               <label>钉钉机器人 Webhook</label>
               <input type="text" id="dingtalkWebhook" class="text-input"
                      placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">
-              <label class="toggle-label" style="margin-top:8px">
-                <input type="checkbox" id="dingtalkEnabled"> 启用钉钉推送
-              </label>
+              <span class="setting-hint">巡店完成后通过群机器人发送异常报告</span>
+            </div>
+
+            <div class="card-subtitle" style="margin-top:16px">个人通知</div>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>AppKey</label>
+                <input type="text" id="dingtalkAppKey" class="text-input" placeholder="dingxxxxxxxxxx">
+              </div>
+              <div class="setting-item">
+                <label>AppSecret</label>
+                <input type="password" id="dingtalkAppSecret" class="text-input" placeholder="xxxxxxxxxx">
+              </div>
+              <div class="setting-item">
+                <label>AgentId</label>
+                <input type="text" id="dingtalkAgentId" class="text-input" placeholder="123456789">
+              </div>
+              <div class="setting-item">
+                <label>接收人 userId</label>
+                <input type="text" id="dingtalkUserIds" class="text-input" placeholder="user1,user2">
+                <span class="setting-hint">多个用户用逗号分隔</span>
+              </div>
             </div>
           </section>
           <section class="card">
