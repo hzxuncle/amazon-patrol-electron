@@ -63,6 +63,7 @@ const dom = {
 
   // Column toggle
   colHistory: $('#colHistory'),
+  enableRefCompare: $('#enableRefCompare'),
 
   // Field toggles
   fieldToggles: $$('.field-toggle input[type="checkbox"]'),
@@ -139,6 +140,18 @@ function initSettingsSliders() {
     renderAllResults();
     saveSettings();
   });
+  dom.enableRefCompare.addEventListener('change', () => {
+    if (dom.enableRefCompare.checked) {
+      const hasRef = referenceData && referenceData.rows && referenceData.rows.length > 0;
+      if (!hasRef) {
+        alert('请先在「参考数据」Tab 导入参考数据');
+        dom.enableRefCompare.checked = false;
+        return;
+      }
+    }
+    renderAllResults();
+    saveSettings();
+  });
 }
 
 function getSettings() {
@@ -153,6 +166,7 @@ function getSettings() {
     retryDelay: 2000,
     dingtalkWebhook: dom.dingtalkEnabled.checked ? dom.dingtalkWebhook.value.trim() : '',
     showHistoryDiff: dom.showHistoryDiff.checked,
+    enableRefCompare: dom.enableRefCompare ? dom.enableRefCompare.checked : false,
     enabledFields: getEnabledFields(),
     showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false
   };
@@ -195,6 +209,7 @@ async function loadSettings() {
     dom.dingtalkWebhook.value = s.dingtalkWebhook || '';
     dom.dingtalkEnabled.checked = !!s.dingtalkWebhook;
     dom.showHistoryDiff.checked = s.showHistoryDiff || false;
+    if (dom.enableRefCompare) dom.enableRefCompare.checked = s.enableRefCompare || false;
     // 恢复字段勾选
     if (s.enabledFields && s.enabledFields.length > 0) {
       dom.fieldToggles.forEach(cb => { cb.checked = s.enabledFields.includes(cb.dataset.field); });
@@ -305,12 +320,17 @@ function processFile(file) {
         expectedStock:      String(r['期望库存'] || r['Expected Stock'] || r['expectedStock'] || '').trim(),
       })).filter(r => r.asin);
 
-      // 将站点简称转换为完整域名
-      const siteMap = buildSiteMap();
+      // 将站点标识规范化为二字码（code）
       rows.forEach(r => {
-        if (r.site && !r.site.startsWith('www.')) {
-          r.site = siteMap[r.site.toUpperCase()] || r.site;
+        if (!r.site) return;
+        // 如果已经是代码形式（不含点号），转为大写即可
+        if (!r.site.includes('.')) {
+          r.site = r.site.toUpperCase();
+          return;
         }
+        // 如果是域名形式（www.amazon.ca 或 amazon.ca），查找对应 code
+        const found = sitesData.find(s => `www.${s.domain}` === r.site || s.domain === r.site);
+        if (found && found.code) r.site = found.code;
       });
 
       const now = new Date().toISOString();
@@ -354,9 +374,11 @@ function clearRef() {
   referenceData = { importedAt: null, fileName: '', rows: [] };
   window.electronAPI.storage.remove('referenceData').catch(() => {});
   dom.refCard.style.display = 'none';
+  // 重置 file input，否则再次选择同一文件时 change 事件不触发
+  dom.fileInput.value = '';
 }
 
-function autoFillAsinGroups(rows) {
+async function autoFillAsinGroups(rows) {
   // 按 site 分组
   const grouped = {};
   for (const r of rows) {
@@ -371,13 +393,26 @@ function autoFillAsinGroups(rows) {
 
   if (!groups.length) return;
 
+  // 确保涉及的站点都已启用，否则下拉选项里没有该站点会导致错配
+  let needSave = false;
+  for (const g of groups) {
+    const found = sitesData.find(s => s.code === g.site);
+    if (found && !found.enabled) {
+      found.enabled = true;
+      needSave = true;
+    }
+  }
+  if (needSave) {
+    await window.electronAPI.saveSites(sitesData);
+    syncEnabledSites();
+  }
+
   // 重新渲染分组卡片
   const container = document.getElementById('siteGroups');
   container.innerHTML = '';
   for (const g of groups) renderGroupCard(g.site, g.asins);
   saveGroupsToCache();
 
-  // 切换到巡店 Tab 提示
   alert(`已自动填入 ${rows.length} 条 ASIN 到巡店面板（${groups.length} 个站点分组）`);
 }
 
@@ -414,7 +449,7 @@ async function initSiteGroups() {
   const cached = await window.electronAPI.storage.get('asinInputCache');
   const groups = Array.isArray(cached) && cached.length
     ? cached
-    : [{ site: enabledSites[0] ? `www.${enabledSites[0].domain}` : 'www.amazon.ca', asins: '' }];
+    : [{ site: enabledSites[0] ? enabledSites[0].code : 'CA', asins: '' }];
 
   const container = document.getElementById('siteGroups');
   container.innerHTML = '';
@@ -422,9 +457,9 @@ async function initSiteGroups() {
 
   document.getElementById('btnAddGroup').addEventListener('click', () => {
     const usedSites = getUsedSites();
-    const next = enabledSites.find(s => !usedSites.has(`www.${s.domain}`));
+    const next = enabledSites.find(s => !usedSites.has(s.code));
     if (!next) { alert('所有已启用站点均已添加'); return; }
-    renderGroupCard(`www.${next.domain}`, '');
+    renderGroupCard(next.code, '');
     saveGroupsToCache();
   });
 }
@@ -442,7 +477,7 @@ function renderGroupCard(site, asins) {
 
   const usedSites = getUsedSites();
   const options = enabledSites.map(s => {
-    const val = `www.${s.domain}`;
+    const val = s.code;
     const disabled = usedSites.has(val) && val !== site ? 'disabled' : '';
     const selected = val === site ? 'selected' : '';
     return `<option value="${val}" ${selected} ${disabled}>${esc(s.country)} (${esc(s.domain)})</option>`;
@@ -481,7 +516,7 @@ function refreshAllGroupOptions() {
   document.querySelectorAll('.site-group-select').forEach(select => {
     const currentVal = select.value;
     select.innerHTML = enabledSites.map(s => {
-      const val = `www.${s.domain}`;
+      const val = s.code;
       const disabled = usedSites.has(val) && val !== currentVal ? 'disabled' : '';
       const selected = val === currentVal ? 'selected' : '';
       return `<option value="${val}" ${selected} ${disabled}>${esc(s.country)} (${esc(s.domain)})</option>`;
@@ -520,7 +555,7 @@ function buildTasks() {
   for (const group of groups) {
     const { site, asins } = group;
     if (!asins) {
-      const siteFound = enabledSites.find(s => `www.${s.domain}` === site);
+      const siteFound = enabledSites.find(s => s.code === site);
       const label = siteFound ? siteFound.country : site;
       alert(`[${label}] 站点 ASIN 不能为空`);
       return null;
@@ -530,7 +565,7 @@ function buildTasks() {
     )];
     const invalid = asinList.filter(a => !/^[A-Z0-9]{10}$/.test(a));
     if (invalid.length) {
-      const siteFound = enabledSites.find(s => `www.${s.domain}` === site);
+      const siteFound = enabledSites.find(s => s.code === site);
       const label = siteFound ? siteFound.country : site;
       alert(`[${label}] 包含无效 ASIN：${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '...' : ''}`);
       return null;
@@ -767,6 +802,7 @@ function handleComplete(summary, results) {
 
 // ========== Reference Compare ==========
 function findRef(asin, site) {
+  if (!dom.enableRefCompare || !dom.enableRefCompare.checked) return null;
   const rows = referenceData && referenceData.rows ? referenceData.rows : [];
   return rows.find(r => r.asin === asin && (!r.site || r.site === site));
 }
@@ -1092,11 +1128,14 @@ function startTimer() {
 function stopTimer() { if (patrolTimer) { clearInterval(patrolTimer); patrolTimer = null; } }
 
 // ========== Utils ==========
-function getSiteLabel(domain) {
-  const found = sitesData.find(s => `www.${s.domain}` === domain || s.domain === domain);
-  if (found) return found.code || found.country;
-  const m = domain.match(/amazon\.(.+)$/);
-  return m ? m[1].toUpperCase() : domain;
+function getSiteLabel(siteCode) {
+  if (!siteCode) return '';
+  // 兼容旧格式域名（迁移期间可能存在）
+  if (siteCode.includes('.')) {
+    const found = sitesData.find(s => `www.${s.domain}` === siteCode || s.domain === siteCode);
+    return found ? (found.code || siteCode) : siteCode;
+  }
+  return siteCode;
 }
 
 function fmtTime(ms) {
