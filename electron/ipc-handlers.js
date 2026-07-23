@@ -203,9 +203,23 @@ async function onPatrolComplete() {
 
   // 钉钉推送
   const patrolSettings = store.get('patrolSettings');
-  if (patrolSettings && patrolSettings.dingtalkWebhook) {
+  if (patrolSettings) {
     const references = (store.get('referenceData') || {}).rows || [];
-    if (references.length > 0) sendDingTalk(summary, patrolSettings.dingtalkWebhook);
+    const webhookEnabled = patrolSettings.enableGroupNotify && patrolSettings.dingtalkWebhook;
+    const personalEnabled = patrolSettings.enablePersonalNotify && patrolSettings.dingtalkPersonal &&
+      patrolSettings.dingtalkPersonal.appKey;
+
+    if ((webhookEnabled || personalEnabled) && references.length > 0) {
+      const text = await buildDingTalkText(summary);
+      if (text && webhookEnabled) {
+        sendDingTalkWebhook(text, patrolSettings.dingtalkWebhook).catch(e =>
+          console.error('[Patrol] 群通知失败:', e.message));
+      }
+      if (text && personalEnabled) {
+        sendDingTalkPersonal(text, patrolSettings.dingtalkPersonal).catch(e =>
+          console.error('[Patrol] 个人通知失败:', e.message));
+      }
+    }
   }
 }
 
@@ -249,6 +263,53 @@ function savePatrolHistory(summary) {
 }
 
 // ========== 钉钉推送 ==========
+async function getAccessToken(appKey, appSecret) {
+  const url = `https://oapi.dingtalk.com/gettoken?appkey=${encodeURIComponent(appKey)}&appsecret=${encodeURIComponent(appSecret)}`;
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const req = require('https').request({
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET',
+    }, res => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(raw);
+          if (data.errcode === 0) resolve(data.access_token);
+          else reject(new Error(`获取 access_token 失败: ${data.errmsg}`));
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function sendDingTalkPersonal(text, config) {
+  const { appKey, appSecret, agentId, userIds } = config;
+  if (!appKey || !appSecret || !agentId || !userIds) return;
+  try {
+    const token = await getAccessToken(appKey, appSecret);
+    const body = {
+      agent_id: parseInt(agentId),
+      userid_list: userIds,
+      msg: {
+        msgtype: 'markdown',
+        markdown: { title: '亚马逊巡店异常报告', text }
+      }
+    };
+    const res = await postJSON(
+      `https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2?access_token=${token}`,
+      body
+    );
+    console.log('[Patrol] 钉钉个人通知 HTTP', res.status);
+  } catch (e) {
+    console.error('[Patrol] 钉钉个人通知失败:', e.message);
+  }
+}
+
 function mismatchPrice(a, e) {
   if (!e) return false;
   const an = parseFloat(String(a||'').replace(/[^0-9.]/g,'')), en = parseFloat(String(e).replace(/[^0-9.]/g,''));
@@ -267,8 +328,7 @@ function mismatchText(a,e) {
   return at!==et&&!at.includes(et)&&!et.includes(at);
 }
 
-async function sendDingTalk(summary, webhookUrl) {
-  if (!webhookUrl) return;
+async function buildDingTalkText(summary) {
   const references = (store.get('referenceData') || {}).rows || [];
   const sites = store.get('sites') || [];
 
@@ -276,8 +336,7 @@ async function sendDingTalk(summary, webhookUrl) {
     return references.find(ref => ref.asin === r.asin && (!ref.site || ref.site === r.site));
   }
 
-  // 按站点分组收集异常
-  const siteMap = new Map(); // site → [{ asin, alias, diffs, failed, error }]
+  const siteMap = new Map();
 
   completedResults.forEach(r => {
     const ref = findRef(r);
@@ -316,10 +375,8 @@ async function sendDingTalk(summary, webhookUrl) {
     }
   });
 
-  // 无异常则不推送
-  if (siteMap.size === 0) return;
+  if (siteMap.size === 0) return null;
 
-  // 构建消息正文
   const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
   let text = `## 亚马逊巡店异常报告\n\n- **时间**: ${time}\n`;
 
@@ -331,29 +388,31 @@ async function sendDingTalk(summary, webhookUrl) {
 
     items.forEach(item => {
       const nameStr = item.alias ? ` · ${item.alias}` : '';
-      text += `\n- **ASIN**: \`${item.asin}\`${nameStr}\n`;
+      text += `\n##### **${item.asin}**${nameStr}\n\n`;
       if (item.failed) {
         text += `- **原因**: <font color=#fa8c16>${item.error}</font>\n`;
       } else {
         item.diffs.forEach(d => {
-          text += `- **${d.field}**: <font color=#07b807>期望 \`${d.expected}\`</font> → <font color=#ff4d4f>实际 \`${d.actual}\`</font>\n`;
+          const actual = d.actual !== '' && d.actual !== null && d.actual !== undefined
+            ? `\`${d.actual}\`` : '`(空)`';
+          text += `- **${d.field}**: <font color=#07b807>期望 \`${d.expected}\`</font> → <font color=#ff4d4f>实际 ${actual}</font>\n`;
         });
       }
     });
   });
 
-  // 汇总放最后
-  text += `\n---\n\n`;
-  text += `> **汇总**　总计 ${summary.total} 条　用时 ${formatTime(summary.elapsed)}\n`;
+  text += `\n---\n\n> **汇总**　总计 ${summary.total} 条　用时 ${formatTime(summary.elapsed)}\n`;
+  return text;
+}
 
+async function sendDingTalkWebhook(text, webhookUrl) {
+  if (!webhookUrl || !text) return;
   const body = {
     msgtype: 'markdown',
     markdown: { title: '亚马逊巡店异常报告', text }
   };
-  try {
-    const res = await postJSON(webhookUrl, body);
-    console.log('[Patrol] 钉钉推送 HTTP', res.status);
-  } catch(e) { console.error('[Patrol] 钉钉推送失败:', e.message); }
+  const res = await postJSON(webhookUrl, body);
+  console.log('[Patrol] 钉钉群通知 HTTP', res.status);
 }
 
 // ========== IPC 注册 ==========
