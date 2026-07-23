@@ -70,43 +70,71 @@
         <!-- ====== Tab: 巡店 ====== -->
         <div class="tab-panel active" id="tab-patrol">
 
-          <!-- 控制栏 -->
-          <section class="control-bar">
+          <!-- 输入区：站点分组 -->
+          <section class="patrol-input" id="patrol-input">
             <div class="site-groups" id="siteGroups"></div>
             <button id="btnAddGroup" class="btn btn-outline btn-add-group">＋ 新增站点</button>
-            <div class="control-right">
-              <button id="btnStart" class="btn btn-primary btn-lg">
+          </section>
+
+          <!-- 配置区 + 操作区（左右并排） -->
+          <section class="patrol-middle">
+
+            <!-- 配置区：字段勾选 + 功能开关 -->
+            <div class="patrol-config" id="patrol-config">
+              <div class="config-section-label">抓取字段</div>
+              <div class="field-toggles" id="fieldToggles">
+                <label class="field-toggle"><input type="checkbox" data-field="price" checked> 售价</label>
+                <label class="field-toggle"><input type="checkbox" data-field="listPrice" checked> 划线价</label>
+                <label class="field-toggle"><input type="checkbox" data-field="dealBadge" checked> 活动标</label>
+                <label class="field-toggle"><input type="checkbox" data-field="acBadge" checked> AC标</label>
+                <label class="field-toggle"><input type="checkbox" data-field="coupon" checked> Coupon</label>
+                <label class="field-toggle"><input type="checkbox" data-field="rating" checked> 星级</label>
+                <label class="field-toggle"><input type="checkbox" data-field="reviews" checked> 评论数</label>
+                <label class="field-toggle"><input type="checkbox" data-field="seller" checked> 卖家</label>
+                <label class="field-toggle"><input type="checkbox" data-field="stock" checked> 库存</label>
+                <label class="field-toggle"><input type="checkbox" data-field="parentAsin" checked> 父体</label>
+                <label class="field-toggle"><input type="checkbox" data-field="title" checked> 标题</label>
+                <label class="field-toggle"><input type="checkbox" data-field="url" checked> URL</label>
+                <label class="field-toggle"><input type="checkbox" data-field="productInfo"> 产品信息</label>
+                <span class="toggle-actions">
+                  <button id="btnToggleAll" class="btn-ghost-sm">全选</button>
+                  <button id="btnToggleNone" class="btn-ghost-sm">全不选</button>
+                </span>
+              </div>
+
+              <div class="config-divider"></div>
+
+              <div class="config-switches">
+                <div class="config-switch-row">
+                  <span class="config-switch-label">启用对比</span>
+                  <label class="cron-toggle-wrap">
+                    <input type="checkbox" id="enableRefCompare">
+                    <span class="cron-toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="config-switch-row">
+                  <span class="config-switch-label">历史对比</span>
+                  <label class="cron-toggle-wrap">
+                    <input type="checkbox" id="showHistoryDiff">
+                    <span class="cron-toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- 操作区：巡店按钮 -->
+            <div class="patrol-actions" id="patrol-actions">
+              <button id="btnStart" class="btn btn-primary btn-lg btn-patrol">
                 <span>▶</span> 开始巡店
               </button>
-              <button id="btnStop" class="btn btn-danger btn-lg" disabled>
+              <button id="btnStop" class="btn btn-danger btn-lg btn-patrol" disabled>
                 <span>■</span> 停止
               </button>
-              <button id="btnRetry" class="btn btn-warning btn-lg" disabled>
+              <button id="btnRetry" class="btn btn-warning btn-lg btn-patrol" disabled>
                 <span>↻</span> 重试失败项
               </button>
             </div>
-          </section>
 
-          <!-- 字段勾选 -->
-          <section class="field-toggles" id="fieldToggles">
-            <span class="toggle-section-label">抓取字段：</span>
-            <label class="field-toggle"><input type="checkbox" data-field="price" checked> 售价</label>
-            <label class="field-toggle"><input type="checkbox" data-field="listPrice" checked> 划线价</label>
-            <label class="field-toggle"><input type="checkbox" data-field="dealBadge" checked> 活动标</label>
-            <label class="field-toggle"><input type="checkbox" data-field="acBadge" checked> AC标</label>
-            <label class="field-toggle"><input type="checkbox" data-field="coupon" checked> Coupon</label>
-            <label class="field-toggle"><input type="checkbox" data-field="rating" checked> 星级</label>
-            <label class="field-toggle"><input type="checkbox" data-field="reviews" checked> 评论数</label>
-            <label class="field-toggle"><input type="checkbox" data-field="seller" checked> 卖家</label>
-            <label class="field-toggle"><input type="checkbox" data-field="stock" checked> 库存</label>
-            <label class="field-toggle"><input type="checkbox" data-field="parentAsin" checked> 父体</label>
-            <label class="field-toggle"><input type="checkbox" data-field="title" checked> 标题</label>
-            <label class="field-toggle"><input type="checkbox" data-field="url" checked> URL</label>
-            <label class="field-toggle"><input type="checkbox" data-field="productInfo"> 产品信息</label>
-            <span class="toggle-actions">
-              <button id="btnToggleAll" class="btn-ghost-sm">全选</button>
-              <button id="btnToggleNone" class="btn-ghost-sm">全不选</button>
-            </span>
           </section>
 
           <!-- 进度条 -->
@@ -121,16 +149,13 @@
             </div>
           </section>
 
-          <!-- 工具栏 -->
+          <!-- 状态栏 -->
           <section class="toolbar" id="toolbar">
             <div class="toolbar-left">
               <span class="results-summary" id="resultsSummary">准备就绪</span>
               <span id="patrolTimestamp" style="font-size:11px;color:var(--text-muted);margin-left:12px;font-family:var(--font-mono)"></span>
             </div>
             <div class="toolbar-right">
-              <label class="toggle-label">
-                <input type="checkbox" id="showHistoryDiff"> 显示历史对比
-              </label>
               <button id="btnExport" class="btn btn-outline" disabled>
                 <span>⇩</span> 导出 Excel
               </button>
