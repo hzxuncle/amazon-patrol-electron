@@ -32,9 +32,7 @@ function getDefaultConfig() {
 function buildDeliveryZips(sites) {
   const zips = {};
   for (const s of sites) {
-    if (s.enabled && s.zip) {
-      zips[`www.${s.domain}`] = s.zip;
-    }
+    if (s.enabled && s.zip && s.code) zips[s.code] = s.zip;
   }
   return zips;
 }
@@ -69,13 +67,16 @@ function broadcastLog(message) {
   }
 }
 
-function getSiteLabel(domain) {
-  const sites = store.get('sites') || [];
-  const found = sites.find(s => `www.${s.domain}` === domain || s.domain === domain);
-  if (found) return found.code || found.country;
-  // 降级：从域名提取简称
-  const m = domain.match(/amazon\.(.+)$/);
-  return m ? m[1].toUpperCase() : domain;
+function getSiteLabel(siteCode) {
+  // siteCode 现在就是二字码，直接返回
+  if (!siteCode) return '';
+  // 兼容旧格式：如果传入的是域名则查一下
+  if (siteCode.includes('.')) {
+    const sites = store.get('sites') || [];
+    const found = sites.find(s => `www.${s.domain}` === siteCode || s.domain === siteCode);
+    return found ? (found.code || siteCode) : siteCode;
+  }
+  return siteCode;
 }
 
 // ========== Node 16 fetch 替代 ==========
@@ -269,40 +270,85 @@ function mismatchText(a,e) {
 async function sendDingTalk(summary, webhookUrl) {
   if (!webhookUrl) return;
   const references = (store.get('referenceData') || {}).rows || [];
+  const sites = store.get('sites') || [];
+
   function findRef(r) {
-    return references.find(ref => ref.asin===r.asin &&
-      (!ref.site||ref.site===r.site||ref.site.includes(r.site.split('.')[1])));
+    return references.find(ref => ref.asin === r.asin && (!ref.site || ref.site === r.site));
   }
-  const anomalySet = new Map();
+
+  // 按站点分组收集异常
+  const siteMap = new Map(); // site → [{ asin, alias, diffs, failed, error }]
+
   completedResults.forEach(r => {
-    const key = `${r.asin}_${r.site}`;
     const ref = findRef(r);
-    const label = `${getSiteLabel(r.site)}·${(ref&&ref.aliasName)||r.asin}`;
-    if (r.status !== 'success') { anomalySet.set(key,{label,details:[r.error||'抓取失败']}); return; }
-    if (!ref) return;
-    const diffs = [];
-    if (mismatchPrice(r.price,ref.expectedPrice)) diffs.push(`售价 期望${ref.expectedPrice} 实际${r.price}`);
-    if (mismatchPrice(r.listPrice,ref.expectedListPrice)) diffs.push(`划线价 期望${ref.expectedListPrice} 实际${r.listPrice}`);
-    if (mismatchText(r.dealBadge,ref.expectedDealBadge)) diffs.push(`活动 期望${ref.expectedDealBadge} 实际${r.dealBadge}`);
-    if (mismatchText(r.acBadge,ref.expectedAcBadge)) diffs.push(`AC标 期望${ref.expectedAcBadge} 实际${r.acBadge}`);
-    if (mismatchText(r.coupon,ref.expectedCoupon)) diffs.push(`Coupon 期望${ref.expectedCoupon} 实际${r.coupon}`);
-    if (mismatchRating(r.rating,ref.expectedRating)) diffs.push(`星级 期望${ref.expectedRating} 实际${r.rating}`);
-    if (mismatchReviews(r.reviews,ref.expectedReviews)) diffs.push(`评论 期望${ref.expectedReviews} 实际${r.reviews}`);
-    if (mismatchText(r.seller,ref.expectedSeller)) diffs.push(`卖家 期望${ref.expectedSeller} 实际${r.seller}`);
-    if (mismatchText(r.stock,ref.expectedStock)) diffs.push(`库存 期望${ref.expectedStock} 实际${r.stock}`);
-    if (diffs.length) anomalySet.set(key,{label,details:diffs});
-  });
-  let anomalyText = '';
-  if (anomalySet.size>0) {
-    anomalyText='\n\n### ⚠️ 异常清单\n';
-    anomalySet.forEach(v=>{ anomalyText+=`- ${v.label}: ${v.details.join('; ')}\n`; });
-  }
-  const body = {
-    msgtype:'markdown',
-    markdown:{
-      title:'亚马逊巡店报告',
-      text:`## 📊 亚马逊巡店报告\n\n**时间**: ${new Date().toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})}\n\n**总计**: ${summary.total} | ✅${summary.success} | ❌${summary.failed} | 🔐${summary.captcha}\n\n**异常**: ${anomalySet.size} 个\n\n**用时**: ${formatTime(summary.elapsed)}`+anomalyText
+    const alias = ref && ref.aliasName ? ref.aliasName : '';
+
+    if (r.status !== 'success') {
+      if (!siteMap.has(r.site)) siteMap.set(r.site, []);
+      siteMap.get(r.site).push({ asin: r.asin, alias, failed: true, error: r.error || '抓取失败' });
+      return;
     }
+    if (!ref) return;
+
+    const diffs = [];
+    if (mismatchPrice(r.price, ref.expectedPrice))
+      diffs.push({ field: '售价', expected: ref.expectedPrice, actual: r.price });
+    if (mismatchPrice(r.listPrice, ref.expectedListPrice))
+      diffs.push({ field: '划线价', expected: ref.expectedListPrice, actual: r.listPrice });
+    if (mismatchText(r.dealBadge, ref.expectedDealBadge))
+      diffs.push({ field: '活动标', expected: ref.expectedDealBadge, actual: r.dealBadge });
+    if (mismatchText(r.acBadge, ref.expectedAcBadge))
+      diffs.push({ field: 'AC标', expected: ref.expectedAcBadge, actual: r.acBadge });
+    if (mismatchText(r.coupon, ref.expectedCoupon))
+      diffs.push({ field: 'Coupon', expected: ref.expectedCoupon, actual: r.coupon });
+    if (mismatchRating(r.rating, ref.expectedRating))
+      diffs.push({ field: '星级', expected: ref.expectedRating, actual: r.rating });
+    if (mismatchReviews(r.reviews, ref.expectedReviews))
+      diffs.push({ field: '评论数', expected: ref.expectedReviews, actual: r.reviews });
+    if (mismatchText(r.seller, ref.expectedSeller))
+      diffs.push({ field: '卖家', expected: ref.expectedSeller, actual: r.seller });
+    if (mismatchText(r.stock, ref.expectedStock))
+      diffs.push({ field: '库存', expected: ref.expectedStock, actual: r.stock });
+
+    if (diffs.length) {
+      if (!siteMap.has(r.site)) siteMap.set(r.site, []);
+      siteMap.get(r.site).push({ asin: r.asin, alias, failed: false, diffs });
+    }
+  });
+
+  // 无异常则不推送
+  if (siteMap.size === 0) return;
+
+  // 构建消息正文
+  const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+  let text = `## 亚马逊巡店异常报告\n\n- **时间**: ${time}\n`;
+
+  siteMap.forEach((items, site) => {
+    const siteLabel = getSiteLabel(site);
+    const siteInfo = sites.find(s => `www.${s.domain}` === site);
+    const domain = siteInfo ? siteInfo.domain : site;
+    text += `\n---\n\n#### ${siteLabel} · ${domain}\n`;
+
+    items.forEach(item => {
+      const nameStr = item.alias ? ` · ${item.alias}` : '';
+      text += `\n- **ASIN**: \`${item.asin}\`${nameStr}\n`;
+      if (item.failed) {
+        text += `- **原因**: <font color=#fa8c16>${item.error}</font>\n`;
+      } else {
+        item.diffs.forEach(d => {
+          text += `- **${d.field}**: <font color=#07b807>期望 \`${d.expected}\`</font> → <font color=#ff4d4f>实际 \`${d.actual}\`</font>\n`;
+        });
+      }
+    });
+  });
+
+  // 汇总放最后
+  text += `\n---\n\n`;
+  text += `> **汇总**　总计 ${summary.total} 条　用时 ${formatTime(summary.elapsed)}\n`;
+
+  const body = {
+    msgtype: 'markdown',
+    markdown: { title: '亚马逊巡店异常报告', text }
   };
   try {
     const res = await postJSON(webhookUrl, body);
