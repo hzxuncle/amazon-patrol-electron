@@ -5,7 +5,7 @@ const path = require('path');
 const ipcHandlers = require('./ipc-handlers');
 const scheduler = require('./scheduler');
 const store = require('./store');
-const { buildDefaultSites } = require('./sites-data');
+const { buildDefaultSites, BUILTIN_SITES } = require('./sites-data');
 
 let mainWindow = null;
 let tray = null;
@@ -63,7 +63,7 @@ function createTray() {
 function buildDeliveryZipsForCron(sites) {
   const zips = {};
   for (const s of sites) {
-    if (s.enabled && s.zip) zips[`www.${s.domain}`] = s.zip;
+    if (s.enabled && s.zip && s.code) zips[s.code] = s.zip;
   }
   return zips;
 }
@@ -118,15 +118,30 @@ if (!gotLock) {
 
 // ========== 应用生命周期 ==========
 function initSites() {
-  if (!store.get('sites')) {
+  const existing = store.get('sites');
+  if (!existing) {
     store.set('sites', buildDefaultSites());
     console.log('[Main] sites.json 初始化完成');
+    return;
+  }
+  // 补丁：旧版本 sites.json 没有 code 字段，按 domain 从 BUILTIN_SITES 补全
+  const needsPatch = existing.some(s => !s.code);
+  if (needsPatch) {
+    const builtinMap = {};
+    BUILTIN_SITES.forEach(b => { builtinMap[b.domain] = b.code; });
+    const patched = existing.map(s => ({
+      ...s,
+      code: s.code || builtinMap[s.domain] || s.domain.split('.').pop().toUpperCase()
+    }));
+    store.set('sites', patched);
+    console.log('[Main] sites.json 补全 code 字段完成');
   }
 }
 
 app.whenReady().then(() => {
   store.migrate();
   initSites();
+  store.migrateSiteCodes();
   ipcHandlers.register();
   createWindow();
   createTray();
