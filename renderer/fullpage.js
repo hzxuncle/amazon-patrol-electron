@@ -54,6 +54,12 @@ const dom = {
   scrapeTimeoutVal: $('#scrapeTimeoutVal'),
   dingtalkWebhook: $('#dingtalkWebhook'),
   dingtalkEnabled: $('#dingtalkEnabled'),
+  dingtalkAppKey:      $('#dingtalkAppKey'),
+  dingtalkAppSecret:   $('#dingtalkAppSecret'),
+  dingtalkAgentId:     $('#dingtalkAgentId'),
+  dingtalkUserIds:     $('#dingtalkUserIds'),
+  enableGroupNotify:   $('#enableGroupNotify'),
+  enablePersonalNotify:$('#enablePersonalNotify'),
   showScrapeWindow: $('#showScrapeWindow'),
 
   // Status
@@ -128,7 +134,13 @@ function initSettingsSliders() {
     slider.addEventListener('input', () => { display.textContent = slider.value; saveSettings(); });
   });
   dom.dingtalkWebhook.addEventListener('input', saveSettings);
-  dom.dingtalkEnabled.addEventListener('change', saveSettings);
+  if (dom.dingtalkEnabled) dom.dingtalkEnabled.addEventListener('change', saveSettings);
+  if (dom.dingtalkAppKey)     dom.dingtalkAppKey.addEventListener('input', saveSettings);
+  if (dom.dingtalkAppSecret)  dom.dingtalkAppSecret.addEventListener('input', saveSettings);
+  if (dom.dingtalkAgentId)    dom.dingtalkAgentId.addEventListener('input', saveSettings);
+  if (dom.dingtalkUserIds)    dom.dingtalkUserIds.addEventListener('input', saveSettings);
+  if (dom.enableGroupNotify)  dom.enableGroupNotify.addEventListener('change', saveSettings);
+  if (dom.enablePersonalNotify) dom.enablePersonalNotify.addEventListener('change', saveSettings);
   if (dom.showScrapeWindow) dom.showScrapeWindow.addEventListener('change', saveSettings);
   dom.showHistoryDiff.addEventListener('change', () => {
     renderAllResults();
@@ -158,7 +170,15 @@ function getSettings() {
     scrapeTimeout: parseInt(dom.scrapeTimeout.value) * 1000,
     maxRetries: 3,
     retryDelay: 2000,
-    dingtalkWebhook: dom.dingtalkEnabled.checked ? dom.dingtalkWebhook.value.trim() : '',
+    dingtalkWebhook: dom.dingtalkEnabled ? (dom.dingtalkEnabled.checked ? dom.dingtalkWebhook.value.trim() : '') : '',
+    enableGroupNotify:   dom.enableGroupNotify   ? dom.enableGroupNotify.checked   : false,
+    enablePersonalNotify:dom.enablePersonalNotify ? dom.enablePersonalNotify.checked : false,
+    dingtalkPersonal: {
+      appKey:    dom.dingtalkAppKey    ? dom.dingtalkAppKey.value.trim()    : '',
+      appSecret: dom.dingtalkAppSecret ? dom.dingtalkAppSecret.value.trim() : '',
+      agentId:   dom.dingtalkAgentId   ? dom.dingtalkAgentId.value.trim()   : '',
+      userIds:   dom.dingtalkUserIds   ? dom.dingtalkUserIds.value.trim()   : '',
+    },
     showHistoryDiff: dom.showHistoryDiff.checked,
     enableRefCompare: dom.enableRefCompare ? dom.enableRefCompare.checked : false,
     enabledFields: getEnabledFields(),
@@ -201,7 +221,15 @@ async function loadSettings() {
     dom.batchRest.value = (s.batchRest || 30000) / 1000; dom.batchRestVal.textContent = (s.batchRest || 30000) / 1000;
     dom.scrapeTimeout.value = (s.scrapeTimeout || 25000) / 1000; dom.scrapeTimeoutVal.textContent = (s.scrapeTimeout || 25000) / 1000;
     dom.dingtalkWebhook.value = s.dingtalkWebhook || '';
-    dom.dingtalkEnabled.checked = !!s.dingtalkWebhook;
+    if (dom.dingtalkEnabled) dom.dingtalkEnabled.checked = !!s.dingtalkWebhook;
+    if (dom.enableGroupNotify)    dom.enableGroupNotify.checked    = s.enableGroupNotify    || false;
+    if (dom.enablePersonalNotify) dom.enablePersonalNotify.checked = s.enablePersonalNotify || false;
+    if (s.dingtalkPersonal) {
+      if (dom.dingtalkAppKey)    dom.dingtalkAppKey.value    = s.dingtalkPersonal.appKey    || '';
+      if (dom.dingtalkAppSecret) dom.dingtalkAppSecret.value = s.dingtalkPersonal.appSecret || '';
+      if (dom.dingtalkAgentId)   dom.dingtalkAgentId.value   = s.dingtalkPersonal.agentId   || '';
+      if (dom.dingtalkUserIds)   dom.dingtalkUserIds.value   = s.dingtalkPersonal.userIds   || '';
+    }
     dom.showHistoryDiff.checked = s.showHistoryDiff || false;
     if (dom.enableRefCompare) dom.enableRefCompare.checked = s.enableRefCompare || false;
     // 恢复字段勾选
