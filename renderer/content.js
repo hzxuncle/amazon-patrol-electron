@@ -37,7 +37,8 @@
   }
 
   function getSite() {
-    return window.location.hostname;
+    // 优先使用注入的 site code，fallback 到 hostname（兼容直接调用场景）
+    return window.__SITE_CODE__ || window.location.hostname;
   }
 
   /**

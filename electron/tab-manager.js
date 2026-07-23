@@ -168,6 +168,9 @@ async function initDeliveryZip(site, zip) {
 async function injectAndScrape(win, asin, config) {
   const scrapeTimeout = config.scrapeTimeout || 25000;
 
+  // 注入 site code，供 content.js 使用（getSite() 优先返回 code）
+  await win.webContents.executeJavaScript(`window.__SITE_CODE__ = ${JSON.stringify(config._siteCode || '')}`);
+
   const fullScript = `
 (async function() {
   'use strict';
@@ -231,7 +234,8 @@ async function openTabForTask(task, config) {
   try {
     await win.loadURL(url);
     await waitForLoad(win);
-    const result = await injectAndScrape(win, asin, config);
+    const configWithCode = { ...config, _siteCode: site };
+    const result = await injectAndScrape(win, asin, configWithCode);
     result.site = site;
     result.index = task.index !== undefined ? task.index : null;
     return result;
