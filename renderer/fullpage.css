@@ -265,11 +265,17 @@ body::before { display: none; }
   text-transform: uppercase; letter-spacing: 0.5px;
   margin-bottom: 8px;
 }
+.card-subtitle {
+  font-size: 12px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 8px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
 .config-divider {
   height: 1px; background: var(--border); margin: 10px 0;
 }
 .config-switches {
-  display: flex; flex-direction: column; gap: 8px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;
 }
 .config-switch-row {
   display: flex; align-items: center; justify-content: space-between;
