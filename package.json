@@ -1,7 +1,7 @@
 {
   "name": "amazon-patrol",
-  "version": "2.0.0",
-  "description": "亚马逊巡店助手桌面版",
+  "version": "1.0.0",
+  "description": "亚马逊监控助手桌面版",
   "main": "electron/main.js",
   "engines": {
     "node": ">=16",
@@ -22,7 +22,8 @@
   },
   "build": {
     "appId": "com.amazonpatrol.desktop",
-    "productName": "亚马逊巡店助手",
+    "productName": "亚马逊监控助手",
+    "artifactName": "${productName}.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -33,7 +34,9 @@
     ],
     "asarUnpack": [
       "renderer/content.js",
-      "renderer/selectors.js"
+      "renderer/selectors.js",
+      "renderer/selectors/**/*",
+      "renderer/sites/**/*"
     ],
     "win": {
       "target": [
@@ -59,7 +62,7 @@
       "include": "build/installer.nsh",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "亚马逊巡店助手"
+      "shortcutName": "亚马逊监控助手"
     }
   }
 }

@@ -12,19 +12,7 @@ function unpackedPath(p) {
   return p.replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
 }
 
-const SELECTORS_JS = fs.readFileSync(
-  unpackedPath(path.join(__dirname, '../renderer/selectors.js')), 'utf8'
-);
-
-const rawContent = fs.readFileSync(
-  unpackedPath(path.join(__dirname, '../renderer/content.js')), 'utf8'
-);
-const CONTENT_BODY = rawContent
-  .replace(/^[\s\S]*?\(function\s*\(\s*\)\s*\{/, '')
-  .replace(/\}\)\(\);?\s*$/, '')
-  .replace(/^\s*'use strict';\s*\n/m, '')
-  .replace(/chrome\.runtime\.onMessage\.addListener\([\s\S]*?\n  \}\);/, '')
-  .replace(/^\s*console\.log\('[^']*Content script[^']*'\);\s*$/m, '');
+const sitesIndex = require(path.join(__dirname, '../renderer/sites/index.js'));
 
 const SITE_LANG_MAP = {
   'amazon.com':    'en_US',
@@ -74,6 +62,8 @@ const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 
 // 记录已经初始化过配送地的站点，巡店期间每站点只设一次
 const initializedSites = new Set();
+// 记录正在初始化中的站点，防止并发重复初始化
+const pendingSiteInit = new Map(); // site → Promise
 
 function getSiteUrl(code) {
   const domain = getDomainByCode(code);
@@ -168,16 +158,20 @@ async function initDeliveryZip(site, zip) {
 async function injectAndScrape(win, asin, config) {
   const scrapeTimeout = config.scrapeTimeout || 25000;
 
-  // 注入 site code，供 content.js 使用（getSite() 优先返回 code）
-  await win.webContents.executeJavaScript(`window.__SITE_CODE__ = ${JSON.stringify(config._siteCode || '')}`);
+  const siteCode = config._siteCode || '';
+
+  // 注入 site code，供 scraper 使用
+  await win.webContents.executeJavaScript(`window.__SITE_CODE__ = ${JSON.stringify(siteCode)}`);
+
+  // 使用新的站点专用 scraper（包含选择器+解析+归一化+抓取流程）
+  const scraperScript = sitesIndex.buildScraperScript(siteCode);
 
   const fullScript = `
 (async function() {
   'use strict';
   try {
-    ${SELECTORS_JS}
-    ${CONTENT_BODY}
-    const result = await handleScrape({
+    ${scraperScript}
+    const result = await window.__SCRAPER__.handleScrape({
       action: 'SCRAPE_NOW',
       asin: ${JSON.stringify(asin)},
       maxRetries: ${config.maxRetries || 3},
@@ -209,9 +203,14 @@ async function openTabForTask(task, config) {
   const url = buildProductUrl(site, asin);
   const zip = (config.deliveryZips || {})[site] || '';
 
-  // 每站点只初始化一次配送地（不阻塞，首个任务会等，后续直接跳过）
+  // 每站点只初始化一次配送地，并发时后续 worker 等待同一个 Promise 而不是重复初始化
   if (zip && !initializedSites.has(site)) {
-    await initDeliveryZip(site, zip);
+    if (!pendingSiteInit.has(site)) {
+      const p = initDeliveryZip(site, zip);
+      pendingSiteInit.set(site, p);
+      p.finally(() => pendingSiteInit.delete(site));
+    }
+    await pendingSiteInit.get(site);
   }
 
   const showWindow = !!config.showScrapeWindow;
@@ -255,6 +254,7 @@ function closeAll() {
 // 巡店开始时重置，让新一轮巡店重新设置配送地（邮编可能已改）
 function resetSiteInit() {
   initializedSites.clear();
+  pendingSiteInit.clear();
 }
 
 module.exports = { openTabForTask, closeAll, resetSiteInit };
