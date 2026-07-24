@@ -197,10 +197,12 @@ function getSettings() {
 
 // 所有可排序字段的默认顺序（与 HTML 中 data-field 顺序一致）
 const DEFAULT_FIELD_ORDER = [
+  'productInfo',
+  'bsrSubRank','bsrSubCategory',
   'price','listPrice','dealBadge','acBadge','coupon',
   'rating','reviews','seller','stock','parentAsin',
-  'title','url','productInfo',
-  'bsrMainRank','bsrMainCategory','bsrSubRank','bsrSubCategory'
+  'title','url',
+  'bsrMainRank','bsrMainCategory'
 ];
 
 const FIELD_LABELS = {
