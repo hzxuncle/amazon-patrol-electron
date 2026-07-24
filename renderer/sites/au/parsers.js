@@ -75,8 +75,9 @@ function extractBsr(productInfo) {
   if (!raw) return null;
 
   // AU 无 # 前缀，先去掉括号内容（如 "(See Top 100 in ...)"），再匹配 "数字 in 分类"
-  const cleaned = raw.replace(/\([^)]*\)/g, '');
-  const matches = [...cleaned.matchAll(/([\d,]+)\s+in\s+([^\n]+)/g)];
+  // 分类名到下一个 "数字 in" 或字符串结束为止
+  const cleaned = raw.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+  const matches = [...cleaned.matchAll(/([\d,]+)\s+in\s+((?:(?!\d+\s+in\s+).)+)/g)];
   if (!matches.length) return null;
 
   function parseMatch(m) {
