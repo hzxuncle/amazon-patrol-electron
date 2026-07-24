@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>亚马逊巡店助手 v2</title>
+  <title>亚马逊监控助手</title>
   <link rel="stylesheet" href="fullpage.css">
 </head>
 <body>
@@ -13,7 +13,7 @@
     <header class="header">
       <div class="header-left">
         <img src="../assets/logo.png" alt="RENPHO" class="header-logo" style="height:24px;width:auto;object-fit:contain;">
-        <span class="version" style="margin-left:6px;font-size:11px;color:var(--text-muted)">巡店助手 v2.0</span>
+        <span class="version" style="margin-left:6px;font-size:11px;color:var(--text-muted)">监控助手 v1.0.0</span>
       </div>
       <div class="header-center">
         <span class="status-badge" id="statusBadge">
@@ -34,28 +34,28 @@
       <aside class="sidebar">
         <nav class="side-nav">
           <button class="side-tab active" data-tab="patrol">
-            <span class="side-tab-icon">◎</span>
-            <span>巡店</span>
+            <span class="side-tab-icon">▶</span>
+            <span>监控</span>
           </button>
           <button class="side-tab" data-tab="import">
-            <span class="side-tab-icon">⇧</span>
-            <span>参考数据</span>
+            <span class="side-tab-icon">≡</span>
+            <span>对比数据</span>
           </button>
           <button class="side-tab" data-tab="cron">
-            <span class="side-tab-icon">⏱</span>
-            <span>定时</span>
-          </button>
-          <button class="side-tab" data-tab="log">
-            <span class="side-tab-icon">📋</span>
-            <span>日志</span>
-          </button>
-          <button class="side-tab" data-tab="history">
-            <span class="side-tab-icon">🕐</span>
-            <span>历史</span>
+            <span class="side-tab-icon">◷</span>
+            <span>定时任务</span>
           </button>
           <button class="side-tab" data-tab="sites">
-            <span class="side-tab-icon">🌐</span>
-            <span>站点</span>
+            <span class="side-tab-icon">⊕</span>
+            <span>站点管理</span>
+          </button>
+          <button class="side-tab" data-tab="history">
+            <span class="side-tab-icon">↺</span>
+            <span>巡店历史</span>
+          </button>
+          <button class="side-tab" data-tab="log">
+            <span class="side-tab-icon">∷</span>
+            <span>日志</span>
           </button>
           <button class="side-tab" data-tab="settings">
             <span class="side-tab-icon">⚙</span>
@@ -72,8 +72,14 @@
 
           <!-- 输入区：站点分组 -->
           <section class="patrol-input" id="patrol-input">
+            <div class="patrol-card-header">
+              <span class="patrol-card-title">巡检站点</span>
+              <div style="display:flex;gap:8px">
+                <button id="btnAddGroup" class="btn btn-outline" style="font-size:12px;padding:4px 10px">新增站点</button>
+                <button id="btnClearGroups" class="btn btn-outline" style="font-size:12px;padding:4px 10px">清空站点</button>
+              </div>
+            </div>
             <div class="site-groups" id="siteGroups"></div>
-            <button id="btnAddGroup" class="btn btn-outline btn-add-group">＋ 新增站点</button>
           </section>
 
           <!-- 配置区 + 操作区（左右并排） -->
@@ -81,7 +87,10 @@
 
             <!-- 配置区：字段勾选 + 功能开关 -->
             <div class="patrol-config" id="patrol-config">
-              <div class="config-section-label">抓取字段</div>
+              <div class="patrol-card-header">
+                <span class="patrol-card-title">抓取配置</span>
+              </div>
+              <div class="config-section-label">字段</div>
               <div class="field-toggles" id="fieldToggles">
                 <label class="field-toggle"><input type="checkbox" data-field="price" checked> 售价</label>
                 <label class="field-toggle"><input type="checkbox" data-field="listPrice" checked> 划线价</label>
@@ -96,6 +105,10 @@
                 <label class="field-toggle"><input type="checkbox" data-field="title" checked> 标题</label>
                 <label class="field-toggle"><input type="checkbox" data-field="url" checked> URL</label>
                 <label class="field-toggle"><input type="checkbox" data-field="productInfo"> 产品信息</label>
+            <label class="field-toggle"><input type="checkbox" data-field="bsrMainRank"> BSR大类排名</label>
+            <label class="field-toggle"><input type="checkbox" data-field="bsrMainCategory"> BSR大类名</label>
+            <label class="field-toggle"><input type="checkbox" data-field="bsrSubRank"> BSR小类排名</label>
+            <label class="field-toggle"><input type="checkbox" data-field="bsrSubCategory"> BSR小类名</label>
                 <span class="toggle-actions">
                   <button id="btnToggleAll" class="btn-ghost-sm">全选</button>
                   <button id="btnToggleNone" class="btn-ghost-sm">全不选</button>
@@ -120,14 +133,14 @@
                   </label>
                 </div>
                 <div class="config-switch-row">
-                  <span class="config-switch-label">群通知</span>
+                  <span class="config-switch-label">钉钉群通知</span>
                   <label class="cron-toggle-wrap">
                     <input type="checkbox" id="enableGroupNotify">
                     <span class="cron-toggle-slider"></span>
                   </label>
                 </div>
                 <div class="config-switch-row">
-                  <span class="config-switch-label">个人通知</span>
+                  <span class="config-switch-label">钉钉个人通知</span>
                   <label class="cron-toggle-wrap">
                     <input type="checkbox" id="enablePersonalNotify">
                     <span class="cron-toggle-slider"></span>
@@ -138,52 +151,52 @@
 
             <!-- 操作区：巡店按钮 -->
             <div class="patrol-actions" id="patrol-actions">
+              <div class="patrol-card-header">
+                <span class="patrol-card-title">操作</span>
+              </div>
               <button id="btnStart" class="btn btn-primary btn-lg btn-patrol">
                 <span>▶</span> 开始巡店
               </button>
-              <button id="btnStop" class="btn btn-danger btn-lg btn-patrol" disabled>
+              <button id="btnStop" class="btn btn-primary btn-lg btn-patrol" disabled>
                 <span>■</span> 停止
               </button>
-              <button id="btnRetry" class="btn btn-warning btn-lg btn-patrol" disabled>
+              <button id="btnRetry" class="btn btn-outline btn-lg btn-patrol" disabled>
                 <span>↻</span> 重试失败项
               </button>
             </div>
 
           </section>
 
-          <!-- 进度条 -->
-          <section class="progress-bar-section" id="progressSection" style="display:none">
-            <div class="progress-info-row">
-              <span id="progressText">0 / 0</span>
-              <span id="progressTime">00:00</span>
-              <span id="progressStatus">准备中...</span>
+          <!-- 巡检结果卡片（状态栏 + 进度条 + 表格合并） -->
+          <div class="result-card" id="tableContainer">
+            <div class="result-card-header" id="toolbar">
+              <div class="toolbar-left">
+                <span class="patrol-card-title">巡检结果</span>
+                <span class="results-summary" id="resultsSummary" style="margin-left:10px"></span>
+                <span id="patrolTimestamp" style="font-size:12px;color:var(--text-muted);margin-left:12px;font-family:var(--font-mono)"></span>
+              </div>
+              <div class="toolbar-right">
+                <button id="btnExport" class="btn btn-outline" disabled>
+                  <span>⇩</span> 导出 Excel
+                </button>
+                <button id="btnClear" class="btn btn-outline">清除结果</button>
+              </div>
             </div>
-            <div class="progress-track">
-              <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-bar-section" id="progressSection" style="display:none">
+              <div class="progress-info-row">
+                <span id="progressText">0 / 0</span>
+                <span id="progressTime">00:00</span>
+                <span id="progressStatus">准备中...</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
             </div>
-          </section>
-
-          <!-- 状态栏 -->
-          <section class="toolbar" id="toolbar">
-            <div class="toolbar-left">
-              <span class="results-summary" id="resultsSummary">准备就绪</span>
-              <span id="patrolTimestamp" style="font-size:11px;color:var(--text-muted);margin-left:12px;font-family:var(--font-mono)"></span>
-            </div>
-            <div class="toolbar-right">
-              <button id="btnExport" class="btn btn-outline" disabled>
-                <span>⇩</span> 导出 Excel
-              </button>
-              <button id="btnClear" class="btn btn-ghost">清除结果</button>
-            </div>
-          </section>
-
-          <!-- 结果表格 -->
-          <div class="table-container" id="tableContainer">
             <div class="table-scroll">
               <table class="results-table" id="resultsTable">
                 <thead>
                   <tr>
-                    <th class="col-status" title="状态">状</th>
+                    <th class="col-status">状态</th>
                     <th class="col-site">站点</th>
                     <th class="col-asin">ASIN</th>
                     <th class="col-title">标题</th>
@@ -199,6 +212,10 @@
                     <th class="col-stock">库存</th>
                     <th class="col-parent">父体</th>
                     <th class="col-product-info">产品信息</th>
+                    <th class="col-bsr-main-rank">BSR大类排名</th>
+                    <th class="col-bsr-main-cat">BSR大类名</th>
+                    <th class="col-bsr-sub-rank">BSR小类排名</th>
+                    <th class="col-bsr-sub-cat">BSR小类名</th>
                     <th class="col-history" id="colHistory">上次</th>
                   </tr>
                 </thead>
@@ -490,13 +507,9 @@
             </div>
           </section>
           <section class="card">
-            <div class="card-header"><span class="card-title">配送地设置</span></div>
-            <p class="setting-hint" style="padding:8px 0">请前往「站点」Tab 管理各站点邮编。</p>
-          </section>
-          <section class="card">
             <div class="card-header"><span class="card-title">通知设置</span></div>
 
-            <div class="card-subtitle">群通知</div>
+            <div class="card-subtitle">钉钉群通知</div>
             <div class="setting-item">
               <label>钉钉机器人 Webhook</label>
               <input type="text" id="dingtalkWebhook" class="text-input"
@@ -504,11 +517,11 @@
               <span class="setting-hint">巡店完成后通过群机器人发送异常报告</span>
             </div>
 
-            <div class="card-subtitle" style="margin-top:16px">个人通知</div>
+            <div class="card-subtitle" style="margin-top:16px">钉钉个人通知</div>
             <div class="settings-grid">
               <div class="setting-item">
                 <label>AppKey</label>
-                <input type="text" id="dingtalkAppKey" class="text-input" placeholder="dingxxxxxxxxxx">
+                <input type="password" id="dingtalkAppKey" class="text-input" placeholder="dingxxxxxxxxxx">
               </div>
               <div class="setting-item">
                 <label>AppSecret</label>
@@ -516,27 +529,35 @@
               </div>
               <div class="setting-item">
                 <label>AgentId</label>
-                <input type="text" id="dingtalkAgentId" class="text-input" placeholder="123456789">
+                <input type="password" id="dingtalkAgentId" class="text-input" placeholder="123456789">
               </div>
               <div class="setting-item">
-                <label>接收人 userId</label>
-                <input type="text" id="dingtalkUserIds" class="text-input" placeholder="user1,user2">
-                <span class="setting-hint">多个用户用逗号分隔</span>
+                <label>接收人手机号</label>
+                <input type="text" id="dingtalkUserIds" class="text-input" placeholder="138xxxxxxxx,139xxxxxxxx">
+                <span class="setting-hint">多个手机号用逗号分隔，发送前自动转换为 userId</span>
               </div>
             </div>
           </section>
           <section class="card">
             <div class="card-header"><span class="card-title">系统设置</span></div>
             <div class="setting-item">
-              <label class="toggle-label">
-                <input type="checkbox" id="openAtLogin"> 开机自动启动
-              </label>
+              <div class="config-switch-row">
+                <span class="config-switch-label">开机自动启动</span>
+                <label class="cron-toggle-wrap">
+                  <input type="checkbox" id="openAtLogin">
+                  <span class="cron-toggle-slider"></span>
+                </label>
+              </div>
               <span class="setting-hint">启用后系统启动时自动运行巡店助手（最小化到托盘）</span>
             </div>
             <div class="setting-item" style="margin-top:12px">
-              <label class="toggle-label">
-                <input type="checkbox" id="showScrapeWindow"> 显示抓取窗口
-              </label>
+              <div class="config-switch-row">
+                <span class="config-switch-label">显示抓取窗口</span>
+                <label class="cron-toggle-wrap">
+                  <input type="checkbox" id="showScrapeWindow">
+                  <span class="cron-toggle-slider"></span>
+                </label>
+              </div>
               <span class="setting-hint">开启后巡店时可看到后台打开的 Amazon 页面，便于调试</span>
             </div>
           </section>

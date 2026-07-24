@@ -139,8 +139,14 @@ function initSettingsSliders() {
   if (dom.dingtalkAppSecret)  dom.dingtalkAppSecret.addEventListener('input', saveSettings);
   if (dom.dingtalkAgentId)    dom.dingtalkAgentId.addEventListener('input', saveSettings);
   if (dom.dingtalkUserIds)    dom.dingtalkUserIds.addEventListener('input', saveSettings);
-  if (dom.enableGroupNotify)  dom.enableGroupNotify.addEventListener('change', saveSettings);
-  if (dom.enablePersonalNotify) dom.enablePersonalNotify.addEventListener('change', saveSettings);
+  if (dom.enableGroupNotify) dom.enableGroupNotify.addEventListener('change', () => {
+    if (dom.enableGroupNotify.checked && dom.enablePersonalNotify) dom.enablePersonalNotify.checked = false;
+    saveSettings();
+  });
+  if (dom.enablePersonalNotify) dom.enablePersonalNotify.addEventListener('change', () => {
+    if (dom.enablePersonalNotify.checked && dom.enableGroupNotify) dom.enableGroupNotify.checked = false;
+    saveSettings();
+  });
   if (dom.showScrapeWindow) dom.showScrapeWindow.addEventListener('change', saveSettings);
   dom.showHistoryDiff.addEventListener('change', () => {
     renderAllResults();
@@ -170,10 +176,15 @@ function getSettings() {
     scrapeTimeout: parseInt(dom.scrapeTimeout.value) * 1000,
     maxRetries: 3,
     retryDelay: 2000,
-    dingtalkWebhook: dom.dingtalkEnabled ? (dom.dingtalkEnabled.checked ? dom.dingtalkWebhook.value.trim() : '') : '',
+    dingtalkWebhook: dom.dingtalkWebhook ? dom.dingtalkWebhook.value.trim() : '',
     enableGroupNotify:   dom.enableGroupNotify   ? dom.enableGroupNotify.checked   : false,
     enablePersonalNotify:dom.enablePersonalNotify ? dom.enablePersonalNotify.checked : false,
-    // dingtalkPersonal 凭证不存本地，通过 getPersonalNotifyConfig() 实时读取
+    dingtalkPersonal: {
+      appKey:    dom.dingtalkAppKey    ? dom.dingtalkAppKey.value.trim()    : '',
+      appSecret: dom.dingtalkAppSecret ? dom.dingtalkAppSecret.value.trim() : '',
+      agentId:   dom.dingtalkAgentId   ? dom.dingtalkAgentId.value.trim()   : '',
+    },
+    dingtalkPersonalPhones: dom.dingtalkUserIds ? dom.dingtalkUserIds.value.trim() : '',
     showHistoryDiff: dom.showHistoryDiff.checked,
     enableRefCompare: dom.enableRefCompare ? dom.enableRefCompare.checked : false,
     enabledFields: getEnabledFields(),
@@ -216,13 +227,14 @@ async function loadSettings() {
     dom.batchRest.value = (s.batchRest || 30000) / 1000; dom.batchRestVal.textContent = (s.batchRest || 30000) / 1000;
     dom.scrapeTimeout.value = (s.scrapeTimeout || 25000) / 1000; dom.scrapeTimeoutVal.textContent = (s.scrapeTimeout || 25000) / 1000;
     dom.dingtalkWebhook.value = s.dingtalkWebhook || '';
-    if (dom.dingtalkEnabled) dom.dingtalkEnabled.checked = !!s.dingtalkWebhook;
     if (dom.enableGroupNotify)    dom.enableGroupNotify.checked    = s.enableGroupNotify    || false;
     if (dom.enablePersonalNotify) dom.enablePersonalNotify.checked = s.enablePersonalNotify || false;
-    // dingtalkPersonal 凭证不从本地恢复，需用户每次填写
-    if (s.dingtalkPersonal && s.dingtalkPersonal.userIds) {
-      if (dom.dingtalkUserIds) dom.dingtalkUserIds.value = s.dingtalkPersonal.userIds || '';
+    if (s.dingtalkPersonal) {
+      if (dom.dingtalkAppKey)    dom.dingtalkAppKey.value    = s.dingtalkPersonal.appKey    || '';
+      if (dom.dingtalkAppSecret) dom.dingtalkAppSecret.value = s.dingtalkPersonal.appSecret || '';
+      if (dom.dingtalkAgentId)   dom.dingtalkAgentId.value   = s.dingtalkPersonal.agentId   || '';
     }
+    if (dom.dingtalkUserIds) dom.dingtalkUserIds.value = s.dingtalkPersonalPhones || '';
     dom.showHistoryDiff.checked = s.showHistoryDiff || false;
     if (dom.enableRefCompare) dom.enableRefCompare.checked = s.enableRefCompare || false;
     // 恢复字段勾选
@@ -331,8 +343,12 @@ function processFile(file) {
         expectedCoupon:     String(r['期望Coupon'] || r['Expected Coupon'] || r['expectedCoupon'] || '').trim(),
         expectedRating:     String(r['期望星级'] || r['Expected Rating'] || r['expectedRating'] || '').trim(),
         expectedReviews:    String(r['期望评论数'] || r['Expected Reviews'] || r['expectedReviews'] || '').trim(),
-        expectedSeller:     String(r['期望卖家'] || r['Expected Seller'] || r['expectedSeller'] || '').trim(),
-        expectedStock:      String(r['期望库存'] || r['Expected Stock'] || r['expectedStock'] || '').trim(),
+        expectedSeller:          String(r['期望卖家'] || r['Expected Seller'] || r['expectedSeller'] || '').trim(),
+        expectedStock:           String(r['期望库存'] || r['Expected Stock'] || r['expectedStock'] || '').trim(),
+        expectedBsrMainRank:     String(r['期望BSR大类排名'] || r['Expected BSR Main Rank'] || r['expectedBsrMainRank'] || '').trim(),
+        expectedBsrMainCategory: String(r['期望BSR大类名'] || r['Expected BSR Main Category'] || r['expectedBsrMainCategory'] || '').trim(),
+        expectedBsrSubRank:      String(r['期望BSR小类排名'] || r['Expected BSR Sub Rank'] || r['expectedBsrSubRank'] || '').trim(),
+        expectedBsrSubCategory:  String(r['期望BSR小类名'] || r['Expected BSR Sub Category'] || r['expectedBsrSubCategory'] || '').trim(),
       })).filter(r => r.asin);
 
       // 将站点标识规范化为二字码（code）
@@ -435,7 +451,7 @@ async function autoFillAsinGroups(rows) {
 async function downloadTemplate() {
   if (typeof XLSX === 'undefined') { await showAlert('提示', 'Excel库加载中'); return; }
   const ws = XLSX.utils.aoa_to_sheet([
-    ['ASIN','站点','常用名','期望售价','期望划线价','期望活动标','期望AC标','期望Coupon','期望星级','期望评论数','期望卖家','期望库存'],
+    ['ASIN','站点','常用名','期望售价','期望划线价','期望活动标','期望AC标','期望Coupon','期望星级','期望评论数','期望卖家','期望库存','期望BSR大类排名','期望BSR大类名','期望BSR小类排名','期望BSR小类名'],
     ['B082W886W9','CA','手机壳','29.99','39.99','Limited-time deal','Amazon\'s Choice','Save 10%','4.5','2000','Amazon','In Stock']
   ]);
   ws['!cols'] = [{wch:14},{wch:18},{wch:16},{wch:12},{wch:12},{wch:16},{wch:30},{wch:16},{wch:10},{wch:10},{wch:15},{wch:12}];
@@ -476,6 +492,15 @@ async function initSiteGroups() {
     const next = enabledSites.find(s => !usedSites.has(s.code));
     if (!next) { await showAlert('提示', '所有已启用站点均已添加'); return; }
     renderGroupCard(next.code, '');
+    saveGroupsToCache();
+  });
+
+  document.getElementById('btnClearGroups').addEventListener('click', async () => {
+    const ok = await showConfirmDialog('清空站点', ['所有站点分组和 ASIN 将被清除。'], '清空', '取消');
+    if (!ok) return;
+    const container = document.getElementById('siteGroups');
+    container.innerHTML = '';
+    renderGroupCard(enabledSites[0] ? enabledSites[0].code : 'CA', '');
     saveGroupsToCache();
   });
 }
@@ -821,8 +846,12 @@ function handleComplete(summary, results) {
     dom.btnRetry.textContent = `↻ 重试(${summary.retryable})`;
   }
 
-  dom.resultsSummary.textContent =
-    `共${summary.total} | ✅${summary.success} | ❌${summary.failed} | 🔐${summary.captcha} | ${fmtTime(summary.elapsed)}`;
+  dom.resultsSummary.innerHTML =
+    `共: <b>${summary.total}</b> &nbsp;` +
+    `<span style="color:var(--success)">成功: ${summary.success}</span> &nbsp;` +
+    (summary.failed  ? `<span style="color:var(--danger)">失败: ${summary.failed}</span> &nbsp;` : '') +
+    (summary.captcha ? `<span style="color:var(--warning)">验证码: ${summary.captcha}</span> &nbsp;` : '') +
+    `<span style="color:var(--text-muted)">用时: ${fmtTime(summary.elapsed)}</span>`;
 }
 
 // ========== Reference Compare ==========
@@ -843,6 +872,12 @@ function hasAliases() {
 function cmpField(actual, expected, field) {
   if (!expected) return { match: true, display: actual || 'N/A' };
   const a = String(actual || '').trim(), e = String(expected).trim();
+  if (field === 'bsrRank') {
+    // BSR 排名越小越好，实际 > 期望则异常
+    const an = parseInt(a.replace(/[^0-9]/g, '')), en = parseInt(e.replace(/[^0-9]/g, ''));
+    if (isNaN(an) || isNaN(en)) return { match: true, display: a || 'N/A' };
+    return { match: an <= en, display: a || 'N/A' };
+  }
   if (field === 'price' || field === 'listPrice') {
     const an = parseFloat(a.replace(/[^0-9.]/g, '')), en = parseFloat(e.replace(/[^0-9.]/g, ''));
     if (isNaN(an) || isNaN(en)) return { match: a === e, display: a || 'N/A' };
@@ -956,6 +991,10 @@ function renderAllResults() {
 
   const piTh = document.querySelector('th.col-product-info');
   if (piTh) piTh.style.display = enabled.includes('productInfo') ? '' : 'none';
+  ['bsrMainRank','bsrMainCategory','bsrSubRank','bsrSubCategory'].forEach(f => {
+    const th = document.querySelector(`th.col-${f.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
+    if (th) th.style.display = enabled.includes(f) ? '' : 'none';
+  });
 
   dom.resultsBody.innerHTML = allResults.map(r => {
     const ref = findRef(r.asin, r.site);
@@ -980,6 +1019,10 @@ function renderAllResults() {
         <td class="col-stock" title="${esc(r.stock || '')}">${renderField(r.stock, ref ? ref.expectedStock : '', 'stock')}</td>
         <td class="col-parent" title="${esc(r.parentAsin || '')}">${esc(r.parentAsin || 'N/A')}</td>
         ${enabled.includes('productInfo') ? `<td class="col-product-info">${r.productInfo && Object.keys(r.productInfo).length ? `<button class="btn-product-info" data-asin="${esc(r.asin)}" data-site="${esc(r.site)}">查看</button>` : ''}</td>` : ''}
+        ${enabled.includes('bsrMainRank') ? `<td class="col-bsr-main-rank">${renderField(r.bsrMainRank, ref ? ref.expectedBsrMainRank : '', 'bsrRank')}</td>` : ''}
+        ${enabled.includes('bsrMainCategory') ? `<td class="col-bsr-main-cat" title="${esc(r.bsrMainCategory || '')}">${renderField(r.bsrMainCategory, ref ? ref.expectedBsrMainCategory : '', 'text')}</td>` : ''}
+        ${enabled.includes('bsrSubRank') ? `<td class="col-bsr-sub-rank">${renderField(r.bsrSubRank, ref ? ref.expectedBsrSubRank : '', 'bsrRank')}</td>` : ''}
+        ${enabled.includes('bsrSubCategory') ? `<td class="col-bsr-sub-cat" title="${esc(r.bsrSubCategory || '')}">${renderField(r.bsrSubCategory, ref ? ref.expectedBsrSubCategory : '', 'text')}</td>` : ''}
         <td class="col-history">${showHistory ? renderHistoryDiff(r) : ''}</td>
       </tr>
     `;
@@ -987,7 +1030,10 @@ function renderAllResults() {
 
   const success = allResults.filter(r => r.status === 'success').length;
   const failed = allResults.filter(r => r.status !== 'success').length;
-  dom.resultsSummary.textContent = `共${allResults.length}条 | ✅${success} | ❌${failed}`;
+  dom.resultsSummary.innerHTML =
+    `共: <b>${allResults.length}</b> &nbsp;` +
+    `<span style="color:var(--success)">成功: ${success}</span>` +
+    (failed ? ` &nbsp;<span style="color:var(--danger)">失败: ${failed}</span>` : '');
 }
 
 // ========== 产品信息浮层 ==========
@@ -1123,6 +1169,10 @@ async function exportExcel() {
     { key: 'seller', label: '卖家', refField: 'expectedSeller' },
     { key: 'stock', label: '库存', refField: 'expectedStock' },
     { key: 'parentAsin', label: '父体ASIN', enabledField: 'parentAsin' },
+    { key: 'bsrMainRank',     label: 'BSR大类排名', enabledField: 'bsrMainRank',     refField: 'expectedBsrMainRank',     compareType: 'bsrRank' },
+    { key: 'bsrMainCategory', label: 'BSR大类名',   enabledField: 'bsrMainCategory', refField: 'expectedBsrMainCategory' },
+    { key: 'bsrSubRank',      label: 'BSR小类排名', enabledField: 'bsrSubRank',      refField: 'expectedBsrSubRank',      compareType: 'bsrRank' },
+    { key: 'bsrSubCategory',  label: 'BSR小类名',   enabledField: 'bsrSubCategory',  refField: 'expectedBsrSubCategory' },
     { key: 'url', label: 'URL', enabledField: 'url' },
     { key: 'timestamp', label: '时间' }
   ];
