@@ -187,6 +187,26 @@ Amazon 各站点的页面结构、语言、DOM 布局存在真实差异，不能
 
 所有用户提示使用 `showAlert()` 和 `showConfirmDialog()`，保持与应用主题一致，不使用浏览器原生 `alert()/confirm()`。
 
+### 新增字段的完整链路
+
+新增一个抓取字段必须走完以下全部节点，缺任何一个都会导致链路断裂：
+
+| 节点 | 位置 | 说明 |
+|------|------|------|
+| 1. 抓取 | `renderer/sites/xx/parsers.js` | 从页面 DOM 提取值，写到 `result.fieldName` |
+| 2. result 初始化 | `renderer/sites/_base/scraper.js` | 在 result 对象里加 `fieldName: ''` 默认值 |
+| 3. 字段勾选 | `renderer/fullpage.html` | 加 `<input type="checkbox" data-field="fieldName">` |
+| 4. 表格列标题 | `renderer/fullpage.html` | 加 `<th class="col-field-name">字段名</th>` |
+| 5. 列宽样式 | `renderer/fullpage.css` | 加 `.col-field-name { width: Xpx; ... }` |
+| 6. th 显隐控制 | `renderer/fullpage.js` `renderAllResults()` | 按 `enabled.includes('fieldName')` 控制 th display |
+| 7. td 渲染 | `renderer/fullpage.js` 行模板 | 加条件 td，调用 `renderField()` |
+| 8. 对比逻辑 | `renderer/fullpage.js` `cmpField()` | 如有特殊比较规则（如排名越小越好）加 field 类型 |
+| 9. 导出列 | `renderer/fullpage.js` `exportExcel()` columns | 加 `{ key, label, enabledField, refField, compareType }` |
+| 10. 参考数据解析 | `renderer/fullpage.js` `processFile()` | 加 `expectedFieldName: String(r['期望列名'] || '')` |
+| 11. Excel 模板 | `renderer/fullpage.js` `downloadTemplate()` | 在表头加「期望列名」列 |
+
+**反例**：只做了抓取（节点1-2），没做字段勾选（节点3），数据抓下来了但界面看不到，用户也不知道可以控制这个字段。
+
 ### 新增站点流程
 
 1. 在对应站点真实页面运行测试脚本，收集各字段的命中选择器
