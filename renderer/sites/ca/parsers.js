@@ -1,0 +1,61 @@
+'use strict';
+
+function extractProductDetails() {
+  const result = {};
+
+  // CA 结构一：prodDetTable（主要内容）
+  document.querySelectorAll(
+    '#productDetails_feature_div .a-expander-section-container'
+  ).forEach(section => {
+    const titleEl = section.querySelector('.a-expander-prompt');
+    if (!titleEl) return;
+    const title = titleEl.textContent.trim();
+    const rows = section.querySelectorAll('.prodDetTable tr');
+    if (!rows.length) return;
+    const sectionData = {};
+    rows.forEach(row => {
+      const keyEl = row.querySelector('th.prodDetSectionEntry');
+      const valEl = row.querySelector('td.prodDetAttrValue');
+      if (!keyEl || !valEl) return;
+      const key = keyEl.textContent.replace(/\s+/g, ' ').trim();
+      const val = valEl.textContent.replace(/\s+/g, ' ').trim();
+      if (!key || !val) return;
+      if (val.includes('out of 5 stars') || val.includes('P.when') ||
+          key.includes('Customer Reviews')) return;
+      sectionData[key] = val;
+    });
+    if (Object.keys(sectionData).length > 0) result[title] = sectionData;
+  });
+
+  // CA 结构二：detailBullets（补充字段，如 BSR/Date First Available）
+  const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
+  if (bulletRows.length) {
+    const sectionData = {};
+    bulletRows.forEach(row => {
+      const keyEl = row.querySelector('.a-text-bold');
+      const valEl = row.querySelector('span:not(.a-text-bold)');
+      if (!keyEl || !valEl) return;
+      const key = keyEl.textContent.replace(/[‏‎‏‎:：]/g, '').replace(/\s+/g, ' ').trim();
+      let val = valEl.textContent.replace(/\s+/g, ' ').trim();
+      if (!key || !val) return;
+      if (val.includes('out of 5 stars') || val.includes('P.when') ||
+          key.includes('Customer Reviews')) return;
+      const keyClean = key.replace(/[‏‎\s]/g, '').toLowerCase();
+      const valNorm = val.replace(/[‏‎]/g, '').replace(/\s+/g, ' ');
+      const colonIdx = valNorm.indexOf(':');
+      if (colonIdx > 0 && colonIdx < 40) {
+        const prefix = valNorm.slice(0, colonIdx).trim().toLowerCase().replace(/\s/g, '');
+        if (prefix === keyClean) val = valNorm.slice(colonIdx + 1).trim();
+      }
+      sectionData[key] = val;
+    });
+    if (Object.keys(sectionData).length > 0) {
+      result['Product Details'] = Object.assign(result['Product Details'] || {}, sectionData);
+    }
+  }
+
+  return result;
+}
+
+const CA_PARSERS = { extractProductDetails };
+if (typeof module !== 'undefined' && module.exports) module.exports = CA_PARSERS;

@@ -78,7 +78,9 @@ function parseDealBadge(rawText) {
 function parseAcBadge(rawText) {
   if (!rawText) return '';
   const text = cleanText(rawText);
-  if (text.toLowerCase().includes('amazon')) {
+  // .mvt-ac-badge-rectangle 返回本地化文本（Amazon's Choice / Opción Amazon 等）
+  // 只要有内容且不是 CSS/JSON 噪音就直接返回
+  if (text.length < 100 && !text.includes('{') && !text.includes('border-radius')) {
     return text;
   }
   return '';
@@ -104,7 +106,8 @@ function parseCoupon(rawText) {
 function extractProductDetails() {
   const result = {};
 
-  // 结构一：prodDetTable（主流，CA/US/AU/MX/JP 等站点）
+  // _base 通用逻辑：prodDetTable（US/CA 主流结构）
+  // 各站点应在自己的 parsers.js 里覆盖此函数实现站点专属逻辑
   const sections = document.querySelectorAll(
     '#productDetails_feature_div .a-expander-section-container'
   );
@@ -122,9 +125,7 @@ function extractProductDetails() {
       const key = keyEl.textContent.replace(/\s+/g, ' ').trim();
       const val = valEl.textContent.replace(/\s+/g, ' ').trim();
       if (!key || !val) return;
-      // 跳过评价行（含评分脚本或"out of 5 stars"）
       if (val.includes('out of 5 stars') || val.includes('P.when') ||
-          key.includes('おすすめ度') || key.includes('Opinión media') ||
           key.includes('Customer Reviews')) return;
       sectionData[key] = val;
     });
@@ -140,10 +141,18 @@ function extractProductDetails() {
       const valEl = row.querySelector('span:not(.a-text-bold)');
       if (!keyEl || !valEl) return;
       const key = keyEl.textContent.replace(/[‏‎‏‎:：]/g, '').replace(/\s+/g, ' ').trim();
-      const val = valEl.textContent.replace(/\s+/g, ' ').trim();
+      let val = valEl.textContent.replace(/\s+/g, ' ').trim();
       if (!key || !val) return;
       if (val.includes('out of 5 stars') || val.includes('P.when') ||
           key.includes('Customer Reviews')) return;
+      // 清理 val 里重复的 key 名前缀（如 "Batteries ‏ : ‎ 2 AAA..." → "2 AAA..."）
+      const keyClean = key.replace(/[‏‎\s]/g, '').toLowerCase();
+      const valPrefix = val.replace(/[‏‎]/g, '').replace(/\s+/g, ' ');
+      const colonIdx = valPrefix.indexOf(':');
+      if (colonIdx > 0 && colonIdx < 40) {
+        const prefix = valPrefix.slice(0, colonIdx).trim().toLowerCase().replace(/\s/g, '');
+        if (prefix === keyClean) val = valPrefix.slice(colonIdx + 1).trim();
+      }
       sectionData[key] = val;
     });
     if (Object.keys(sectionData).length > 0) {

@@ -147,6 +147,57 @@ amazon-patrol-electron/
 └── package.json          依赖与打包配置
 ```
 
+## 开发原则
+
+这些原则是在实际开发中归纳出来的，适用于本项目所有新功能和修改。
+
+### 按站点独立，不共用假设
+
+Amazon 各站点的页面结构、语言、DOM 布局存在真实差异，不能用"通用逻辑 + if/else 堆条件"来处理。正确做法是：
+
+- **每个站点有自己的实现文件**（`renderer/sites/us/`、`renderer/sites/mx/` 等）
+- **差异在各自文件里处理**，而不是写进共用函数
+- **`_base/` 只放真正无差异的逻辑**（如 `extractPrice` 提取数字——这不会因站点不同而不同）
+
+反例：把 `Disponible`→`In Stock`、`de 5 estrellas` 提取数字、MX 两列布局结构全部写进 `_base/parsers.js`，看起来方便，实则让所有站点都背上了彼此的包袱，新增站点时不知道该改哪里。
+
+### 实测驱动，不靠猜测
+
+选择器、DOM 结构、字段格式必须在真实页面上验证，不能靠"看起来应该是这样"来写代码。**在修改任何抓取逻辑之前，先在对应站点页面的 DevTools Console 里验证。**
+
+遇到新问题时的标准流程：
+1. 在真实页面运行测试脚本，确认实际 DOM 结构
+2. 根据实测结果写选择器和解析逻辑
+3. 写到对应站点的文件里，不写进 `_base`
+
+### 职责分离，分层清晰
+
+抓取引擎按职责分四层，每层只做一件事：
+
+| 层 | 文件 | 职责 | 示例 |
+|----|------|------|------|
+| 选择器层 | `selectors.js` | 找哪个元素 | `price: ['.a-price[data-a-size="xl"] .a-offscreen']` |
+| 解析层 | `parsers.js` | 从文本提取有效值 | `extractRating('4.7 de 5 estrellas')` → `'4.7'` |
+| 归一化层 | `normalizers.js` | 将值标准化 | `normalizeStock('Disponible')` → `'In Stock'` |
+| 抓取层 | `scraper.js` | 协调三层，组装 result | `scrapePageData(options)` |
+
+跨层干事是坏味道。如果在选择器里写了文本处理逻辑，或在解析层里写了归一化规则，说明职责边界被破坏了。
+
+### 通用弹框，不用原生 alert/confirm
+
+所有用户提示使用 `showAlert()` 和 `showConfirmDialog()`，保持与应用主题一致，不使用浏览器原生 `alert()/confirm()`。
+
+### 新增站点流程
+
+1. 在对应站点真实页面运行测试脚本，收集各字段的命中选择器
+2. 在 `renderer/sites/` 下建目录（如 `jp/`）
+3. 写 `selectors.js`（必须），只写有差异的选择器
+4. 如有多语言解析需求，写 `parsers.js`（如 JP 的评分格式 `5つ星のうち4.3`）
+5. 如有多语言归一化需求，写 `normalizers.js`（如 JP 的库存文本）
+6. 其余逻辑自动继承 `_base`
+
+---
+
 ## 技术架构
 
 > **抓取引擎架构设计文档**：[docs/scraper-architecture.md](docs/scraper-architecture.md)
