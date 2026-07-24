@@ -166,6 +166,7 @@ async function scrapePageData(options = {}) {
     acBadge: 'N/A',
     coupon: 'N/A',
     productInfo: {},
+    bsr: null,
     url: window.location.href,
     timestamp: new Date().toISOString(),
     status: 'success',
@@ -250,6 +251,10 @@ async function scrapePageData(options = {}) {
     // Product information 区块（原样存储所有站点数据）
     if (isEnabled('productInfo')) {
       result.productInfo = parsers.extractProductDetails();
+      // BSR 从产品信息里提取（各站点独立解析逻辑）
+      if (parsers.extractBsr && Object.keys(result.productInfo).length > 0) {
+        result.bsr = parsers.extractBsr(result.productInfo);
+      }
     }
 
     // 父体ASIN

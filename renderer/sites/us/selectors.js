@@ -8,6 +8,6 @@ const US_SELECTORS = {
   stock: ['#availability span'],
   title: ['#productTitle'],
   dealBadge: ['.detailpage-dealBadge-countdown-timer', '#dealBadgeSupportingText span'],
-  acBadge: ['#acBadge_feature_div'],
+  acBadge: ['.mvt-ac-badge-rectangle', '#acBadge_feature_div span.a-size-small'],
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = US_SELECTORS;

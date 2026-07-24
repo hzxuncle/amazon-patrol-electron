@@ -24,12 +24,10 @@ function extractProductDetails() {
     if (Object.keys(sectionData).length > 0) result[title] = sectionData;
   }
 
-  // 主流结构：productDetails_expanderSectionTables（两列布局，US/CA/MX 均使用）
   document.querySelectorAll(
     '#productDetails_expanderSectionTables .a-expander-section-container'
   ).forEach(parseSection);
 
-  // 旧布局 fallback：productDetails_feature_div（少数商品）
   if (Object.keys(result).length === 0) {
     document.querySelectorAll(
       '#productDetails_feature_div .a-expander-section-container'
@@ -39,5 +37,25 @@ function extractProductDetails() {
   return result;
 }
 
-const US_PARSERS = { extractProductDetails };
+function extractBsr(productInfo) {
+  // US BSR key: "Best Sellers Rank"，值格式: "#7,378 in Health & Household ... #3 in Body Fat Monitors"
+  let raw = null;
+  for (const section of Object.values(productInfo)) {
+    if (section && section['Best Sellers Rank']) { raw = section['Best Sellers Rank']; break; }
+  }
+  if (!raw) return null;
+
+  const matches = [...raw.matchAll(/#([\d,]+)\s+in\s+([^(#\n]+)/g)];
+  if (!matches.length) return null;
+
+  function parseMatch(m) {
+    return { rank: parseInt(m[1].replace(/,/g, '')), category: m[2].trim().replace(/\s+/g, ' ') };
+  }
+  return {
+    main: parseMatch(matches[0]),
+    sub: matches.length > 1 ? parseMatch(matches[matches.length - 1]) : null
+  };
+}
+
+const US_PARSERS = { extractProductDetails, extractBsr };
 if (typeof module !== 'undefined' && module.exports) module.exports = US_PARSERS;

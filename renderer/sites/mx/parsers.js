@@ -41,5 +41,31 @@ function extractProductDetails() {
   return result;
 }
 
-const MX_PARSERS = { extractRating, extractProductDetails };
+function extractBsr(productInfo) {
+  // MX BSR key: "Clasificación en los más vendidos de Amazon"
+  // 值格式: "nº1,526 en Salud y Cuidado Personal (Ver el Top 100...) nº1 en Masajeadores Eléctricos"
+  const BSR_KEY = 'Clasificación en los más vendidos de Amazon';
+  let raw = null;
+  for (const section of Object.values(productInfo)) {
+    if (section && section[BSR_KEY]) { raw = section[BSR_KEY]; break; }
+  }
+  if (!raw) return null;
+
+  // MX 格式: nº1,526 en 分类
+  const matches = [...raw.matchAll(/nº([\d,.]+)\s+en\s+([^(\nnº]+)/g)];
+  if (!matches.length) return null;
+
+  function parseMatch(m) {
+    return {
+      rank: parseInt(m[1].replace(/[,.]/g, '').replace(/\D/g, '')),
+      category: m[2].trim().replace(/\s+/g, ' ')
+    };
+  }
+  return {
+    main: parseMatch(matches[0]),
+    sub: matches.length > 1 ? parseMatch(matches[matches.length - 1]) : null
+  };
+}
+
+const MX_PARSERS = { extractRating, extractProductDetails, extractBsr };
 if (typeof module !== 'undefined' && module.exports) module.exports = MX_PARSERS;

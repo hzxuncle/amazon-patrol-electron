@@ -66,5 +66,25 @@ function extractProductDetails() {
   return result;
 }
 
-const CA_PARSERS = { extractProductDetails };
+function extractBsr(productInfo) {
+  // CA BSR key: "Best Sellers Rank"，值格式与 US 相同: "#194 in Health & Personal Care ... #1 in Body Fat Monitors"
+  let raw = null;
+  for (const section of Object.values(productInfo)) {
+    if (section && section['Best Sellers Rank']) { raw = section['Best Sellers Rank']; break; }
+  }
+  if (!raw) return null;
+
+  const matches = [...raw.matchAll(/#([\d,]+)\s+in\s+([^(#\n]+)/g)];
+  if (!matches.length) return null;
+
+  function parseMatch(m) {
+    return { rank: parseInt(m[1].replace(/,/g, '')), category: m[2].trim().replace(/\s+/g, ' ') };
+  }
+  return {
+    main: parseMatch(matches[0]),
+    sub: matches.length > 1 ? parseMatch(matches[matches.length - 1]) : null
+  };
+}
+
+const CA_PARSERS = { extractProductDetails, extractBsr };
 if (typeof module !== 'undefined' && module.exports) module.exports = CA_PARSERS;

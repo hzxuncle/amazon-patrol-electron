@@ -66,5 +66,26 @@ function extractProductDetails() {
   return result;
 }
 
-const AU_PARSERS = { extractProductDetails };
+function extractBsr(productInfo) {
+  // AU BSR key: "Best Sellers Rank"，值格式无 # 前缀: "72,016 in Health, Household & Personal Care ... 973 in Electric Massagers"
+  let raw = null;
+  for (const section of Object.values(productInfo)) {
+    if (section && section['Best Sellers Rank']) { raw = section['Best Sellers Rank']; break; }
+  }
+  if (!raw) return null;
+
+  // AU 无 # 前缀，匹配 "数字 in 分类"
+  const matches = [...raw.matchAll(/([\d,]+)\s+in\s+([^(\n]+)/g)];
+  if (!matches.length) return null;
+
+  function parseMatch(m) {
+    return { rank: parseInt(m[1].replace(/,/g, '')), category: m[2].trim().replace(/\s+/g, ' ') };
+  }
+  return {
+    main: parseMatch(matches[0]),
+    sub: matches.length > 1 ? parseMatch(matches[matches.length - 1]) : null
+  };
+}
+
+const AU_PARSERS = { extractProductDetails, extractBsr };
 if (typeof module !== 'undefined' && module.exports) module.exports = AU_PARSERS;
