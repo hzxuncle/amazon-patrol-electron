@@ -1148,8 +1148,9 @@ function renderAllResults() {
       const th = theadTr.querySelector(`th.${cls}`);
       if (th) th.remove();
     });
-    // 按 fieldOrder 重新插入
-    [...fieldOrder].reverse().forEach(f => {
+    // 正序 insertBefore(historyTh)：
+    // price→stock→title 依次插到 historyTh 前，最终顺序 = price,stock,title,history ✅
+    fieldOrder.forEach(f => {
       const colCls = FIELD_TO_COL[f];
       if (!colCls) return;
       const th = document.createElement('th');
