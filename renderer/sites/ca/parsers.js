@@ -24,19 +24,19 @@ function extractProductDetails() {
     if (Object.keys(sectionData).length > 0) result[title] = sectionData;
   }
 
-  // CA 结构一：productDetails_feature_div（部分商品）
+  // 主流结构：productDetails_expanderSectionTables（两列布局，CA 主要使用）
   document.querySelectorAll(
-    '#productDetails_feature_div .a-expander-section-container'
+    '#productDetails_expanderSectionTables .a-expander-section-container'
   ).forEach(parseSection);
 
-  // CA 结构一b：productDetails_expanderSectionTables（两列布局，部分商品）
+  // 旧布局 fallback：productDetails_feature_div（少数商品）
   if (Object.keys(result).length === 0) {
     document.querySelectorAll(
-      '#productDetails_expanderSectionTables .a-expander-section-container'
+      '#productDetails_feature_div .a-expander-section-container'
     ).forEach(parseSection);
   }
 
-  // CA 结构二：detailBullets（补充字段，如 BSR/Date First Available）
+  // CA 额外：detailBullets（BSR/Date First Available 等额外字段）
   const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
   if (bulletRows.length) {
     const sectionData = {};
