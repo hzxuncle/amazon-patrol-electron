@@ -252,7 +252,12 @@ async function scrapePageData(options = {}) {
     }
 
     // Product information 区块（原样存储所有站点数据）
-    if (isEnabled('productInfo')) {
+    // BSR 字段依赖产品信息，任一 BSR 字段启用时也需抓取
+    const needProductInfo = isEnabled('productInfo') ||
+      isEnabled('bsrMainRank') || isEnabled('bsrMainCategory') ||
+      isEnabled('bsrSubRank')  || isEnabled('bsrSubCategory');
+
+    if (needProductInfo) {
       result.productInfo = parsers.extractProductDetails();
       // BSR 从产品信息里提取（各站点独立解析逻辑），展开为四个独立字段
       if (parsers.extractBsr && Object.keys(result.productInfo).length > 0) {
@@ -268,6 +273,8 @@ async function scrapePageData(options = {}) {
           }
         }
       }
+      // 如果只是为了 BSR 而抓取，不保留 productInfo 内容（减少数据体积）
+      if (!isEnabled('productInfo')) result.productInfo = {};
     }
 
     // 父体ASIN
