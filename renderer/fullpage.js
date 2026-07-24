@@ -326,6 +326,7 @@ async function closeColOrderDialog(save) {
     const changed = newOrder.some((f, i) => f !== fieldOrder[i]);
     fieldOrder = newOrder;
     saveSettings();
+    reorderFieldToggles();
     overlay.remove();
     if (changed && allResults.length > 0) {
       const ok = await showConfirmDialog(
@@ -341,8 +342,21 @@ async function closeColOrderDialog(save) {
   }
 }
 
+function reorderFieldToggles() {
+  const container = document.getElementById('fieldToggles');
+  if (!container) return;
+  // 找到 toggle-actions span（全选/全不选/列顺序按钮），保留在末尾
+  const actions = container.querySelector('.toggle-actions');
+  // 按 fieldOrder 重排 label 节点
+  fieldOrder.forEach(f => {
+    const label = container.querySelector(`input[data-field="${f}"]`)?.closest('label');
+    if (label) container.insertBefore(label, actions);
+  });
+}
+
 function resetColOrder() {
   fieldOrder = [...DEFAULT_FIELD_ORDER];
+  reorderFieldToggles();
   const list = document.getElementById('colOrderList');
   if (!list) return;
   const items = [...list.querySelectorAll('.col-order-item')];
@@ -382,6 +396,7 @@ async function loadSettings() {
     }
     if (s.fieldOrder && s.fieldOrder.length > 0) {
       fieldOrder = s.fieldOrder;
+      reorderFieldToggles();
     }
     if (dom.showScrapeWindow) dom.showScrapeWindow.checked = s.showScrapeWindow || false;
   }

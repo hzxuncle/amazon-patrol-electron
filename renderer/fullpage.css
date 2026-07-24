@@ -396,22 +396,29 @@ body::before { display: none; }
 .results-table tbody tr:hover { background: var(--bg-card-hover); }
 
 /* 列宽 — table-layout:fixed 严格固宽 + 统一溢出截断 */
-.col-status { width: 48px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
-.col-site   { width: 48px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
-.col-asin   { width: 96px; overflow: hidden; text-overflow: ellipsis; }
-.col-title  { width: 160px; overflow: hidden; text-overflow: ellipsis; }
-.col-alias  { width: 70px; overflow: hidden; text-overflow: ellipsis; }
-.col-price  { width: 58px; text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.col-listprice { width: 58px; text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.col-deal   { width: 72px; overflow: hidden; text-overflow: ellipsis; }
-.col-ac     { width: 120px; overflow: hidden; text-overflow: ellipsis; }
-.col-coupon { width: 66px; overflow: hidden; text-overflow: ellipsis; }
-.col-rating { width: 56px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
-.col-reviews { width: 60px; text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.col-seller { width: 70px; overflow: hidden; text-overflow: ellipsis; }
-.col-stock  { width: 66px; overflow: hidden; text-overflow: ellipsis; }
-.col-parent { width: 78px; overflow: hidden; text-overflow: ellipsis; }
-.col-history { width: 66px; overflow: hidden; text-overflow: ellipsis; }
+/* ===== 结果表格列宽 — 统一规范 =====
+   短数字/金额：右对齐 64px
+   短标识/状态：居中 56px
+   中等文本：左对齐 80-96px
+   长文本：左对齐 160px
+   所有列：overflow:hidden text-overflow:ellipsis
+   ===================================== */
+.col-status    { width: 56px;  text-align: center; overflow: hidden; text-overflow: ellipsis; }
+.col-site      { width: 56px;  text-align: center; overflow: hidden; text-overflow: ellipsis; }
+.col-asin      { width: 96px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-alias     { width: 80px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-price     { width: 64px;  text-align: right;  overflow: hidden; text-overflow: ellipsis; }
+.col-listprice { width: 64px;  text-align: right;  overflow: hidden; text-overflow: ellipsis; }
+.col-deal      { width: 96px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-ac        { width: 80px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-coupon    { width: 80px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-rating    { width: 56px;  text-align: center; overflow: hidden; text-overflow: ellipsis; }
+.col-reviews   { width: 64px;  text-align: right;  overflow: hidden; text-overflow: ellipsis; }
+.col-seller    { width: 96px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-stock     { width: 80px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-parent    { width: 80px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-title     { width: 160px; text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-history   { width: 80px;  text-align: left;   overflow: hidden; text-overflow: ellipsis; }
 
 /* 行状态 */
 .results-table tbody tr.match-success {
@@ -643,12 +650,12 @@ body::before { display: none; }
 .ref-last-sep { opacity: 0.4; }
 
 /* ===== 产品信息列 + 浮层 ===== */
-.col-product-info { width: 68px; text-align: center; }
-.col-bsr-main-rank { width: 80px; text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.col-bsr-main-cat  { width: 160px; overflow: hidden; text-overflow: ellipsis; }
-.col-bsr-sub-rank  { width: 80px; text-align: right; overflow: hidden; text-overflow: ellipsis; }
-.col-bsr-sub-cat   { width: 160px; overflow: hidden; text-overflow: ellipsis; }
-.col-url           { width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.col-product-info  { width: 64px;  text-align: center; overflow: hidden; text-overflow: ellipsis; }
+.col-bsr-main-rank { width: 64px;  text-align: right;  overflow: hidden; text-overflow: ellipsis; }
+.col-bsr-main-cat  { width: 160px; text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-bsr-sub-rank  { width: 64px;  text-align: right;  overflow: hidden; text-overflow: ellipsis; }
+.col-bsr-sub-cat   { width: 160px; text-align: left;   overflow: hidden; text-overflow: ellipsis; }
+.col-url           { width: 160px; text-align: left;   overflow: hidden; text-overflow: ellipsis; }
 .btn-product-info {
   font-size: 11px; padding: 2px 8px; cursor: pointer;
   background: var(--bg-input); border: 1px solid var(--border);
