@@ -1,7 +1,12 @@
 'use strict';
 const MX_SELECTORS = {
-  price: ['.a-price[data-a-size="xl"] .a-offscreen'],
-  listPrice: ['.basisPrice .a-price .a-offscreen'],
+  price: [
+    '#corePrice_feature_div .a-offscreen',
+  ],
+  listPrice: [
+    '#corePriceDisplay_desktop_feature_div .a-offscreen',
+    '.basisPrice .a-price .a-offscreen',
+  ],
   rating: ['#acrPopover .a-icon-alt'],
   reviews: ['#acrCustomerReviewText'],
   seller: ['a#sellerProfileTriggerId'],
