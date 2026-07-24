@@ -188,11 +188,31 @@ function getSettings() {
     showHistoryDiff: dom.showHistoryDiff.checked,
     enableRefCompare: dom.enableRefCompare ? dom.enableRefCompare.checked : false,
     enabledFields: getEnabledFields(),
+    fieldOrder: fieldOrder,
     showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false
   };
 }
 
 // ========== Field Toggles ==========
+
+// 所有可排序字段的默认顺序（与 HTML 中 data-field 顺序一致）
+const DEFAULT_FIELD_ORDER = [
+  'price','listPrice','dealBadge','acBadge','coupon',
+  'rating','reviews','seller','stock','parentAsin',
+  'title','url','productInfo',
+  'bsrMainRank','bsrMainCategory','bsrSubRank','bsrSubCategory'
+];
+
+const FIELD_LABELS = {
+  price: '售价', listPrice: '划线价', dealBadge: '活动标', acBadge: 'AC标',
+  coupon: 'Coupon', rating: '星级', reviews: '评论数', seller: '卖家',
+  stock: '库存', parentAsin: '父体', title: '标题', url: 'URL',
+  productInfo: '产品信息', bsrMainRank: 'BSR大类排名', bsrMainCategory: 'BSR大类名',
+  bsrSubRank: 'BSR小类排名', bsrSubCategory: 'BSR小类名'
+};
+
+let fieldOrder = [...DEFAULT_FIELD_ORDER];
+
 function initFieldToggles() {
   dom.btnToggleAll.addEventListener('click', () => {
     dom.fieldToggles.forEach(cb => { cb.checked = true; });
@@ -205,12 +225,99 @@ function initFieldToggles() {
   dom.fieldToggles.forEach(cb => {
     cb.addEventListener('change', () => saveSettings());
   });
+  document.getElementById('btnColumnOrder').addEventListener('click', showColumnOrderDialog);
 }
 
 function getEnabledFields() {
   return [...dom.fieldToggles]
     .filter(cb => cb.checked)
     .map(cb => cb.dataset.field);
+}
+
+// 返回按当前 fieldOrder 排序后的 enabledFields
+function getOrderedEnabledFields() {
+  const enabled = new Set(getEnabledFields());
+  const ordered = fieldOrder.filter(f => enabled.has(f));
+  // 未在 fieldOrder 里的字段追加到末尾
+  getEnabledFields().forEach(f => { if (!fieldOrder.includes(f)) ordered.push(f); });
+  return ordered;
+}
+
+function showColumnOrderDialog() {
+  const overlay = document.createElement('div');
+  overlay.className = 'product-info-overlay';
+  overlay.id = 'colOrderOverlay';
+
+  const listHtml = fieldOrder.map((f, i) => `
+    <div class="col-order-item" data-field="${f}" draggable="true">
+      <span class="col-order-handle">⠿</span>
+      <span>${esc(FIELD_LABELS[f] || f)}</span>
+    </div>
+  `).join('');
+
+  overlay.innerHTML = `
+    <div class="col-order-dialog">
+      <div class="confirm-dialog-header"><span>调整列顺序</span></div>
+      <p class="col-order-hint">拖拽调整显示顺序，固定列（状态/站点/ASIN/标题/上次）不参与排序</p>
+      <div class="col-order-list" id="colOrderList">${listHtml}</div>
+      <div class="confirm-dialog-footer">
+        <button class="btn btn-ghost confirm-cancel" onclick="closeColOrderDialog(false)">取消</button>
+        <button class="btn btn-outline" onclick="resetColOrder()">重置</button>
+        <button class="btn btn-primary confirm-ok" onclick="closeColOrderDialog(true)">确认</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  initColOrderDrag();
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeColOrderDialog(false); });
+  document.addEventListener('keydown', function onKey(e) {
+    if (e.key === 'Escape') { closeColOrderDialog(false); document.removeEventListener('keydown', onKey); }
+  });
+}
+
+function initColOrderDrag() {
+  const list = document.getElementById('colOrderList');
+  let dragSrc = null;
+
+  list.querySelectorAll('.col-order-item').forEach(item => {
+    item.addEventListener('dragstart', () => { dragSrc = item; item.classList.add('dragging'); });
+    item.addEventListener('dragend', () => { dragSrc = null; item.classList.remove('dragging'); list.querySelectorAll('.col-order-item').forEach(i => i.classList.remove('drag-over')); });
+    item.addEventListener('dragover', e => { e.preventDefault(); if (dragSrc && dragSrc !== item) item.classList.add('drag-over'); });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      if (!dragSrc || dragSrc === item) return;
+      const items = [...list.querySelectorAll('.col-order-item')];
+      const srcIdx = items.indexOf(dragSrc);
+      const dstIdx = items.indexOf(item);
+      if (srcIdx < dstIdx) item.after(dragSrc);
+      else item.before(dragSrc);
+    });
+  });
+}
+
+function closeColOrderDialog(save) {
+  const overlay = document.getElementById('colOrderOverlay');
+  if (!overlay) return;
+  if (save) {
+    const newOrder = [...overlay.querySelectorAll('.col-order-item')].map(el => el.dataset.field);
+    fieldOrder = newOrder;
+    saveSettings();
+    renderAllResults();
+  }
+  overlay.remove();
+}
+
+function resetColOrder() {
+  fieldOrder = [...DEFAULT_FIELD_ORDER];
+  const list = document.getElementById('colOrderList');
+  if (!list) return;
+  const items = [...list.querySelectorAll('.col-order-item')];
+  DEFAULT_FIELD_ORDER.forEach(f => {
+    const item = items.find(el => el.dataset.field === f);
+    if (item) list.appendChild(item);
+  });
 }
 
 async function saveSettings() {
@@ -240,6 +347,9 @@ async function loadSettings() {
     // 恢复字段勾选
     if (s.enabledFields && s.enabledFields.length > 0) {
       dom.fieldToggles.forEach(cb => { cb.checked = s.enabledFields.includes(cb.dataset.field); });
+    }
+    if (s.fieldOrder && s.fieldOrder.length > 0) {
+      fieldOrder = s.fieldOrder;
     }
     if (dom.showScrapeWindow) dom.showScrapeWindow.checked = s.showScrapeWindow || false;
   }
@@ -989,40 +1099,70 @@ function renderAllResults() {
   const showHistory = dom.showHistoryDiff.checked;
   dom.colHistory.style.display = showHistory ? '' : 'none';
 
-  const piTh = document.querySelector('th.col-product-info');
-  if (piTh) piTh.style.display = enabled.includes('productInfo') ? '' : 'none';
-  ['bsrMainRank','bsrMainCategory','bsrSubRank','bsrSubCategory'].forEach(f => {
-    const th = document.querySelector(`th.col-${f.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
-    if (th) th.style.display = enabled.includes(f) ? '' : 'none';
-  });
+  // 按 fieldOrder 控制可排序列的 th 显隐
+  const FIELD_TO_COL = {
+    price: 'col-price', listPrice: 'col-listprice', dealBadge: 'col-deal',
+    acBadge: 'col-ac', coupon: 'col-coupon', rating: 'col-rating',
+    reviews: 'col-reviews', seller: 'col-seller', stock: 'col-stock',
+    parentAsin: 'col-parent', title: 'col-title', url: null,
+    productInfo: 'col-product-info',
+    bsrMainRank: 'col-bsr-main-rank', bsrMainCategory: 'col-bsr-main-cat',
+    bsrSubRank: 'col-bsr-sub-rank', bsrSubCategory: 'col-bsr-sub-cat'
+  };
+  // 同步 thead 列顺序
+  const thead = document.querySelector('#resultsTable thead tr');
+  if (thead) {
+    const orderedFields = fieldOrder.filter(f => FIELD_TO_COL[f] && FIELD_TO_COL[f]);
+    orderedFields.forEach(f => {
+      const colCls = FIELD_TO_COL[f];
+      if (!colCls) return;
+      const th = thead.querySelector(`th.${colCls}`);
+      if (th) {
+        th.style.display = enabled.includes(f) ? '' : 'none';
+        thead.appendChild(th); // 移到末尾实现排序（固定列在前，可排序列按顺序追加）
+      }
+    });
+  }
+
+  // 可排序字段的 td 渲染函数
+  function renderFieldTd(f, r, ref) {
+    switch(f) {
+      case 'price':       return `<td class="col-price">${renderField(r.price, ref ? ref.expectedPrice : '', 'price')}</td>`;
+      case 'listPrice':   return `<td class="col-listprice">${renderField(r.listPrice, ref ? ref.expectedListPrice : '', 'listPrice')}</td>`;
+      case 'dealBadge':   return `<td class="col-deal" title="${esc(r.dealBadge || '')}">${renderField(r.dealBadge, ref ? ref.expectedDealBadge : '', 'dealBadge')}</td>`;
+      case 'acBadge':     return `<td class="col-ac" title="${esc(r.acBadge || '')}">${renderFieldAc(r.acBadge, ref ? ref.expectedAcBadge : '')}</td>`;
+      case 'coupon':      return `<td class="col-coupon" title="${esc(r.coupon || '')}">${renderField(r.coupon, ref ? ref.expectedCoupon : '', 'coupon')}</td>`;
+      case 'rating':      return `<td class="col-rating">${renderField(r.rating, ref ? ref.expectedRating : '', 'rating')}</td>`;
+      case 'reviews':     return `<td class="col-reviews">${renderField(r.reviews, ref ? ref.expectedReviews : '', 'reviews')}</td>`;
+      case 'seller':      return `<td class="col-seller" title="${esc(r.seller || '')}">${renderField(r.seller, ref ? ref.expectedSeller : '', 'seller')}</td>`;
+      case 'stock':       return `<td class="col-stock" title="${esc(r.stock || '')}">${renderField(r.stock, ref ? ref.expectedStock : '', 'stock')}</td>`;
+      case 'parentAsin':  return `<td class="col-parent" title="${esc(r.parentAsin || '')}">${esc(r.parentAsin || 'N/A')}</td>`;
+      case 'title':       return `<td class="col-title" title="${esc(r.title || '')}">${esc(truncateTitle(r.title))}</td>`;
+      case 'url':         return '';
+      case 'productInfo': return `<td class="col-product-info">${r.productInfo && Object.keys(r.productInfo).length ? `<button class="btn-product-info" data-asin="${esc(r.asin)}" data-site="${esc(r.site)}">查看</button>` : ''}</td>`;
+      case 'bsrMainRank':     return `<td class="col-bsr-main-rank">${renderField(r.bsrMainRank, ref ? ref.expectedBsrMainRank : '', 'bsrRank')}</td>`;
+      case 'bsrMainCategory': return `<td class="col-bsr-main-cat" title="${esc(r.bsrMainCategory || '')}">${renderField(r.bsrMainCategory, ref ? ref.expectedBsrMainCategory : '', 'text')}</td>`;
+      case 'bsrSubRank':      return `<td class="col-bsr-sub-rank">${renderField(r.bsrSubRank, ref ? ref.expectedBsrSubRank : '', 'bsrRank')}</td>`;
+      case 'bsrSubCategory':  return `<td class="col-bsr-sub-cat" title="${esc(r.bsrSubCategory || '')}">${renderField(r.bsrSubCategory, ref ? ref.expectedBsrSubCategory : '', 'text')}</td>`;
+      default: return '';
+    }
+  }
+
+  const orderedEnabled = fieldOrder.filter(f => enabled.includes(f));
 
   dom.resultsBody.innerHTML = allResults.map(r => {
     const ref = findRef(r.asin, r.site);
     const cls = getRowClass(r);
     const alias = showAlias ? `<td class="col-alias">${esc(getAlias(r.asin, r.site) || r.asin)}</td>` : '';
+    const fieldTds = orderedEnabled.map(f => renderFieldTd(f, r, ref)).join('');
 
     return `
       <tr class="${cls}">
         <td class="col-status">${getStatusIcon(r.status)}</td>
         <td class="col-site">${getSiteLabel(r.site)}</td>
         <td class="col-asin" title="${esc(r.asin)}">${esc(r.asin)}</td>
-        <td class="col-title" title="${esc(r.title || '')}">${esc(truncateTitle(r.title))}</td>
         ${alias}
-        <td class="col-price">${renderField(r.price, ref ? ref.expectedPrice : '', 'price')}</td>
-        <td class="col-listprice">${renderField(r.listPrice, ref ? ref.expectedListPrice : '', 'listPrice')}</td>
-        <td class="col-deal" title="${esc(r.dealBadge || '')}">${renderField(r.dealBadge, ref ? ref.expectedDealBadge : '', 'dealBadge')}</td>
-        <td class="col-ac" title="${esc(r.acBadge || '')}">${renderFieldAc(r.acBadge, ref ? ref.expectedAcBadge : '')}</td>
-        <td class="col-coupon" title="${esc(r.coupon || '')}">${renderField(r.coupon, ref ? ref.expectedCoupon : '', 'coupon')}</td>
-        <td class="col-rating">${renderField(r.rating, ref ? ref.expectedRating : '', 'rating')}</td>
-        <td class="col-reviews">${renderField(r.reviews, ref ? ref.expectedReviews : '', 'reviews')}</td>
-        <td class="col-seller" title="${esc(r.seller || '')}">${renderField(r.seller, ref ? ref.expectedSeller : '', 'seller')}</td>
-        <td class="col-stock" title="${esc(r.stock || '')}">${renderField(r.stock, ref ? ref.expectedStock : '', 'stock')}</td>
-        <td class="col-parent" title="${esc(r.parentAsin || '')}">${esc(r.parentAsin || 'N/A')}</td>
-        ${enabled.includes('productInfo') ? `<td class="col-product-info">${r.productInfo && Object.keys(r.productInfo).length ? `<button class="btn-product-info" data-asin="${esc(r.asin)}" data-site="${esc(r.site)}">查看</button>` : ''}</td>` : ''}
-        ${enabled.includes('bsrMainRank') ? `<td class="col-bsr-main-rank">${renderField(r.bsrMainRank, ref ? ref.expectedBsrMainRank : '', 'bsrRank')}</td>` : ''}
-        ${enabled.includes('bsrMainCategory') ? `<td class="col-bsr-main-cat" title="${esc(r.bsrMainCategory || '')}">${renderField(r.bsrMainCategory, ref ? ref.expectedBsrMainCategory : '', 'text')}</td>` : ''}
-        ${enabled.includes('bsrSubRank') ? `<td class="col-bsr-sub-rank">${renderField(r.bsrSubRank, ref ? ref.expectedBsrSubRank : '', 'bsrRank')}</td>` : ''}
-        ${enabled.includes('bsrSubCategory') ? `<td class="col-bsr-sub-cat" title="${esc(r.bsrSubCategory || '')}">${renderField(r.bsrSubCategory, ref ? ref.expectedBsrSubCategory : '', 'text')}</td>` : ''}
+        ${fieldTds}
         <td class="col-history">${showHistory ? renderHistoryDiff(r) : ''}</td>
       </tr>
     `;
