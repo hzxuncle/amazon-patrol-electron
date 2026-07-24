@@ -52,5 +52,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 站点管理
   getSites: () => ipcRenderer.invoke('GET_SITES'),
-  saveSites: (sites) => ipcRenderer.invoke('SAVE_SITES', sites)
+  saveSites: (sites) => ipcRenderer.invoke('SAVE_SITES', sites),
+
+  // 在系统默认浏览器打开链接
+  openExternal: (url) => ipcRenderer.invoke('OPEN_EXTERNAL', url)
 });

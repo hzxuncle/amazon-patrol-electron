@@ -1,6 +1,6 @@
 'use strict';
 
-const { ipcMain, Notification, app, dialog } = require('electron');
+const { ipcMain, Notification, app, dialog, shell } = require('electron');
 const fs = require('fs');
 const https = require('https');
 const store = require('./store');
@@ -184,6 +184,7 @@ async function onPatrolComplete() {
 
   saveHistorySnapshot();
   savePatrolHistory(summary);
+  const lastPatrolConfig = activePatrol ? activePatrol.config : null;
   activePatrol = null;
   store.set('patrolState', { running: false });
 
@@ -206,8 +207,10 @@ async function onPatrolComplete() {
   if (patrolSettings) {
     const references = (store.get('referenceData') || {}).rows || [];
     const webhookEnabled = patrolSettings.enableGroupNotify && patrolSettings.dingtalkWebhook;
-    const personalEnabled = patrolSettings.enablePersonalNotify && patrolSettings.dingtalkPersonal &&
-      patrolSettings.dingtalkPersonal.appKey;
+    // AK/SK/AgentId 从 settings.json 的 dingtalkPersonal 读（管理员配置），手机号从 dingtalkPersonalPhones 读
+    const personalCredentials = patrolSettings.dingtalkPersonal || {};
+    const phones = patrolSettings.dingtalkPersonalPhones || '';
+    const personalEnabled = patrolSettings.enablePersonalNotify && personalCredentials.appKey && phones;
 
     if ((webhookEnabled || personalEnabled) && references.length > 0) {
       const text = await buildDingTalkText(summary);
@@ -216,7 +219,8 @@ async function onPatrolComplete() {
           console.error('[Patrol] 群通知失败:', e.message));
       }
       if (text && personalEnabled) {
-        sendDingTalkPersonal(text, patrolSettings.dingtalkPersonal).catch(e =>
+        // 手机号转 userId 后发送
+        sendDingTalkPersonalByPhone(text, personalCredentials, phones).catch(e =>
           console.error('[Patrol] 个人通知失败:', e.message));
       }
     }
@@ -285,6 +289,41 @@ async function getAccessToken(appKey, appSecret) {
     req.on('error', reject);
     req.end();
   });
+}
+
+async function getMobileUserId(token, mobile) {
+  const res = await postJSON(
+    `https://oapi.dingtalk.com/topapi/v2/user/getbymobile?access_token=${token}`,
+    { mobile }
+  );
+  const data = JSON.parse(res.text());
+  if (data.errcode !== 0) throw new Error(`手机号 ${mobile} 查询失败: ${data.errmsg}`);
+  return data.result.userid;
+}
+
+async function sendDingTalkPersonalByPhone(text, credentials, phones) {
+  const { appKey, appSecret, agentId } = credentials;
+  if (!appKey || !appSecret || !agentId || !phones) return;
+  try {
+    const token = await getAccessToken(appKey, appSecret);
+    const phoneList = phones.split(',').map(p => p.trim()).filter(Boolean);
+    const userIds = await Promise.all(phoneList.map(p => getMobileUserId(token, p)));
+    const body = {
+      agent_id: parseInt(agentId),
+      userid_list: userIds.join(','),
+      msg: {
+        msgtype: 'markdown',
+        markdown: { title: '亚马逊巡店异常报告', text }
+      }
+    };
+    const res = await postJSON(
+      `https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2?access_token=${token}`,
+      body
+    );
+    console.log('[Patrol] 钉钉个人通知 HTTP', res.status);
+  } catch (e) {
+    console.error('[Patrol] 钉钉个人通知失败:', e.message);
+  }
 }
 
 async function sendDingTalkPersonal(text, config) {
@@ -401,7 +440,7 @@ async function buildDingTalkText(summary) {
     });
   });
 
-  text += `\n---\n\n> **汇总**　总计 ${summary.total} 条　用时 ${formatTime(summary.elapsed)}\n`;
+  text += `\n---\n\n> **汇总**　共: ${summary.total}　<font color=#07b807>成功: ${summary.success}</font>　<font color=#ff4d4f>失败: ${summary.failed}</font>　验证码: ${summary.captcha}　用时: ${formatTime(summary.elapsed)}\n`;
   return text;
 }
 
@@ -529,6 +568,13 @@ function register() {
 
   ipcMain.handle('GET_SITES', () => {
     return store.get('sites') || require('./sites-data').buildDefaultSites();
+  });
+
+  ipcMain.handle('OPEN_EXTERNAL', (e, url) => {
+    if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+      shell.openExternal(url);
+    }
+    return { success: true };
   });
 
   ipcMain.handle('SAVE_SITES', (e, sites) => {

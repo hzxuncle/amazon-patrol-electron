@@ -623,6 +623,16 @@ async function downloadTemplate() {
 
 // ========== Actions ==========
 function initActionHandlers() {
+  // URL 列链接用系统浏览器打开，防止在应用内跳转
+  document.addEventListener('click', e => {
+    const link = e.target.closest('.ext-link');
+    if (link) {
+      e.preventDefault();
+      const url = link.dataset.url;
+      if (url) window.electronAPI.openExternal(url);
+    }
+  });
+
   dom.btnStart.addEventListener('click', startPatrol);
   dom.btnStop.addEventListener('click', stopPatrol);
   dom.btnRetry.addEventListener('click', retryFailed);
@@ -1192,7 +1202,7 @@ function renderAllResults() {
       case 'stock':       return `<td class="col-stock" title="${esc(r.stock || '')}">${renderField(r.stock, ref ? ref.expectedStock : '', 'stock')}</td>`;
       case 'parentAsin':  return `<td class="col-parent" title="${esc(r.parentAsin || '')}">${esc(r.parentAsin || 'N/A')}</td>`;
       case 'title':       return `<td class="col-title" title="${esc(r.title || '')}">${esc(truncateTitle(r.title))}</td>`;
-      case 'url':         return `<td class="col-url" title="${esc(r.url || '')}"><a href="${esc(r.url || '')}" style="color:var(--accent);font-size:11px">${r.url ? r.url.replace(/https?:\/\/[^/]+/, '').slice(0,30) || r.url.slice(0,30) : ''}</a></td>`;
+      case 'url':         return `<td class="col-url" title="${esc(r.url || '')}"><a class="ext-link" data-url="${esc(r.url || '')}" style="color:var(--accent);font-size:11px;cursor:pointer">${r.url ? r.url.replace(/https?:\/\/[^/]+/, '').slice(0,30) || r.url.slice(0,30) : ''}</a></td>`;
       case 'productInfo': return `<td class="col-product-info">${r.productInfo && Object.keys(r.productInfo).length ? `<button class="btn-product-info" data-asin="${esc(r.asin)}" data-site="${esc(r.site)}">查看</button>` : ''}</td>`;
       case 'bsrMainRank':     return `<td class="col-bsr-main-rank">${renderField(r.bsrMainRank, ref ? ref.expectedBsrMainRank : '', 'bsrRank')}</td>`;
       case 'bsrMainCategory': return `<td class="col-bsr-main-cat" title="${esc(r.bsrMainCategory || '')}">${renderField(r.bsrMainCategory, ref ? ref.expectedBsrMainCategory : '', 'text')}</td>`;
