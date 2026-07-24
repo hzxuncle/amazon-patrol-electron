@@ -3,10 +3,7 @@
 function extractProductDetails() {
   const result = {};
 
-  // CA 结构一：prodDetTable（主要内容）
-  document.querySelectorAll(
-    '#productDetails_feature_div .a-expander-section-container'
-  ).forEach(section => {
+  function parseSection(section) {
     const titleEl = section.querySelector('.a-expander-prompt');
     if (!titleEl) return;
     const title = titleEl.textContent.trim();
@@ -15,7 +12,7 @@ function extractProductDetails() {
     const sectionData = {};
     rows.forEach(row => {
       const keyEl = row.querySelector('th.prodDetSectionEntry');
-      const valEl = row.querySelector('td.prodDetAttrValue');
+      const valEl = row.querySelector('td.prodDetAttrValue') || row.querySelector('td');
       if (!keyEl || !valEl) return;
       const key = keyEl.textContent.replace(/\s+/g, ' ').trim();
       const val = valEl.textContent.replace(/\s+/g, ' ').trim();
@@ -25,7 +22,19 @@ function extractProductDetails() {
       sectionData[key] = val;
     });
     if (Object.keys(sectionData).length > 0) result[title] = sectionData;
-  });
+  }
+
+  // CA 结构一：productDetails_feature_div（部分商品）
+  document.querySelectorAll(
+    '#productDetails_feature_div .a-expander-section-container'
+  ).forEach(parseSection);
+
+  // CA 结构一b：productDetails_expanderSectionTables（两列布局，部分商品）
+  if (Object.keys(result).length === 0) {
+    document.querySelectorAll(
+      '#productDetails_expanderSectionTables .a-expander-section-container'
+    ).forEach(parseSection);
+  }
 
   // CA 结构二：detailBullets（补充字段，如 BSR/Date First Available）
   const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
