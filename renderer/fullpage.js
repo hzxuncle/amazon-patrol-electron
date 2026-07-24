@@ -318,16 +318,27 @@ function initColOrderDrag() {
   });
 }
 
-function closeColOrderDialog(save) {
+async function closeColOrderDialog(save) {
   const overlay = document.getElementById('colOrderOverlay');
   if (!overlay) return;
   if (save) {
     const newOrder = [...overlay.querySelectorAll('.col-order-item')].map(el => el.dataset.field);
+    const changed = newOrder.some((f, i) => f !== fieldOrder[i]);
     fieldOrder = newOrder;
     saveSettings();
+    overlay.remove();
+    if (changed && allResults.length > 0) {
+      const ok = await showConfirmDialog(
+        '列顺序已变更',
+        ['当前巡检结果的列顺序与新设置不一致，建议清空后重新巡检。', '是否立即清空结果？'],
+        '清空结果', '保留'
+      );
+      if (ok) { allResults = []; }
+    }
     renderAllResults();
+  } else {
+    overlay.remove();
   }
-  overlay.remove();
 }
 
 function resetColOrder() {
@@ -1106,15 +1117,6 @@ function getRowClass(result) {
 function renderAllResults() {
   const enabled = getEnabledFields();
   const showAlias = hasAliases();
-  const colSpan = document.querySelectorAll('#resultsTable thead th:not([style*="display: none"]):not([style*="display:none"])').length || (showAlias ? 16 : 15);
-
-  if (!allResults.length) {
-    dom.resultsBody.innerHTML = `<tr class="empty-row"><td colspan="${colSpan}"><div class="empty-state"><span class="empty-icon">◎</span><p>点击「开始巡店」查看结果</p></div></td></tr>`;
-    dom.resultsSummary.textContent = '准备就绪';
-    $('#colAliasHdr').style.display = showAlias ? '' : 'none';
-    dom.colHistory.style.display = dom.showHistoryDiff.checked ? '' : 'none';
-    return;
-  }
 
   $('#colAliasHdr').style.display = showAlias ? '' : 'none';
   const showHistory = dom.showHistoryDiff.checked;
@@ -1183,6 +1185,13 @@ function renderAllResults() {
   }
 
   const orderedEnabled = fieldOrder.filter(f => enabled.includes(f));
+
+  if (!allResults.length) {
+    const colSpan = document.querySelectorAll('#resultsTable thead th:not([style*="display: none"]):not([style*="display:none"])').length || 15;
+    dom.resultsBody.innerHTML = `<tr class="empty-row"><td colspan="${colSpan}"><div class="empty-state"><span class="empty-icon">◎</span><p>点击「开始巡店」查看结果</p></div></td></tr>`;
+    dom.resultsSummary.textContent = '准备就绪';
+    return;
+  }
 
   dom.resultsBody.innerHTML = allResults.map(r => {
     const ref = findRef(r.asin, r.site);
