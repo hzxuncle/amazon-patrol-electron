@@ -739,7 +739,7 @@ body::before { display: none; }
 /* ===== 列顺序弹框 ===== */
 .col-order-dialog {
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); width: 320px; max-width: 90vw; max-height: 70vh;
+  border-radius: var(--radius-lg); width: 560px; max-width: 90vw; max-height: 70vh;
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 8px 32px rgba(0,0,0,0.2);
 }

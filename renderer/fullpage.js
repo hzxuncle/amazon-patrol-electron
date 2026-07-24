@@ -278,15 +278,36 @@ function showColumnOrderDialog() {
 function initColOrderDrag() {
   const list = document.getElementById('colOrderList');
   let dragSrc = null;
+  let scrollTimer = null;
+  const SCROLL_ZONE = 48; // px from edge to trigger scroll
+  const SCROLL_SPEED = 8;
 
   list.querySelectorAll('.col-order-item').forEach(item => {
     item.addEventListener('dragstart', () => { dragSrc = item; item.classList.add('dragging'); });
-    item.addEventListener('dragend', () => { dragSrc = null; item.classList.remove('dragging'); list.querySelectorAll('.col-order-item').forEach(i => i.classList.remove('drag-over')); });
-    item.addEventListener('dragover', e => { e.preventDefault(); if (dragSrc && dragSrc !== item) item.classList.add('drag-over'); });
-    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('dragend', () => {
+      dragSrc = null;
+      item.classList.remove('dragging');
+      list.querySelectorAll('.col-order-item').forEach(i => i.classList.remove('drag-over'));
+      clearInterval(scrollTimer); scrollTimer = null;
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (dragSrc && dragSrc !== item) item.classList.add('drag-over');
+      // 边缘自动滚动
+      const rect = list.getBoundingClientRect();
+      const y = e.clientY;
+      clearInterval(scrollTimer);
+      if (y - rect.top < SCROLL_ZONE) {
+        scrollTimer = setInterval(() => { list.scrollTop -= SCROLL_SPEED; }, 16);
+      } else if (rect.bottom - y < SCROLL_ZONE) {
+        scrollTimer = setInterval(() => { list.scrollTop += SCROLL_SPEED; }, 16);
+      }
+    });
+    item.addEventListener('dragleave', () => { item.classList.remove('drag-over'); clearInterval(scrollTimer); scrollTimer = null; });
     item.addEventListener('drop', e => {
       e.preventDefault();
       item.classList.remove('drag-over');
+      clearInterval(scrollTimer); scrollTimer = null;
       if (!dragSrc || dragSrc === item) return;
       const items = [...list.querySelectorAll('.col-order-item')];
       const srcIdx = items.indexOf(dragSrc);
@@ -1099,7 +1120,7 @@ function renderAllResults() {
   const showHistory = dom.showHistoryDiff.checked;
   dom.colHistory.style.display = showHistory ? '' : 'none';
 
-  // 按 fieldOrder 控制可排序列的 th 显隐
+  // 按 fieldOrder 重建 thead 列顺序和显隐
   const FIELD_TO_COL = {
     price: 'col-price', listPrice: 'col-listprice', dealBadge: 'col-deal',
     acBadge: 'col-ac', coupon: 'col-coupon', rating: 'col-rating',
@@ -1109,18 +1130,31 @@ function renderAllResults() {
     bsrMainRank: 'col-bsr-main-rank', bsrMainCategory: 'col-bsr-main-cat',
     bsrSubRank: 'col-bsr-sub-rank', bsrSubCategory: 'col-bsr-sub-cat'
   };
-  // 同步 thead 列顺序
-  const thead = document.querySelector('#resultsTable thead tr');
-  if (thead) {
-    const orderedFields = fieldOrder.filter(f => FIELD_TO_COL[f] && FIELD_TO_COL[f]);
-    orderedFields.forEach(f => {
+  const FIELD_TO_LABEL = {
+    price: '售价', listPrice: '划线价', dealBadge: '活动', acBadge: 'AC标',
+    coupon: 'Coupon', rating: '星级', reviews: '评论', seller: '卖家',
+    stock: '库存', parentAsin: '父体', title: '标题', url: 'URL',
+    productInfo: '产品信息', bsrMainRank: 'BSR大类排名', bsrMainCategory: 'BSR大类名',
+    bsrSubRank: 'BSR小类排名', bsrSubCategory: 'BSR小类名'
+  };
+  // 重建可排序区域的 th：先隐藏所有可排序 th，再按 fieldOrder 顺序重新插入到 col-history 之前
+  const theadTr = document.querySelector('#resultsTable thead tr');
+  const historyTh = theadTr ? theadTr.querySelector('th#colHistory') : null;
+  if (theadTr && historyTh) {
+    // 移除所有可排序 th
+    Object.values(FIELD_TO_COL).filter(Boolean).forEach(cls => {
+      const th = theadTr.querySelector(`th.${cls}`);
+      if (th) th.remove();
+    });
+    // 按 fieldOrder 重新插入
+    [...fieldOrder].reverse().forEach(f => {
       const colCls = FIELD_TO_COL[f];
       if (!colCls) return;
-      const th = thead.querySelector(`th.${colCls}`);
-      if (th) {
-        th.style.display = enabled.includes(f) ? '' : 'none';
-        thead.appendChild(th); // 移到末尾实现排序（固定列在前，可排序列按顺序追加）
-      }
+      const th = document.createElement('th');
+      th.className = colCls;
+      th.textContent = FIELD_TO_LABEL[f] || f;
+      th.style.display = enabled.includes(f) ? '' : 'none';
+      theadTr.insertBefore(th, historyTh);
     });
   }
 
@@ -1317,7 +1351,17 @@ async function exportExcel() {
     { key: 'timestamp', label: '时间' }
   ];
 
-  const activeColumns = columns.filter(col => {
+  // 按 fieldOrder 对可排序列排序，固定列（status/site/asin/timestamp）保持原位
+  const fixedKeys = new Set(['status', 'site', 'asin', 'timestamp']);
+  const orderedColumns = [
+    ...columns.filter(c => fixedKeys.has(c.key)),
+    ...fieldOrder
+      .map(f => columns.find(c => c.key === f))
+      .filter(Boolean)
+      .filter(c => !fixedKeys.has(c.key)),
+    ...columns.filter(c => !fixedKeys.has(c.key) && !fieldOrder.includes(c.key))
+  ];
+  const activeColumns = orderedColumns.filter(col => {
     if (col.enabledField) return enabled.includes(col.enabledField);
     return true;
   });
