@@ -1,6 +1,6 @@
-# 亚马逊巡店助手 Electron 版
+# 亚马逊监控助手 v1.0.0
 
-将 Chrome 扩展版（`amazon-patrol`）改造为 Windows + Mac 双平台桌面应用，保留全部巡店功能，新增系统托盘、开机自启动、配送地设置、执行日志、历史记录等功能。
+将 Chrome 扩展版（`amazon-patrol`）改造为 Windows + Mac 双平台桌面应用，保留全部巡检功能，新增系统托盘、开机自启动、钉钉通知、产品信息抓取、站点管理等功能。
 
 ## 功能
 
@@ -10,6 +10,7 @@
 - **参考对比**：导入 Excel 预设期望值（必须含 ASIN 和站点列），自动标红偏差项，导入时自动按站点填入巡检面板；巡检面板「启用对比」开关控制是否进行对比
 - **缺货保护**：缺货商品（Out of Stock）价格自动清空，避免误抓页面推荐区价格
 - **下架检测**：商品重定向到其他 ASIN 时自动标记为失败并提示已下架
+- **并发安全**：多 Worker 并发时同一站点配送地只初始化一次，避免竞争条件
 - **历史快照**：每次巡检后自动保存，支持与上次对比
 - **智能重试**：一键重试失败项，自动降低并发
 - **定时巡检**：Cron 表达式配置，到点自动触发，关闭主窗口后托盘继续运行；修改配置后无需手动触发即生效
@@ -113,25 +114,37 @@ rm -rf icon.iconset
 ```
 amazon-patrol-electron/
 ├── electron/
-│   ├── main.js          主进程：窗口管理、托盘、生命周期、定时触发
-│   ├── preload.js       contextBridge：暴露 window.electronAPI 给渲染进程
-│   ├── store.js         数据持久化：JSON 文件读写，替换 chrome.storage
-│   ├── ipc-handlers.js  IPC 路由：巡店核心逻辑、执行日志推送、历史记录保存
-│   ├── tab-manager.js   抓取层：BrowserWindow 池、配送地初始化、UA 伪装
-│   └── scheduler.js     定时层：node-schedule，替换 chrome.alarms
+│   ├── main.js           主进程：窗口管理、托盘、生命周期、定时触发
+│   ├── preload.js        contextBridge：暴露 window.electronAPI 给渲染进程
+│   ├── store.js          数据持久化：5 个 JSON 文件读写
+│   ├── sites-data.js     20 个站点内置数据（域名/二字码/邮编格式）
+│   ├── ipc-handlers.js   IPC 路由：巡检核心逻辑、日志推送、历史记录
+│   ├── tab-manager.js    抓取层：BrowserWindow 池、配送地初始化、并发控制
+│   └── scheduler.js      定时层：node-schedule
 ├── renderer/
-│   ├── fullpage.html    主界面
-│   ├── fullpage.js      界面逻辑（chrome.* → window.electronAPI.*）
-│   ├── fullpage.css     样式（Light/Dark 双主题）
-│   ├── content.js       Amazon 页面抓取脚本（零改动）
-│   ├── selectors.js     CSS 选择器配置（零改动）
+│   ├── fullpage.html     主界面
+│   ├── fullpage.js       界面逻辑
+│   ├── fullpage.css      样式（Light/Dark 双主题）
+│   ├── sites/            抓取引擎（按站点拆分）
+│   │   ├── _base/        通用基准层
+│   │   │   ├── selectors.js   通用选择器
+│   │   │   ├── parsers.js     通用解析函数
+│   │   │   ├── normalizers.js 通用归一化
+│   │   │   └── scraper.js     抓取主流程
+│   │   ├── us/           amazon.com 专用配置
+│   │   ├── ca/           amazon.ca 专用配置
+│   │   ├── au/           amazon.com.au 专用配置
+│   │   ├── mx/           amazon.com.mx 专用配置（含多语言解析覆盖）
+│   │   └── index.js      Node端入口：按站点构建注入脚本
 │   └── lib/
-│       ├── cron.js      Cron 表达式解析器
+│       ├── cron.js       Cron 表达式解析器
 │       └── xlsx.full.min.js  Excel 库
+├── docs/
+│   └── scraper-architecture.md  抓取引擎架构设计文档
 ├── assets/
-│   ├── icons/           应用图标（16/48/128/256px PNG）
-│   └── logo.png         RENPHO 品牌 Logo
-└── package.json         依赖与打包配置
+│   ├── icons/            应用图标
+│   └── logo.png          RENPHO 品牌 Logo
+└── package.json          依赖与打包配置
 ```
 
 ## 技术架构
@@ -153,20 +166,34 @@ amazon-patrol-electron/
 | 文件下载 | `chrome.downloads` | `dialog.showSaveDialog` + `fs.writeFileSync` |
 | 抓取逻辑 | `content.js`（扩展注入） | `content.js`（`executeJavaScript` 注入，零改动） |
 
+### 抓取引擎架构
+
+抓取引擎按站点拆分为独立目录，每个站点有自己的选择器、解析函数和归一化逻辑，互不干扰。详见 [docs/scraper-architecture.md](docs/scraper-architecture.md)。
+
+```
+renderer/sites/
+├── _base/          通用基准（选择器/解析/归一化/抓取流程）
+├── us/ ca/ au/ mx/ 站点专用覆盖（只写与 _base 不同的部分）
+└── index.js        Node端：按站点合并后注入页面
+```
+
+**新增站点**：在 `renderer/sites/` 下建目录，写有差异的文件（至少 `selectors.js`），其余自动 fallback 到 `_base`。
+
 ### 抓取流程
 
 ```
-巡店开始
-  → 每个站点初始化配送地（仅第一个任务触发，后续复用 Cookie）
+巡检开始
+  → 每个站点初始化配送地（并发安全：同一站点只初始化一次，其余 Worker 等待同一 Promise）
     → loadURL(首页) → AJAX 设置邮编
   → Worker Pool 并发抓取
     → new BrowserWindow({ show: false })
     → setUserAgent(Chrome 120 真实 UA)
-    → loadURL(amazon.com/dp/ASIN?language=en_US)
-    → executeJavaScript(selectors.js + content.js)
+    → loadURL(amazon.xx/dp/ASIN?language=xx_XX)
+    → sites/index.js 按站点构建注入脚本（选择器+解析+归一化+抓取流程）
+    → executeJavaScript → window.__SCRAPER__.handleScrape()
     → Promise 直接返回抓取结果
   → broadcastUpdate → 实时推送到界面 + 日志 Tab
-  → 巡店完成 → 保存历史记录 → 系统通知 → 钉钉推送
+  → 巡检完成 → 保存历史记录 → 系统通知 → 钉钉推送
 ```
 
 ### 定时触发链路
@@ -403,6 +430,8 @@ node-schedule 每分钟 tick
 - 遇到验证码（status = captcha）需手动打开对应页面完成验证，不会自动重试
 - 缺货商品（Out of Stock）价格和划线价自动清空，避免误抓推荐区价格
 - 商品已下架（页面跳转到其他 ASIN）时自动标记为失败并显示跳转目标 ASIN
+- MX/BR/JP 等非英语站点响应较慢，建议将「抓取超时」设置为 45 秒以上，避免误超时
+- 新增站点抓取支持：在 `renderer/sites/` 下新建站点目录，至少提供 `selectors.js`，其余逻辑自动继承 `_base`
 - 数据存储在本地 5 个 JSON 文件（settings.json、state.json、history.json、reference.json、sites.json），卸载应用不会自动删除
 - 定时任务在电脑睡眠/休眠时无法触发，建议关闭自动睡眠；修改配置后无需手动触发，定时任务自动读取最新配置
 - 钉钉通知（群/个人）需在监控面板开启对应开关，且已导入参考数据；群通知和个人通知互斥只能开一个
