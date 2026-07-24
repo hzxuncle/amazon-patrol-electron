@@ -3,30 +3,64 @@
 function extractProductDetails() {
   const result = {};
 
-  // AU 主要使用 detailBullets 结构（无 prodDetTable）
-  const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
-  if (bulletRows.length) {
+  function parseSection(section) {
+    const titleEl = section.querySelector('.a-expander-prompt');
+    if (!titleEl) return;
+    const title = titleEl.textContent.trim();
+    const rows = section.querySelectorAll('.prodDetTable tr');
+    if (!rows.length) return;
     const sectionData = {};
-    bulletRows.forEach(row => {
-      const keyEl = row.querySelector('.a-text-bold');
-      const valEl = row.querySelector('span:not(.a-text-bold)');
+    rows.forEach(row => {
+      const keyEl = row.querySelector('th.prodDetSectionEntry');
+      const valEl = row.querySelector('td.prodDetAttrValue') || row.querySelector('td');
       if (!keyEl || !valEl) return;
-      const key = keyEl.textContent.replace(/[‏‎‏‎:：]/g, '').replace(/\s+/g, ' ').trim();
-      let val = valEl.textContent.replace(/\s+/g, ' ').trim();
+      const key = keyEl.textContent.replace(/\s+/g, ' ').trim();
+      const val = valEl.textContent.replace(/\s+/g, ' ').trim();
       if (!key || !val) return;
       if (val.includes('out of 5 stars') || val.includes('P.when') ||
           key.includes('Customer Reviews')) return;
-      // 清理 val 里重复的 key 名前缀（如 "Batteries ‏ : ‎ 2 AAA..." → "2 AAA..."）
-      const keyClean = key.replace(/[‏‎\s]/g, '').toLowerCase();
-      const valNorm = val.replace(/[‏‎]/g, '').replace(/\s+/g, ' ');
-      const colonIdx = valNorm.indexOf(':');
-      if (colonIdx > 0 && colonIdx < 40) {
-        const prefix = valNorm.slice(0, colonIdx).trim().toLowerCase().replace(/\s/g, '');
-        if (prefix === keyClean) val = valNorm.slice(colonIdx + 1).trim();
-      }
       sectionData[key] = val;
     });
-    if (Object.keys(sectionData).length > 0) result['Product Details'] = sectionData;
+    if (Object.keys(sectionData).length > 0) result[title] = sectionData;
+  }
+
+  // 主流结构：productDetails_expanderSectionTables（两列布局，AU 也使用此结构）
+  document.querySelectorAll(
+    '#productDetails_expanderSectionTables .a-expander-section-container'
+  ).forEach(parseSection);
+
+  // 旧布局 fallback：productDetails_feature_div
+  if (Object.keys(result).length === 0) {
+    document.querySelectorAll(
+      '#productDetails_feature_div .a-expander-section-container'
+    ).forEach(parseSection);
+  }
+
+  // AU 额外：detailBullets（部分商品有，补充 BSR/Date First Available 等字段）
+  if (Object.keys(result).length === 0) {
+    const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
+    if (bulletRows.length) {
+      const sectionData = {};
+      bulletRows.forEach(row => {
+        const keyEl = row.querySelector('.a-text-bold');
+        const valEl = row.querySelector('span:not(.a-text-bold)');
+        if (!keyEl || !valEl) return;
+        const key = keyEl.textContent.replace(/[‏‎‏‎:：]/g, '').replace(/\s+/g, ' ').trim();
+        let val = valEl.textContent.replace(/\s+/g, ' ').trim();
+        if (!key || !val) return;
+        if (val.includes('out of 5 stars') || val.includes('P.when') ||
+            key.includes('Customer Reviews')) return;
+        const keyClean = key.replace(/[‏‎\s]/g, '').toLowerCase();
+        const valNorm = val.replace(/[‏‎]/g, '').replace(/\s+/g, ' ');
+        const colonIdx = valNorm.indexOf(':');
+        if (colonIdx > 0 && colonIdx < 40) {
+          const prefix = valNorm.slice(0, colonIdx).trim().toLowerCase().replace(/\s/g, '');
+          if (prefix === keyClean) val = valNorm.slice(colonIdx + 1).trim();
+        }
+        sectionData[key] = val;
+      });
+      if (Object.keys(sectionData).length > 0) result['Product Details'] = sectionData;
+    }
   }
 
   return result;
