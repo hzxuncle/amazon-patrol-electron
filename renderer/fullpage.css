@@ -648,6 +648,7 @@ body::before { display: none; }
 .col-bsr-main-cat  { width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .col-bsr-sub-rank  { width: 80px; text-align: right; overflow: hidden; text-overflow: ellipsis; }
 .col-bsr-sub-cat   { width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.col-url           { width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .btn-product-info {
   font-size: 11px; padding: 2px 8px; cursor: pointer;
   background: var(--bg-input); border: 1px solid var(--border);

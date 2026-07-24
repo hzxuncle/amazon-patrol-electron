@@ -1127,7 +1127,7 @@ function renderAllResults() {
     price: 'col-price', listPrice: 'col-listprice', dealBadge: 'col-deal',
     acBadge: 'col-ac', coupon: 'col-coupon', rating: 'col-rating',
     reviews: 'col-reviews', seller: 'col-seller', stock: 'col-stock',
-    parentAsin: 'col-parent', title: 'col-title', url: null,
+    parentAsin: 'col-parent', title: 'col-title', url: 'col-url',
     productInfo: 'col-product-info',
     bsrMainRank: 'col-bsr-main-rank', bsrMainCategory: 'col-bsr-main-cat',
     bsrSubRank: 'col-bsr-sub-rank', bsrSubCategory: 'col-bsr-sub-cat'
@@ -1136,7 +1136,7 @@ function renderAllResults() {
     price: '售价', listPrice: '划线价', dealBadge: '活动', acBadge: 'AC标',
     coupon: 'Coupon', rating: '星级', reviews: '评论', seller: '卖家',
     stock: '库存', parentAsin: '父体', title: '标题', url: 'URL',
-    productInfo: '产品信息', bsrMainRank: 'BSR大类排名', bsrMainCategory: 'BSR大类名',
+    url: 'URL', productInfo: '产品信息', bsrMainRank: 'BSR大类排名', bsrMainCategory: 'BSR大类名',
     bsrSubRank: 'BSR小类排名', bsrSubCategory: 'BSR小类名'
   };
   // 重建可排序区域的 th：先隐藏所有可排序 th，再按 fieldOrder 顺序重新插入到 col-history 之前
@@ -1175,7 +1175,7 @@ function renderAllResults() {
       case 'stock':       return `<td class="col-stock" title="${esc(r.stock || '')}">${renderField(r.stock, ref ? ref.expectedStock : '', 'stock')}</td>`;
       case 'parentAsin':  return `<td class="col-parent" title="${esc(r.parentAsin || '')}">${esc(r.parentAsin || 'N/A')}</td>`;
       case 'title':       return `<td class="col-title" title="${esc(r.title || '')}">${esc(truncateTitle(r.title))}</td>`;
-      case 'url':         return '';
+      case 'url':         return `<td class="col-url" title="${esc(r.url || '')}"><a href="${esc(r.url || '')}" style="color:var(--accent);font-size:11px">${r.url ? r.url.replace(/https?:\/\/[^/]+/, '').slice(0,30) || r.url.slice(0,30) : ''}</a></td>`;
       case 'productInfo': return `<td class="col-product-info">${r.productInfo && Object.keys(r.productInfo).length ? `<button class="btn-product-info" data-asin="${esc(r.asin)}" data-site="${esc(r.site)}">查看</button>` : ''}</td>`;
       case 'bsrMainRank':     return `<td class="col-bsr-main-rank">${renderField(r.bsrMainRank, ref ? ref.expectedBsrMainRank : '', 'bsrRank')}</td>`;
       case 'bsrMainCategory': return `<td class="col-bsr-main-cat" title="${esc(r.bsrMainCategory || '')}">${renderField(r.bsrMainCategory, ref ? ref.expectedBsrMainCategory : '', 'text')}</td>`;
