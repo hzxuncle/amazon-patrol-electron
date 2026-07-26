@@ -147,12 +147,12 @@ async function initDeliveryZip(site, zip) {
 
     if (ok) {
       initializedSites.add(site);
-      console.log(`[TabManager] 配送地已设置: ${site} → ${zip}`);
+      tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}`);
     } else {
-      console.warn(`[TabManager] 配送地设置失败: ${site}`);
+      tabLog(`[TabManager] ⚠️ 配送地设置失败: ${site}`);
     }
   } catch (e) {
-    console.warn(`[TabManager] initDeliveryZip error:`, e.message);
+    tabLog(`[TabManager] ⚠️ initDeliveryZip error: ${e.message}`);
   } finally {
     if (!win.isDestroyed()) win.close();
   }
