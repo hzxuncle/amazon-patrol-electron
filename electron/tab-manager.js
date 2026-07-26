@@ -5,6 +5,9 @@ const path = require('path');
 const fs = require('fs');
 
 const activeTabs = new Map();
+let _logFn = null;
+function setLogCallback(fn) { _logFn = fn; }
+function tabLog(msg) { console.log(msg); if (_logFn) _logFn(msg); }
 
 // asarUnpack 后文件在 app.asar.unpacked/ 而非 app.asar/ 内
 // 开发模式下路径不含 .asar，直接使用原路径
@@ -202,6 +205,7 @@ async function openTabForTask(task, config) {
   const { asin, site } = task;
   const url = buildProductUrl(site, asin);
   const zip = (config.deliveryZips || {})[site] || '';
+  tabLog(`[TabManager] 抓取: ${asin} @ ${site} → ${url}`);
 
   // 每站点只初始化一次配送地，并发时后续 worker 等待同一个 Promise 而不是重复初始化
   if (zip && !initializedSites.has(site)) {
@@ -233,6 +237,8 @@ async function openTabForTask(task, config) {
   try {
     await win.loadURL(url);
     await waitForLoad(win);
+    const finalUrl = win.webContents.getURL();
+    if (finalUrl !== url) tabLog(`[TabManager] 重定向: ${url} → ${finalUrl}`);
     const configWithCode = { ...config, _siteCode: site };
     const result = await injectAndScrape(win, asin, configWithCode);
     result.site = site;
@@ -257,4 +263,4 @@ function resetSiteInit() {
   pendingSiteInit.clear();
 }
 
-module.exports = { openTabForTask, closeAll, resetSiteInit };
+module.exports = { openTabForTask, closeAll, resetSiteInit, setLogCallback };

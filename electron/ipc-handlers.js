@@ -15,7 +15,10 @@ let startTime = null;
 let retryMap = {};
 let mainWindow = null; // 由 main.js 注入
 
-function setMainWindow(win) { mainWindow = win; }
+function setMainWindow(win) {
+  mainWindow = win;
+  tabManager.setLogCallback(broadcastLog);
+}
 
 // ========== 工具函数 ==========
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
