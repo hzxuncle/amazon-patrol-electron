@@ -73,10 +73,11 @@
           <!-- 输入区：站点分组 -->
           <section class="patrol-input" id="patrol-input">
             <div class="patrol-card-header">
-              <span class="patrol-card-title">巡检站点</span>
-              <div style="display:flex;gap:8px">
+              <span class="patrol-card-title" style="cursor:pointer" id="btnToggleInput">巡检站点 <span id="inputCollapseHint" style="font-size:11px;color:var(--text-muted);font-weight:400"></span></span>
+              <div style="display:flex;gap:8px;align-items:center">
                 <button id="btnAddGroup" class="btn btn-outline" style="font-size:12px;padding:4px 10px">新增站点</button>
                 <button id="btnClearGroups" class="btn btn-outline" style="font-size:12px;padding:4px 10px">清空站点</button>
+                <button id="btnCollapseInput" class="btn-ghost-sm" style="font-size:16px;padding:2px 8px;line-height:1" title="折叠/展开">⌃</button>
               </div>
             </div>
             <div class="site-groups" id="siteGroups"></div>

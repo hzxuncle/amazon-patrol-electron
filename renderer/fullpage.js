@@ -99,6 +99,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initProductInfoOverlay();
   await initSitesTab();
   await initSiteGroups();
+  initInputCollapse();
   await loadPersistedState();
 
   window.electronAPI.onMessage(handleBgMessage);
@@ -642,6 +643,33 @@ function initActionHandlers() {
 
 // ========== 站点分组卡片 ==========
 let enabledSites = []; // [{domain, country, ...}] — 从 sites.json 读取 enabled=true 的站点
+
+function initInputCollapse() {
+  const section = document.getElementById('patrol-input');
+  const btn = document.getElementById('btnCollapseInput');
+  const titleBtn = document.getElementById('btnToggleInput');
+  const hint = document.getElementById('inputCollapseHint');
+  const content = document.getElementById('siteGroups');
+  const addBtn = document.getElementById('btnAddGroup');
+  const clearBtn = document.getElementById('btnClearGroups');
+
+  let collapsed = false;
+
+  function toggle() {
+    collapsed = !collapsed;
+    const display = collapsed ? 'none' : '';
+    content.style.display = display;
+    addBtn.style.display = display;
+    clearBtn.style.display = display;
+    btn.textContent = collapsed ? '⌄' : '⌃';
+    btn.title = collapsed ? '展开' : '折叠';
+    hint.textContent = collapsed ? '（已折叠）' : '';
+    section.style.maxHeight = collapsed ? '' : '38vh';
+  }
+
+  btn.addEventListener('click', toggle);
+  titleBtn.addEventListener('click', toggle);
+}
 
 async function initSiteGroups() {
   const allSites = await window.electronAPI.getSites();
