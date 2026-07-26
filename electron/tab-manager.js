@@ -149,10 +149,14 @@ async function initDeliveryZip(site, zip) {
       initializedSites.add(site);
       tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}`);
     } else {
-      tabLog(`[TabManager] ⚠️ 配送地设置失败: ${site}`);
+      // 设置失败时标记为已初始化（跳过），避免异常 session 影响后续抓取
+      initializedSites.add(site);
+      tabLog(`[TabManager] ⚠️ 配送地设置失败，跳过继续抓取: ${site}`);
     }
   } catch (e) {
-    tabLog(`[TabManager] ⚠️ initDeliveryZip error: ${e.message}`);
+    // 初始化出错时同样标记跳过，不让异常 session 阻塞后续任务
+    initializedSites.add(site);
+    tabLog(`[TabManager] ⚠️ initDeliveryZip error，跳过: ${e.message}`);
   } finally {
     if (!win.isDestroyed()) win.close();
   }
