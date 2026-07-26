@@ -61,7 +61,7 @@ function getLangByCode(code) {
   return CODE_TO_LANG[code] || 'en_US';
 }
 
-const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+const CHROME_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
 
 // 记录已经初始化过配送地的站点，巡店期间每站点只设一次
 const initializedSites = new Set();
