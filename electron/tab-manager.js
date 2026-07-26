@@ -166,6 +166,21 @@ async function injectAndScrape(win, asin, config) {
   // 注入 site code，供 scraper 使用
   await win.webContents.executeJavaScript(`window.__SITE_CODE__ = ${JSON.stringify(siteCode)}`);
 
+  // 页面诊断日志
+  const diagInfo = await win.webContents.executeJavaScript(`({
+    url: location.href,
+    title: document.title.slice(0,60),
+    hasProduct: !!document.querySelector('#productTitle,#title'),
+    hasCaptcha: !!document.querySelector('#captcha,form[action*="captcha"]'),
+    isSearch: !!document.querySelector('[data-component-type="s-search-result"]'),
+    bodyText: document.body?.innerText?.slice(0,100)?.replace(/\\s+/g,' ')
+  })`).catch(() => null);
+  if (diagInfo) {
+    tabLog(`[Diag] ${siteCode}/${asin} url=${diagInfo.url.slice(0,80)}`);
+    tabLog(`[Diag] title="${diagInfo.title}" hasProduct=${diagInfo.hasProduct} hasCaptcha=${diagInfo.hasCaptcha} isSearch=${diagInfo.isSearch}`);
+    if (!diagInfo.hasProduct) tabLog(`[Diag] bodyText: ${diagInfo.bodyText}`);
+  }
+
   // 使用新的站点专用 scraper（包含选择器+解析+归一化+抓取流程）
   const scraperScript = sitesIndex.buildScraperScript(siteCode);
 
