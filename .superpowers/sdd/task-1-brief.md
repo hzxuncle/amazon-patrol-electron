@@ -1,156 +1,117 @@
-# 亚马逊巡店助手 Electron 版 实现计划
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** 将现有 Chrome 扩展 `amazon-patrol` 改造为支持 Windows + Mac 的 Electron 桌面应用，保留全部功能，增加系统托盘、开机自启动。
-
-**Architecture:** 主进程（electron/）用 Node.js 实现调度、存储、抓取逻辑，替换所有 `chrome.*` API；渲染进程（renderer/）直接复用现有 HTML/CSS，仅将 `chrome.*` 调用替换为 `window.electronAPI.*`；两者通过 preload.js 的 contextBridge 通信。
-
-**Tech Stack:** Electron 28、node-schedule、electron-builder、fs/path（Node 内置）、现有 xlsx.full.min.js / cron.js
-
-## Global Constraints
-
-- Electron 版本：28.x（LTS）
-- Node 版本：≥18
-- 不引入 React/Vue，渲染层保持原生 HTML/JS
-- 所有数据文件存到 `app.getPath('userData')`
-- 抓取窗口必须 `show: false`，不干扰用户操作
-- 支持平台：Windows 10+、macOS 11+
-- 打包工具：electron-builder 24.x
-- 源扩展路径：`../amazon-patrol/`（相对于 `amazon-patrol-electron/`）
-
----
-
-## 文件清单
-
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `package.json` | 新建 | 项目配置、依赖、打包脚本 |
-| `electron/main.js` | 新建 | 主进程入口：窗口、托盘、生命周期 |
-| `electron/preload.js` | 新建 | contextBridge 暴露 electronAPI |
-| `electron/store.js` | 新建 | JSON 文件读写，替换 chrome.storage |
-| `electron/ipc-handlers.js` | 新建 | ipcMain.handle 路由，对应原 background.js 逻辑 |
-| `electron/tab-manager.js` | 新建 | BrowserWindow 抓取池，替换 chrome.tabs |
-| `electron/scheduler.js` | 新建 | node-schedule 定时，替换 chrome.alarms |
-| `renderer/fullpage.html` | 复制+改 | 去掉扩展特有 meta，script src 路径调整 |
-| `renderer/fullpage.js` | 复制+改 | 所有 chrome.* 替换为 window.electronAPI.* |
-| `renderer/fullpage.css` | 复制 | 零改动 |
-| `renderer/selectors.js` | 复制 | 零改动 |
-| `renderer/lib/cron.js` | 复制 | 零改动 |
-| `renderer/lib/xlsx.full.min.js` | 复制 | 零改动 |
-| `assets/icons/` | 新建 | 从扩展 icons/ 复制，补充 256px |
-| `build/electron-builder.yml` | 新建 | 打包配置 |
-
----
-
-## Task 1: 项目脚手架与依赖
+## Task 1: _base/ — 通用基准层
 
 **Files:**
-- Create: `amazon-patrol-electron/package.json`
-- Create: `amazon-patrol-electron/.gitignore`
+- Create: `renderer/sites/_base/selectors.js`
+- Create: `renderer/sites/_base/parsers.js`
+- Create: `renderer/sites/_base/normalizers.js`
+- Create: `renderer/sites/_base/scraper.js`
 
 **Interfaces:**
-- Produces: `npm start` 可启动开发模式，`npm run build:win` / `npm run build:mac` 触发打包
+- Produces:
+  - `_base/selectors.js`：导出 `BASE_SELECTORS` 对象（所有字段的选择器数组）
+  - `_base/parsers.js`：导出 `{ extractPrice, extractRating, extractReviewCount, cleanText, extractNumber, parseDealBadge, parseAcBadge, parseCoupon, extractProductDetails }`
+  - `_base/normalizers.js`：导出 `{ normalizeStock, normalizePrice }`
+  - `_base/scraper.js`：导出 `{ scrapePageData, handleScrape, checkPageType, waitForStableDOM, simulateHumanBehavior, queryWithFallback, queryAllWithFallback }`
 
-- [ ] **Step 1: 创建项目目录结构**
+- [ ] **Step 1: 新建 renderer/sites/_base/selectors.js**
 
-```bash
-cd /home/ec2-user/claude/amz-xundian
-mkdir -p amazon-patrol-electron/{electron,renderer/lib,assets/icons,build,docs/superpowers/plans}
+将 `renderer/selectors/common.js` 的内容迁移，重命名导出变量为 `BASE_SELECTORS`：
+
+```js
+'use strict';
+const BASE_SELECTORS = {
+  price: [
+    '.a-price[data-a-size="xl"] .a-offscreen',
+    // ... 完整内容从 renderer/selectors/common.js 复制
+  ],
+  // ... 其余字段
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = BASE_SELECTORS;
 ```
 
-- [ ] **Step 2: 创建 package.json**
+- [ ] **Step 2: 新建 renderer/sites/_base/parsers.js**
 
-创建 `/home/ec2-user/claude/amz-xundian/amazon-patrol-electron/package.json`：
+从 `renderer/content.js` 提取以下函数，保持逻辑完全不变：
+- `cleanText(text)`
+- `extractNumber(text)`
+- `extractPrice(text)`
+- `extractRating(text)` — 注意：base 版只支持英文 `out of`，MX 会在 mx/parsers.js 覆盖
+- `extractReviewCount(text)`
+- `parseDealBadge(rawText)` — 包含当前所有 patterns（含已加的多语言）
+- `parseAcBadge(rawText)`
+- `parseCoupon(rawText)`
+- `extractProductDetails()` — 注意：这是在页面上下文运行的，不能有 require
 
-```json
-{
-  "name": "amazon-patrol",
-  "version": "2.0.0",
-  "description": "亚马逊巡店助手桌面版",
-  "main": "electron/main.js",
-  "scripts": {
-    "start": "electron .",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac",
-    "build:all": "electron-builder --win --mac"
-  },
-  "dependencies": {
-    "node-schedule": "^2.1.1"
-  },
-  "devDependencies": {
-    "electron": "^28.3.3",
-    "electron-builder": "^24.13.3"
-  },
-  "build": {
-    "appId": "com.amazonpatrol.desktop",
-    "productName": "亚马逊巡店助手",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "electron/**/*",
-      "renderer/**/*",
-      "assets/**/*"
-    ],
-    "win": {
-      "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "zip",  "arch": ["x64"] }
-      ],
-      "icon": "assets/icons/icon.ico"
-    },
-    "mac": {
-      "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] }
-      ],
-      "icon": "assets/icons/icon.icns"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icons/icon.ico",
-      "uninstallerIcon": "assets/icons/icon.ico"
-    }
-  }
+```js
+'use strict';
+// 注意：此文件会被序列化后注入到浏览器页面，不能使用 require/module.exports 以外的 Node API
+function cleanText(text) { /* 从 content.js 复制 */ }
+function extractPrice(text) { /* 从 content.js 复制 */ }
+// ... 其他函数
+const BASE_PARSERS = { cleanText, extractNumber, extractPrice, extractRating, extractReviewCount, parseDealBadge, parseAcBadge, parseCoupon, extractProductDetails };
+if (typeof module !== 'undefined' && module.exports) module.exports = BASE_PARSERS;
+```
+
+- [ ] **Step 3: 新建 renderer/sites/_base/normalizers.js**
+
+从 `content.js` 的库存归一化逻辑提取：
+
+```js
+'use strict';
+function normalizeStock(rawStock) {
+  if (!rawStock) return null;
+  const lower = rawStock.toLowerCase();
+  if (lower.includes('unavailable') || lower.includes('out of stock')) return 'Out of Stock';
+  if (lower.includes('only') || lower.match(/\d+\s*(left|remaining)/)) return 'In Stock (Limited)';
+  if (lower.includes('stock') || lower.includes('in stock')) return 'In Stock';
+  // 兜底：返回原始文本（各站点可覆盖此函数处理本地语言）
+  return rawStock;
 }
+const BASE_NORMALIZERS = { normalizeStock };
+if (typeof module !== 'undefined' && module.exports) module.exports = BASE_NORMALIZERS;
 ```
 
-- [ ] **Step 3: 创建 .gitignore**
+- [ ] **Step 4: 新建 renderer/sites/_base/scraper.js**
 
-```
-node_modules/
-dist/
+从 `content.js` 提取核心抓取流程，改为接受注入的 selectors/parsers/normalizers 而不是全局引用：
+
+```js
+'use strict';
+// 此文件注入到页面后，通过 window.__SCRAPER_CONFIG__ 获取 selectors/parsers/normalizers
+
+function getSite() {
+  return window.__SITE_CODE__ || window.location.hostname;
+}
+
+function queryWithFallback(selectors) { /* 从 content.js 复制 */ }
+function queryAllWithFallback(selectors, maxResults) { /* 从 content.js 复制 */ }
+function waitForStableDOM(targetSelectors, stableMs, maxWaitMs) { /* 从 content.js 复制 */ }
+function simulateHumanBehavior() { /* 从 content.js 复制 */ }
+function checkPageType() { /* 从 content.js 复制 */ }
+
+async function scrapePageData(options) {
+  const cfg = window.__SCRAPER_CONFIG__;
+  const { selectors, parsers, normalizers } = cfg;
+  const hostname = getSite();
+
+  // ... 完整抓取逻辑从 content.js 复制
+  // 关键：将原来直接调用 extractPrice(rawPrice) 改为 parsers.extractPrice(rawPrice)
+  // 将原来直接调用 getSelectors(hostname, 'price') 改为 selectors.price
+  // 将库存归一化改为 normalizers.normalizeStock(rawStock)
+}
+
+async function handleScrape(message) { /* 从 content.js 复制，调用 scrapePageData */ }
+
+const BASE_SCRAPER = { scrapePageData, handleScrape, checkPageType, waitForStableDOM, simulateHumanBehavior, queryWithFallback, queryAllWithFallback };
+if (typeof module !== 'undefined' && module.exports) module.exports = BASE_SCRAPER;
 ```
 
-- [ ] **Step 4: 安装依赖**
+- [ ] **Step 5: Commit**
 
 ```bash
-cd /home/ec2-user/claude/amz-xundian/amazon-patrol-electron
-npm install
+git add renderer/sites/_base/
+git commit -m "feat: add _base scraper layer (selectors/parsers/normalizers/scraper)"
 ```
-
-预期输出：`node_modules/` 目录创建，包含 electron、node-schedule、electron-builder。
-
-- [ ] **Step 5: 复制静态资源**
-
-```bash
-cd /home/ec2-user/claude/amz-xundian
-cp amazon-patrol/fullpage.css         amazon-patrol-electron/renderer/
-cp amazon-patrol/selectors.js         amazon-patrol-electron/renderer/
-cp amazon-patrol/lib/cron.js          amazon-patrol-electron/renderer/lib/
-cp amazon-patrol/lib/xlsx.full.min.js amazon-patrol-electron/renderer/lib/
-cp amazon-patrol/icons/*              amazon-patrol-electron/assets/icons/
-```
-
-- [ ] **Step 6: 验证目录结构**
-
-```bash
-find /home/ec2-user/claude/amz-xundian/amazon-patrol-electron -type f | sort
-```
-
-预期：看到 package.json、renderer/fullpage.css、renderer/selectors.js、renderer/lib/cron.js、renderer/lib/xlsx.full.min.js、assets/icons/ 下有图标文件。
 
 ---
 

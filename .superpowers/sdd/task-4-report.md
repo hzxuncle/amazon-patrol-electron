@@ -1,28 +1,26 @@
-# Task 4 Report: ipc-handlers.js
+# Task 4 Report: tab-manager.js — 切换到新入口
 
 **Status:** DONE
 
-## 文件
-- `electron/ipc-handlers.js` — 新建，317行
+## Commits
+- `f29b153` refactor: tab-manager uses new sites/index.js per-site scraper
 
-## 导出接口
-- `register()` — 注册所有 ipcMain.handle 处理器
-- `setMainWindow(win)` — 由 main.js 注入主窗口引用
+## Changes Summary
 
-## 注册的 Action（共15个）
-START_PATROL / STOP_PATROL / RETRY_FAILED / GET_STATUS / GET_RESULTS / GET_HISTORY / CLEAR_RESULTS / CLEAR_HISTORY / STORAGE_GET / STORAGE_SET / STORAGE_REMOVE / SAVE_CRON_CONFIG / GET_CRON_CONFIG / SAVE_EXCEL / GET_LOGIN_ITEM / SET_LOGIN_ITEM
+### electron/tab-manager.js
 
-## 关键实现说明
+1. **Removed** `const selectorsIndex = require(...)` and `const SELECTORS_JS = fs.readFileSync(...)` (old selectors/index.js + selectors.js read).
+2. **Removed** `rawContent` / `CONTENT_BODY` block (fs.readFileSync of content.js + string processing).
+3. **Added** `const sitesIndex = require(path.join(__dirname, '../renderer/sites/index.js'))`.
+4. **In `injectAndScrape`:**
+   - Kept: `window.__SITE_CODE__` injection.
+   - Removed: `siteSelectors` build loop and `window.__SITE_SELECTORS__` injection.
+   - Replaced `fullScript` to call `sitesIndex.buildScraperScript(siteCode)` and invoke `window.__SCRAPER__.handleScrape(...)` instead of inlining `SELECTORS_JS` + `CONTENT_BODY`.
 
-1. **Worker Pool** — async 函数循环（非 Promise.all），支持 concurrency 并发、batchSize/batchRest 批量休息、pageInterval+jitter 间隔
-2. **START_PATROL payload** — 回调签名 `(e, payload)` 再解构，符合 ipcMain.handle 规范
-3. **Node 16 fetch 替代** — 用 `https` 模块实现 `postJSON(url, body)`，替换 `fetch()`
-4. **系统通知** — `new Notification({...}).show()` 包在 try/catch 中
-5. **SAVE_EXCEL** — `dialog.showSaveDialog` + `fs.writeFileSync`
-6. **钉钉推送** — 对比 referenceData，差异汇总后推送 Markdown 消息
+### package.json
 
-## 验证
-```
-node --check → OK
-所有17项符号检查 → OK
-```
+Added `"renderer/sites/**/*"` to `asarUnpack` array (existing entries preserved).
+
+## Verification
+- `node --check electron/tab-manager.js` → SYNTAX OK (Node v16.20.2, no output = pass)
+- No new npm dependencies introduced

@@ -1,35 +1,26 @@
-# Task 6 Report: preload.js — contextBridge API 桥
+# Task 6 Report: fullpage.js — 渲染层全面改用 code
 
-**Status:** DONE
+## Status: DONE
 
-## 实现内容
+## Commits Made
+- `0a5da12` refactor: fullpage.js uses site code throughout - dropdowns, getSiteLabel, findRef, buildTasks
 
-创建了 `electron/preload.js`，通过 `contextBridge.exposeInMainWorld('electronAPI', {...})` 暴露以下 API：
+## Changes Made
 
-### 消息通信
-- `sendMessage(action, payload)` → `ipcRenderer.invoke(action, payload)`
-- `onMessage(callback)` — 注册回调，接收主进程推送事件
+### renderer/fullpage.js
 
-### 存储操作
-- `storage.get(key)` → `ipcRenderer.invoke('STORAGE_GET', key)`
-- `storage.set(key, value)` → `ipcRenderer.invoke('STORAGE_SET', key, value)`
-- `storage.remove(key)` → `ipcRenderer.invoke('STORAGE_REMOVE', key)`
-- `storage.onChanged(callback)` — 注册回调，接收 `STORAGE_CHANGED` 事件
+1. **renderGroupCard()** — `val = s.code` (was `` `www.${s.domain}` ``); option values are now two-letter codes (CA, US, etc.)
+2. **refreshAllGroupOptions()** — same `val = s.code` change
+3. **initSiteGroups()** — default site = `enabledSites[0].code` (was `` `www.${enabledSites[0].domain}` ``); fallback `'CA'` (was `'www.amazon.ca'`)
+4. **btnAddGroup handler** — `usedSites.has(s.code)` lookup and `renderGroupCard(next.code, '')` call
+5. **buildTasks()** — both `siteFound` lookups changed from `` `www.${s.domain}` === site `` to `s.code === site`
+6. **autoFillAsinGroups()** — `siteFound` lookup changed from `` `www.${s.domain}` === g.site `` to `s.code === g.site`
+7. **getSiteLabel()** — renamed param to `siteCode`; code-first (returns code directly if no dot); falls back to domain match for legacy data
+8. **findRef()** — simplified to direct `r.site === site` match; removed domain-conversion compatibility code
+9. **processFile()** — changed normalization block: now converts imported site values to code (not to `www.domain`); handles both domain-format and short-code inputs
 
-### 其他
-- `saveExcel(buffer)` → `ipcRenderer.invoke('SAVE_EXCEL', buffer)`
-- `getLoginItem()` → `ipcRenderer.invoke('GET_LOGIN_ITEM')`
-- `setLoginItem(openAtLogin)` → `ipcRenderer.invoke('SET_LOGIN_ITEM', openAtLogin)`
+## Test Summary
+`node --check renderer/fullpage.js` passes (exit 0, no output). No automated tests; manual test path: open app → site-group dropdowns show codes (CA, US…) as values; import Excel → site normalized to code in referenceData; autoFillAsinGroups matches by code.
 
-### 主进程推送事件监听
-- `PATROL_UPDATE` → messageCallbacks
-- `PATROL_COMPLETE` → messageCallbacks
-- `CRON_AUTO_START` → messageCallbacks
-- `STORAGE_CHANGED` → storageChangeCallbacks
-
-## 语法验证
-
-```
-/home/ec2-user/.nvm/versions/node/v16.20.2/bin/node --check electron/preload.js && echo OK
-OK
-```
+## Concerns
+None.

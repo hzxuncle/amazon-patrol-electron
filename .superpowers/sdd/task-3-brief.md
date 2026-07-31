@@ -1,202 +1,115 @@
-# 亚马逊巡店助手 Electron 版 实现计划
-
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** 将现有 Chrome 扩展 `amazon-patrol` 改造为支持 Windows + Mac 的 Electron 桌面应用，保留全部功能，增加系统托盘、开机自启动。
-
-**Architecture:** 主进程（electron/）用 Node.js 实现调度、存储、抓取逻辑，替换所有 `chrome.*` API；渲染进程（renderer/）直接复用现有 HTML/CSS，仅将 `chrome.*` 调用替换为 `window.electronAPI.*`；两者通过 preload.js 的 contextBridge 通信。
-
-**Tech Stack:** Electron 28、node-schedule、electron-builder、fs/path（Node 内置）、现有 xlsx.full.min.js / cron.js
-
-## Global Constraints
-
-- Electron 版本：28.x（LTS）
-- Node 版本：≥18
-- 不引入 React/Vue，渲染层保持原生 HTML/JS
-- 所有数据文件存到 `app.getPath('userData')`
-- 抓取窗口必须 `show: false`，不干扰用户操作
-- 支持平台：Windows 10+、macOS 11+
-- 打包工具：electron-builder 24.x
-- 源扩展路径：`../amazon-patrol/`（相对于 `amazon-patrol-electron/`）
-
----
-
-## 文件清单
-
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `package.json` | 新建 | 项目配置、依赖、打包脚本 |
-| `electron/main.js` | 新建 | 主进程入口：窗口、托盘、生命周期 |
-| `electron/preload.js` | 新建 | contextBridge 暴露 electronAPI |
-| `electron/store.js` | 新建 | JSON 文件读写，替换 chrome.storage |
-| `electron/ipc-handlers.js` | 新建 | ipcMain.handle 路由，对应原 background.js 逻辑 |
-| `electron/tab-manager.js` | 新建 | BrowserWindow 抓取池，替换 chrome.tabs |
-| `electron/scheduler.js` | 新建 | node-schedule 定时，替换 chrome.alarms |
-| `renderer/fullpage.html` | 复制+改 | 去掉扩展特有 meta，script src 路径调整 |
-| `renderer/fullpage.js` | 复制+改 | 所有 chrome.* 替换为 window.electronAPI.* |
-| `renderer/fullpage.css` | 复制 | 零改动 |
-| `renderer/selectors.js` | 复制 | 零改动 |
-| `renderer/lib/cron.js` | 复制 | 零改动 |
-| `renderer/lib/xlsx.full.min.js` | 复制 | 零改动 |
-| `assets/icons/` | 新建 | 从扩展 icons/ 复制，补充 256px |
-| `build/electron-builder.yml` | 新建 | 打包配置 |
-
----
-
-## Task 3: tab-manager.js — 抓取窗口管理
+## Task 3: sites/index.js — Node端总入口
 
 **Files:**
-- Create: `electron/tab-manager.js`
+- Create: `renderer/sites/index.js`
 
 **Interfaces:**
-- Consumes: `electron` 模块（BrowserWindow、session）；`fs`（读取 selectors.js、content.js）
-- Produces:
-  - `openTabForTask(task, config)` → `Promise<result>` — 创建隐藏窗口、注入脚本、返回抓取结果
-  - `closeAll()` → `void` — 关闭所有抓取窗口
+- Produces: `buildScraper(siteCode)` → 返回合并后的完整 scraper 字符串（可直接注入页面）
 
-- [ ] **Step 1: 创建 tab-manager.js**
-
-创建 `/home/ec2-user/claude/amz-xundian/amazon-patrol-electron/electron/tab-manager.js`：
+- [ ] **Step 1: 新建 renderer/sites/index.js**
 
 ```js
 'use strict';
-
-const { BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const activeTabs = new Map(); // tabId -> { asin, site, win }
+const BASE_DIR = path.join(__dirname, '_base');
 
-const SELECTORS_JS = fs.readFileSync(
-  path.join(__dirname, '../renderer/selectors.js'), 'utf8'
-);
-const CONTENT_JS = fs.readFileSync(
-  path.join(__dirname, '../../amazon-patrol/content.js'), 'utf8'
-);
-
-const SITE_URLS = {
-  'www.amazon.ca':     'https://www.amazon.ca',
-  'www.amazon.com':    'https://www.amazon.com',
-  'www.amazon.com.au': 'https://www.amazon.com.au',
-  'www.amazon.com.mx': 'https://www.amazon.com.mx'
-};
-
-function getSiteUrl(site) {
-  return SITE_URLS[site] || `https://${site}`;
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function waitForLoad(win, maxWait = 15000) {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, maxWait);
-    win.webContents.once('did-finish-load', () => {
-      clearTimeout(timer);
-      setTimeout(resolve, 2000);
-    });
-  });
-}
-
-async function injectAndScrape(win, asin, config) {
-  return new Promise(async (resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('抓取超时')), config.scrapeTimeout || 25000);
-
-    // IPC 监听抓取结果
-    const { ipcMain } = require('electron');
-    const channel = `scrape-result-${win.id}`;
-    const handler = (event, result) => {
-      clearTimeout(timeout);
-      ipcMain.removeHandler(channel);
-      resolve(result);
-    };
-    ipcMain.handleOnce(channel, handler);
-
-    try {
-      // 注入选择器 + content script
-      await win.webContents.executeJavaScript(SELECTORS_JS);
-
-      // 将 content.js 的消息监听替换为直接调用后回传结果
-      const patchedContent = CONTENT_JS.replace(
-        /chrome\.runtime\.onMessage\.addListener[\s\S]*?}\s*\);/m,
-        `
-        (async () => {
-          const result = await handleScrape({
-            action: 'SCRAPE_NOW',
-            asin: ${JSON.stringify(asin)},
-            maxRetries: ${config.maxRetries || 3},
-            retryDelay: ${config.retryDelay || 2000},
-            useStability: ${config.useStability !== false},
-            enabledFields: ${JSON.stringify(config.enabledFields || null)}
-          });
-          require('electron').ipcRenderer.invoke(${JSON.stringify(channel)}, result);
-        })();
-        `
-      );
-      await win.webContents.executeJavaScript(patchedContent);
-    } catch (e) {
-      clearTimeout(timeout);
-      ipcMain.removeHandler(channel);
-      reject(e);
-    }
-  });
-}
-
-async function openTabForTask(task, config) {
-  const { asin, site } = task;
-  const url = `${getSiteUrl(site)}/dp/${asin}`;
-
-  const win = new BrowserWindow({
-    show: false,
-    width: 1280,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: false,  // content.js 需要直接访问 DOM，不走 preload
-      javascript: true
-    }
-  });
-
-  activeTabs.set(win.id, { asin, site, win });
-
+function tryRequire(filePath) {
   try {
-    await win.loadURL(url);
-    await waitForLoad(win);
-    const result = await injectAndScrape(win, asin, config);
-    result.site = site;
-    result.index = task.index;
-    return result;
-  } finally {
-    activeTabs.delete(win.id);
-    if (!win.isDestroyed()) win.close();
-  }
+    if (fs.existsSync(filePath + '.js')) return require(filePath);
+  } catch (e) {}
+  return null;
 }
 
-function closeAll() {
-  for (const [, { win }] of activeTabs) {
-    if (!win.isDestroyed()) win.close();
-  }
-  activeTabs.clear();
+function readFileContent(filePath) {
+  try {
+    if (fs.existsSync(filePath + '.js')) return fs.readFileSync(filePath + '.js', 'utf8');
+  } catch (e) {}
+  return null;
 }
 
-module.exports = { openTabForTask, closeAll };
+/**
+ * 构建指定站点的完整 scraper 配置
+ * 返回可注入页面的 JS 字符串
+ */
+function buildScraperScript(siteCode) {
+  const code = (siteCode || 'US').toUpperCase();
+  const siteDir = path.join(__dirname, code.toLowerCase());
+
+  // 加载各层（站点覆盖优先，缺失则用 _base）
+  const baseSelectors = require(path.join(BASE_DIR, 'selectors'));
+  const baseParsers   = require(path.join(BASE_DIR, 'parsers'));
+  const baseNormalizers = require(path.join(BASE_DIR, 'normalizers'));
+
+  const siteSelectors   = tryRequire(path.join(siteDir, 'selectors'))   || {};
+  const siteParsers     = tryRequire(path.join(siteDir, 'parsers'))     || {};
+  const siteNormalizers = tryRequire(path.join(siteDir, 'normalizers')) || {};
+
+  // 合并：站点覆盖 > _base
+  const selectors   = { ...baseSelectors,   ...siteSelectors };
+  const parsers     = { ...baseParsers,     ...siteParsers };
+  const normalizers = { ...baseNormalizers, ...siteNormalizers };
+
+  // 读取 scraper 主文件（直接内联字符串，不序列化函数）
+  const scraperContent = fs.readFileSync(path.join(BASE_DIR, 'scraper.js'), 'utf8');
+  // parsers/normalizers 各层文件内容内联
+  const baseParserContent   = fs.readFileSync(path.join(BASE_DIR, 'parsers.js'), 'utf8');
+  const baseNormContent     = fs.readFileSync(path.join(BASE_DIR, 'normalizers.js'), 'utf8');
+  const siteParserContent   = readFileContent(path.join(siteDir, 'parsers'))   || '';
+  const siteNormContent     = readFileContent(path.join(siteDir, 'normalizers')) || '';
+
+  // 注入配置：selectors 作为 JSON，parsers/normalizers 作为代码（支持函数覆盖）
+  return `
+(function() {
+  'use strict';
+
+  // ===== selectors =====
+  var __SEL__ = ${JSON.stringify(selectors)};
+
+  // ===== parsers (_base) =====
+  ${baseParserContent.replace(/if \(typeof module.*\n?/g, '').replace(/module\.exports.*\n?/g, '')}
+
+  // ===== parsers (site override) =====
+  ${siteParserContent.replace(/if \(typeof module.*\n?/g, '').replace(/module\.exports.*\n?/g, '')}
+
+  // ===== normalizers (_base) =====
+  ${baseNormContent.replace(/if \(typeof module.*\n?/g, '').replace(/module\.exports.*\n?/g, '')}
+
+  // ===== normalizers (site override) =====
+  ${siteNormContent.replace(/if \(typeof module.*\n?/g, '').replace(/module\.exports.*\n?/g, '')}
+
+  // ===== scraper =====
+  ${scraperContent.replace(/if \(typeof module.*\n?/g, '').replace(/module\.exports.*\n?/g, '')}
+
+  // 挂载到全局供 tab-manager 调用
+  window.__SCRAPER__ = { scrapePageData, handleScrape };
+  window.__SCRAPER_CONFIG__ = {
+    selectors: __SEL__,
+    parsers:   { extractPrice, extractRating, extractReviewCount, cleanText, parseDealBadge, parseAcBadge, parseCoupon, extractProductDetails },
+    normalizers: { normalizeStock }
+  };
+})();
+`;
+}
+
+module.exports = { buildScraperScript };
 ```
 
-- [ ] **Step 2: 验证语法**
+- [ ] **Step 2: node --check renderer/sites/index.js**
 
 ```bash
-python3 -c "
-import re, sys
-with open('/home/ec2-user/claude/amz-xundian/amazon-patrol-electron/electron/tab-manager.js') as f:
-    content = f.read()
-print('Lines:', len(content.splitlines()))
-print('Has openTabForTask:', 'openTabForTask' in content)
-print('Has closeAll:', 'closeAll' in content)
-"
+/home/ec2-user/.nvm/versions/node/v16.20.2/bin/node -e "const s = require('./renderer/sites/index.js'); console.log('buildScraperScript ok:', typeof s.buildScraperScript)"
 ```
 
-预期：Lines > 80，两个函数均存在。
+Expected: `buildScraperScript ok: function`
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add renderer/sites/index.js
+git commit -m "feat: add sites/index.js - build per-site scraper script for injection"
+```
 
 ---
 

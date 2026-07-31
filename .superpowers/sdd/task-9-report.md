@@ -46,3 +46,11 @@
 ## 输出文件
 
 - `renderer/fullpage.js`（基于源文件改造）
+
+## 修复补丁（commit aa99add）
+
+### fix(task-9): SAVE_CRON_CONFIG payload, add .catch on storage calls
+
+- **[CRITICAL] L954 SAVE_CRON_CONFIG payload**：`sendMessage('SAVE_CRON_CONFIG', { config })` → `sendMessage('SAVE_CRON_CONFIG', config)`，去掉多余的 `{ config }` 包装层，与 ipc-handlers 直接存储 cronConfig 的行为对齐。
+- **[中] processFile storage.set**：在 FileReader onload 同步回调内无法 await，改为 `.catch(e => console.error('[Store] referenceData 保存失败:', e))` 防止静默失败。
+- **[中] clearRef storage.remove**：同样加 `.catch(e => console.error('[Store] referenceData 删除失败:', e))`。

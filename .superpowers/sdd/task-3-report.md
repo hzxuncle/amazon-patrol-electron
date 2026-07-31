@@ -1,23 +1,40 @@
-# Task 3 Report: tab-manager.js
+# Task 3 Report: sites/index.js — Node-side scraper builder
 
 **Status:** DONE
 
-## 完成内容
+## Commits
 
-创建了 `electron/tab-manager.js`，实现 BrowserWindow 抓取窗口管理。
+- `69fa347` feat: add sites/index.js - build per-site scraper script for injection
 
-## 关键实现
+## Changes Made
 
-- `openTabForTask(task, config)` — 创建 `show: false` 隐藏窗口，加载 Amazon 商品页，等待页面加载完成后注入 selectors.js + 打补丁的 content.js，通过 `ipcMain.handleOnce` + `ipcRenderer.invoke` 回传抓取结果，`finally` 块确保窗口总被关闭。
-- `closeAll()` — 关闭 activeTabs 中所有存活窗口并清空 Map。
+### renderer/sites/index.js (new file)
 
-## 技术细节
+Created the Node-side entry point that builds a per-site injectable JS string.
 
-- `chrome.runtime.onMessage.addListener(...)` 块用正则替换为立即执行的 async IIFE，直接调用 `handleScrape()` 并通过 `ipcRenderer.invoke(channel, result)` 回传结果。
-- `channel` 格式为 `scrape-result-<winId>`，防止多窗口并发时冲突。
-- catch 块内也通过 channel 回传失败结果，避免超时才能感知错误。
-- `contextIsolation: false` 允许注入的 content.js 直接访问 DOM 和调用 `require('electron')`。
+Key design decisions:
 
-## 验证
+1. **`stripNodeGuards(src)`** — strips `'use strict';`, the `const BASE_XXX = {...};` export objects, and `if (typeof module !== 'undefined' && module.exports) module.exports = ...` guard lines before inlining each file. Uses regex that handles all naming variants (BASE/MX/US/CA/AU).
 
-`node --check electron/tab-manager.js` → OK
+2. **Inline order** — `_base` parsers/normalizers first, then site-specific parsers/normalizers second. Because both layers use `function` declarations (hoisted), the site-level re-declaration of a same-named function (e.g. `extractRating` for MX, `normalizeStock` for MX) wins at runtime.
+
+3. **Selectors** — JSON-serialized via `JSON.stringify` (arrays of strings and plain objects are JSON-safe).
+
+4. **`window.__SCRAPER_CONFIG__`** — exposes `selectors` (the merged JSON object), `parsers` (references to the inlined named functions), and `normalizers` (same).
+
+5. **`window.__SCRAPER__`** — exposes `{ scrapePageData, handleScrape }` for tab-manager.
+
+6. Wrapped in an IIFE `(function() { 'use strict'; ... })();` to avoid polluting the page global scope beyond the two `window.__*` assignments.
+
+## Test Summary
+
+Exact brief test: `script length: 20244 / has handleScrape: true / has __SCRAPER__: true`
+
+Additional checks all pass:
+- `node --check renderer/sites/index.js` — syntax OK
+- US script: all core functions present (extractRating, normalizeStock, scrapePageData, handleScrape, __SCRAPER_CONFIG__)
+- MX script: 2× `function extractRating` (base + MX override), 2× `function normalizeStock` (base + MX override), contains "estrellas" and "no disponible"
+
+## Concerns
+
+None.

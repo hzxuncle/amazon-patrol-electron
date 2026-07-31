@@ -1,30 +1,22 @@
-# Task 2 Report: store.js 数据持久化层
+# Task 2 Report: 站点目录 — us/ca/au/mx
 
-**状态:** DONE
+## Status: DONE
 
-## 完成内容
+## Changes Made
 
-创建了 `electron/store.js`，实现以下同步接口：
-- `get(key)` — 从内存缓存读取指定键
-- `set(key, value)` — 写入内存缓存并同步落盘
-- `remove(key)` — 从内存缓存删除并同步落盘
-- `getAll()` — 返回全部数据的浅拷贝
+Created 6 new files across 4 site directories under `renderer/sites/`:
 
-## 实现细节
+- `renderer/sites/us/selectors.js` — US-specific selectors (acBadge: 1 selector)
+- `renderer/sites/ca/selectors.js` — CA-specific selectors (acBadge: 2 selectors)
+- `renderer/sites/au/selectors.js` — AU-specific selectors (acBadge: 2 selectors)
+- `renderer/sites/mx/selectors.js` — MX-specific selectors (acBadge: 1 selector)
+- `renderer/sites/mx/parsers.js` — MX extractRating supporting "X de 5 estrellas" Spanish format
+- `renderer/sites/mx/normalizers.js` — MX normalizeStock supporting Disponible/No disponible/Agotado
 
-- 数据存储位置：`app.getPath('userData')/store.json`
-- 内存缓存 `_cache` 懒加载（首次调用时读取文件）
-- 写入时确保 `userData` 目录存在（`mkdirSync recursive`）
-- JSON 文件格式化存储（indent=2），便于调试
-- 容错：文件不存在或 JSON 解析失败均回退到空对象 `{}`
+All files follow the no-require-inside-functions constraint and use the module.exports guard pattern.
 
-## 验证
+## Commits made
+- `b296d84` - feat: add per-site scraper configs (us/ca/au/mx)
 
-```bash
-/home/ec2-user/.nvm/versions/node/v16.20.2/bin/node --check electron/store.js
-# 输出: OK
-```
-
-## 支持的键名
-
-`patrolSettings`、`cronConfig`、`patrolResults`、`patrolState`、`patrolConfig`、`historySnapshots`、`asinInputCache`、`referenceData`、`lastUpdate`
+## One-line test summary
+17/17 assertions passed: selectors load correctly, MX extractRating handles EN/ES/null, MX normalizeStock handles Disponible→In Stock, No disponible→Out of Stock, Agotado→Out of Stock, limited stock, and null.
