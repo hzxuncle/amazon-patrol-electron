@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>亚马逊监控助手 · 功能讲解</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --accent: #5b5edb;
+  --accent-light: #eeeffe;
+  --accent-dim: #5b5edb18;
+  --bg: #f5f6fa;
+  --bg-white: #ffffff;
+  --bg-card: #f9f9fc;
+  --border: #e4e5f0;
+  --border-strong: #d0d1e0;
+  --text: #1a1b2e;
+  --text-muted: #6b6c80;
+  --text-dim: #a0a1b0;
+  --green: #389e0d;
+  --green-bg: #f0f9eb;
+  --red: #cf1322;
+  --red-bg: #fff1f0;
+  --yellow: #d48806;
+  --yellow-bg: #fffbe6;
+  --blue-bg: #f0f5ff;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* 顶部导航 */
+#toc {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: #ffffffee;
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 48px;
+  z-index: 100;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+#toc a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+#toc a:hover { color: var(--accent); background: var(--accent-dim); }
+#toc a.active { color: var(--accent); background: var(--accent-dim); font-weight: 600; }
+
+/* 主体 */
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 72px 40px 120px;
+}
+
+/* 封面 */
+.cover {
+  text-align: center;
+  padding: 72px 0 88px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 72px;
+}
+
+.cover-badge {
+  display: inline-block;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  margin-bottom: 20px;
+}
+
+.cover-title {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -1px;
+  margin-bottom: 10px;
+}
+
+.cover-sub {
+  font-size: 18px;
+  color: var(--text-muted);
+  margin-bottom: 36px;
+}
+
+.cover-meta {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* 章节 */
+.chapter {
+  margin-bottom: 72px;
+  scroll-margin-top: 64px;
+}
+
+.chapter-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--border);
+}
+
+.chapter-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+  background: var(--accent-dim);
+  padding: 3px 10px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.chapter-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 节 */
+.section {
+  margin-bottom: 36px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+}
+
+/* 卡片网格 */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 5px;
+}
+
+.card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* 步骤 */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.step-text strong { color: var(--accent); }
+
+/* 提示框 */
+.tip {
+  background: var(--blue-bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  line-height: 1.65;
+}
+.tip strong { color: var(--text); }
+
+.warn {
+  background: var(--yellow-bg);
+  border-left: 3px solid var(--yellow);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--yellow);
+  margin-top: 10px;
+  line-height: 1.65;
+}
+.warn strong { color: #8a5c00; }
+
+.danger {
+  background: var(--red-bg);
+  border-left: 3px solid var(--red);
+  border-radius: 0 6px 6px 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--red);
+  margin-top: 10px;
+  line-height: 1.65;
+}
+
+/* 表格 */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  color: var(--text);
+}
+
+.data-table tr:last-child td { border-bottom: none; }
+.data-table td.muted { color: var(--text-muted); }
+.data-table td.dim { color: var(--text-dim); font-size: 12px; }
+
+/* 标签 */
+.tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.tag-required { background: var(--red-bg); color: var(--red); }
+.tag-stable { background: var(--green-bg); color: var(--green); }
+.tag-beta { background: var(--yellow-bg); color: var(--yellow); }
+
+/* 站点能力矩阵 */
+.site-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.site-matrix th {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.site-matrix th:first-child { text-align: left; }
+
+.site-matrix td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  font-size: 13px;
+}
+.site-matrix td:first-child { text-align: left; font-weight: 500; color: var(--text); }
+.site-matrix tr:last-child td { border-bottom: none; }
+
+.dot-stable { color: var(--green); font-weight: 700; }
+.dot-beta { color: var(--yellow); font-weight: 700; }
+.dot-no { color: var(--text-dim); }
+
+/* 钉钉预览 */
+.dingtalk-preview {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 22px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.dt-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.dt-site { color: var(--accent); font-weight: 600; font-size: 14px; }
+.dt-asin { color: #b45309; font-weight: 600; }
+.dt-normal { color: var(--green); }
+.dt-alert { color: var(--red); }
+.dt-muted { color: var(--text-dim); font-size: 12px; }
+
+code {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--accent);
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+/* 状态说明 */
+.status-list { display: flex; flex-direction: column; gap: 8px; }
+
+.status-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+.badge-success { background: var(--green-bg); color: var(--green); }
+.badge-failed { background: var(--red-bg); color: var(--red); }
+.badge-captcha { background: var(--yellow-bg); color: var(--yellow); }
+
+.status-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.status-desc strong { color: var(--text); }
+
+hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+@media (max-width: 640px) {
+  .two-col, .cards { grid-template-columns: 1fr; }
+  .cover-title { font-size: 32px; }
+  main { padding: 64px 20px 80px; }
+  #toc { padding: 0 20px; }
+}
+</style>
+</head>
+<body>
+
+<nav id="toc">
+  <a href="#cover">首页</a>
+  <a href="#ch1">软件介绍</a>
+  <a href="#ch2">站点能力</a>
+  <a href="#ch3">基础设置</a>
+  <a href="#ch4">监控配置</a>
+  <a href="#ch5">参考数据</a>
+  <a href="#ch6">开始巡查</a>
+  <a href="#ch7">结果查看</a>
+  <a href="#ch8">钉钉通知</a>
+  <a href="#ch9">定时任务</a>
+  <a href="#ch10">历史与日志</a>
+  <a href="#ch11">常见问题</a>
+</nav>
+
+<main>
+
+<!-- 封面 -->
+<div class="cover" id="cover">
+  <div class="cover-title">亚马逊监控助手</div>
+  <div class="cover-sub"><span class="cover-badge">功能介绍</span></div>
+  <div class="cover-meta">桌面端应用 · Windows / Mac</div>
+</div>
+
+<!-- 01 软件介绍 -->
+<div class="chapter" id="ch1">
+  <div class="chapter-header">
+    <span class="chapter-num">01</span>
+    <span class="chapter-title">软件介绍</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">这个软件做什么</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:16px">
+      亚马逊监控助手是一款桌面端自动化巡查工具，模拟真实浏览器访问 Amazon 商品页面，抓取价格、库存、卖家、排名等数据，与预设期望值自动对比，异常时推送钉钉通知。
+    </p>
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">批量巡查</div>
+        <div class="card-desc">一次性抓取多个站点、多个 ASIN 的数据，无需逐一手动查看。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">异常预警</div>
+        <div class="card-desc">导入期望值后，任何字段偏离都会标红并推送钉钉，第一时间发现问题。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">定时自动化</div>
+        <div class="card-desc">配置定时任务后无需人工操作，到点自动巡查并发送报告。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">真实浏览器抓取</div>
+        <div class="card-desc">内嵌 Chromium 内核，看到的数据与用户在浏览器里看到的完全一致。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">界面结构</div>
+    <table class="data-table">
+      <thead><tr><th>导航项</th><th>用途</th><th>使用频率</th></tr></thead>
+      <tbody>
+        <tr><td>监控</td><td class="muted">填写 ASIN、选择站点、启动巡查、查看结果</td><td class="dim">日常高频</td></tr>
+        <tr><td>对比数据</td><td class="muted">导入 Excel 预设期望值，自动对比标红</td><td class="dim">数据变更时</td></tr>
+        <tr><td>定时任务</td><td class="muted">配置自动定时巡查</td><td class="dim">初次设置后少动</td></tr>
+        <tr><td>站点管理</td><td class="muted">管理站点启用状态和配送邮编</td><td class="dim">初次设置后少动</td></tr>
+        <tr><td>巡店历史</td><td class="muted">查看近 10 次巡查记录</td><td class="dim">按需查阅</td></tr>
+        <tr><td>日志</td><td class="muted">实时查看每条任务抓取状态</td><td class="dim">排查问题时</td></tr>
+        <tr><td>设置</td><td class="muted">并发参数、钉钉通知、系统配置</td><td class="dim">初次设置后少动</td></tr>
+      </tbody>
+    </table>
+    <div class="tip">右上角可一键切换深色 / 浅色主题，自动保存。</div>
+  </div>
+</div>
+
+<!-- 02 站点能力边界 -->
+<div class="chapter" id="ch2">
+  <div class="chapter-header">
+    <span class="chapter-num">02</span>
+    <span class="chapter-title">站点支持情况与使用边界</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">已验证支持的站点</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:14px">
+      以下 4 个站点经过大量实测验证，页面结构、字段解析、多语言处理均已完善，可放心用于日常监控：
+    </p>
+    <table class="site-matrix">
+      <thead>
+        <tr>
+          <th>站点</th>
+          <th>域名</th>
+          <th>价格</th>
+          <th>库存</th>
+          <th>BSR</th>
+          <th>产品信息</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>US <span class="tag tag-stable">已验证</span></td>
+          <td class="muted">amazon.com</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+        </tr>
+        <tr>
+          <td>CA <span class="tag tag-stable">已验证</span></td>
+          <td class="muted">amazon.ca</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+        </tr>
+        <tr>
+          <td>AU <span class="tag tag-stable">已验证</span></td>
+          <td class="muted">amazon.com.au</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+        </tr>
+        <tr>
+          <td>MX <span class="tag tag-stable">已验证</span></td>
+          <td class="muted">amazon.com.mx</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+          <td class="dot-stable">+</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">其他站点的情况</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:14px">
+      软件内置 20 个 Amazon 站点（UK、DE、FR、JP 等），技术上均可使用，但尚未针对这些站点做专项测试和页面结构适配。
+    </p>
+    <table class="site-matrix">
+      <thead>
+        <tr>
+          <th>站点</th>
+          <th>价格</th>
+          <th>库存</th>
+          <th>BSR</th>
+          <th>产品信息</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>UK / DE / FR / IT / ES <span class="tag tag-beta">待验证</span></td>
+          <td class="dot-beta">~</td>
+          <td class="dot-beta">~</td>
+          <td class="dot-beta">~</td>
+          <td class="dot-beta">~</td>
+          <td class="dim">欧洲站，本地语言可能导致部分字段解析不准</td>
+        </tr>
+        <tr>
+          <td>JP / BR 等 <span class="tag tag-beta">待验证</span></td>
+          <td class="dot-beta">~</td>
+          <td class="dot-beta">~</td>
+          <td class="dot-no">-</td>
+          <td class="dot-no">-</td>
+          <td class="dim">非英语站点，页面结构差异较大，准确率较低</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="warn"><strong>使用其他站点前请注意：</strong>抓取结果可能存在字段为空或数据不准确的情况，建议人工核对关键数据。后续版本将陆续针对各站点做专项适配。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">软件能力边界</div>
+    <table class="data-table">
+      <thead><tr><th>能力</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>抓取的是浏览器渲染结果</td>
+          <td class="muted">软件内嵌真实 Chromium，看到的数据与用户在浏览器里看到的完全一致，包括 JS 动态渲染的价格和库存。</td>
+        </tr>
+        <tr>
+          <td>数据是某一时刻的快照</td>
+          <td class="muted">抓取结果只反映抓取瞬间的页面状态。价格、库存、卖家随时在变，如需确认关键数据请以实际页面为准。</td>
+        </tr>
+        <tr>
+          <td>依赖页面元素识别</td>
+          <td class="muted">通过 CSS 选择器定位页面元素提取数据。Amazon 前端改版后，对应字段可能暂时为空，需更新软件适配。</td>
+        </tr>
+        <tr>
+          <td>不支持需要登录的数据</td>
+          <td class="muted">软件以访客身份访问页面，无法抓取需要登录才能看到的数据（如广告报表、后台库存等）。</td>
+        </tr>
+        <tr>
+          <td>单站点最多 100 个 ASIN</td>
+          <td class="muted">每个站点分组最多填写 100 个 ASIN，超出需拆分多次巡查。</td>
+        </tr>
+        <tr>
+          <td>只抓取商品详情页数据</td>
+          <td class="muted">只支持 /dp/ASIN 格式的商品页，不支持搜索页、店铺页、促销页等其他页面类型。</td>
+        </tr>
+        <tr>
+          <td>自动处理拦截页</td>
+          <td class="muted">Amazon 有时会在跳转商品页前弹出「Continue shopping」等拦截页面。软件会自动识别并点击继续按钮，无需人工干预，日志中会记录「检测到拦截页，已自动点击继续」。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">反爬机制带来的未知风险</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:14px">
+      Amazon 持续升级反爬系统，以下风险无法完全规避，使用时需了解：
+    </p>
+    <table class="data-table">
+      <thead><tr><th>风险</th><th>表现</th><th>影响程度</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>触发验证码</td>
+          <td class="muted">Amazon 检测到异常访问，弹出人机验证。巡查中断，需手动处理。</td>
+          <td class="dim">中 — 手动处理后可继续</td>
+        </tr>
+        <tr>
+          <td>IP 临时封锁</td>
+          <td class="muted">同一 IP 短时间请求量过大，Amazon 拒绝连接，表现为大量任务失败（ERR_ABORTED）。</td>
+          <td class="dim">中 — 等待一段时间后恢复</td>
+        </tr>
+        <tr>
+          <td>返回不同内容</td>
+          <td class="muted">Amazon 对检测到的异常访问返回简化页面或不同价格，抓取到的数据与正常用户看到的不一致。此类情况难以察觉。</td>
+          <td class="dim">高 — 数据可能失真且无感知</td>
+        </tr>
+        <tr>
+          <td>页面结构悄悄改变</td>
+          <td class="muted">Amazon 前端更新后，原有选择器失效，字段静默变为空而不报错，导致数据丢失但看起来正常。</td>
+          <td class="dim">高 — 容易被忽视</td>
+        </tr>
+        <tr>
+          <td>多人同 IP 叠加风险</td>
+          <td class="muted">公司统一出口 IP 下，N 人同时使用等于 N 倍请求量打到同一 IP，封锁概率显著上升。</td>
+          <td class="dim">中高 — 取决于使用人数和频率</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="warn">
+      <strong>使用建议：</strong>巡查结果出现大量 N/A 或数据异常时，优先在真实浏览器里核对几条数据，确认是软件问题还是 Amazon 本身的变化。不要完全依赖软件数据做重要决策。
+    </div>
+  </div>
+</div>
+
+<!-- 03 基础设置 -->
+<div class="chapter" id="ch3">
+  <div class="chapter-header">
+    <span class="chapter-num">03</span>
+    <span class="chapter-title">基础设置（首次使用必做）</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">站点管理 — 启用站点和配置邮编</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:14px">
+      只有启用的站点才会出现在监控面板的站点选择列表中。配送邮编直接影响价格和库存显示，必须填写正确。
+    </p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">切换到「站点管理」Tab，找到需要的站点</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">打开「启用」开关，填写该站点的配送邮编</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">点击 <strong>保存</strong> 生效</div>
+      </div>
+    </div>
+    <div class="warn"><strong>注意：</strong>邮编填写错误会导致价格和库存数据不准确，部分商品因配送地不同价格差异较大。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">设置 — 巡查参数</div>
+    <table class="data-table">
+      <thead><tr><th>参数</th><th>默认值</th><th>说明</th><th>参数建议</th></tr></thead>
+      <tbody>
+        <tr><td>并发数</td><td class="muted">2</td><td class="muted">同时抓取的任务数，越大越快，但被封风险越高</td><td class="dim">多人共用网络时调为 1</td></tr>
+        <tr><td>页面间隔</td><td class="muted">4000 ms</td><td class="muted">每个任务之间的等待时间</td><td class="dim">多人共用时调至 8000 ms</td></tr>
+        <tr><td>随机抖动</td><td class="muted">2000 ms</td><td class="muted">在间隔基础上随机增加，模拟人工操作节奏</td><td class="dim">保持默认即可</td></tr>
+        <tr><td>批次大小</td><td class="muted">20 个</td><td class="muted">每抓取 N 个任务后休息一次</td><td class="dim">保持默认即可</td></tr>
+        <tr><td>批次休息</td><td class="muted">30 s</td><td class="muted">批次间休息时长</td><td class="dim">保持默认即可</td></tr>
+        <tr><td>抓取超时</td><td class="muted">25 s</td><td class="muted">单任务超时时间，网络慢时建议调至 45 s</td></tr>
+      </tbody>
+    </table>
+    <div class="tip"><strong>多人同时使用建议：</strong>并发数调为 1，页面间隔调至 8000 ms 以上，降低同一 IP 的请求频率。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">设置 — 钉钉通知</div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">群通知（Webhook）</div>
+        <div class="card-desc">在钉钉群添加「自定义机器人」，复制 Webhook 地址填入此处。在监控面板开启「群通知」开关后生效。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">个人通知</div>
+        <div class="card-desc">需要企业内部应用的 AppKey、AppSecret、AgentId（由管理员提供），接收人手机号在监控面板配置。</div>
+      </div>
+    </div>
+    <div class="warn">群通知和个人通知互斥，同时只能开启一个。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">设置 — 系统</div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">开机自启动</div>
+        <div class="card-desc">系统启动时自动运行并最小化到托盘，配合定时任务使用，无需手动打开软件。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">显示抓取窗口</div>
+        <div class="card-desc">开启后巡查时可以看到后台打开的 Amazon 页面，方便处理验证码或排查问题。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 04 监控配置 -->
+<div class="chapter" id="ch4">
+  <div class="chapter-header">
+    <span class="chapter-num">04</span>
+    <span class="chapter-title">监控配置</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">填写监控目标（巡检站点区）</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">点击 <strong>新增站点</strong>，从下拉列表选择目标站点（如 US、AU）</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">在输入框粘贴 ASIN，每行一个，或用逗号分隔。单站点最多 <strong>100 个</strong> ASIN</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">重复以上步骤添加其他站点，同一 ASIN 可在多个站点同时监控</div>
+      </div>
+    </div>
+    <div class="tip"><strong>自动填入：</strong>导入对比数据 Excel 后，系统会自动将 ASIN 按站点填入此处，通常无需手动录入。</div>
+    <div class="tip">点击输入区标题栏的折叠按钮可收起输入区，节省屏幕空间查看结果。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">字段选择（显示哪些列）</div>
+    <p style="font-size:14px;color:var(--text-muted);margin-bottom:12px">勾选需要抓取的字段，只勾选必要字段可略微加快速度。</p>
+    <table class="data-table">
+      <thead><tr><th>字段</th><th>说明</th><th>默认</th></tr></thead>
+      <tbody>
+        <tr><td>售价</td><td class="muted">当前 Buy Box 价格</td><td class="dim">开启</td></tr>
+        <tr><td>划线价</td><td class="muted">原价（被划掉的价格）</td><td class="dim">开启</td></tr>
+        <tr><td>活动标</td><td class="muted">Deal 标签，如 Limited-time deal</td><td class="dim">开启</td></tr>
+        <tr><td>AC标</td><td class="muted">Amazon's Choice 标识</td><td class="dim">开启</td></tr>
+        <tr><td>Coupon</td><td class="muted">优惠券信息</td><td class="dim">开启</td></tr>
+        <tr><td>星级</td><td class="muted">商品评分，如 4.5</td><td class="dim">开启</td></tr>
+        <tr><td>评论数</td><td class="muted">评论总数量</td><td class="dim">开启</td></tr>
+        <tr><td>卖家</td><td class="muted">Buy Box 卖家名称</td><td class="dim">开启</td></tr>
+        <tr><td>库存</td><td class="muted">In Stock / Out of Stock / In Stock (Limited)</td><td class="dim">开启</td></tr>
+        <tr><td>父体</td><td class="muted">父体 ASIN（有变体的商品）</td><td class="dim">开启</td></tr>
+        <tr><td>标题</td><td class="muted">商品页标题</td><td class="dim">开启</td></tr>
+        <tr><td>URL</td><td class="muted">商品页链接，点击在浏览器打开</td><td class="dim">开启</td></tr>
+        <tr><td>产品信息</td><td class="muted">Product Information 全部字段，点击查看弹窗</td><td class="dim">关闭</td></tr>
+        <tr><td>BSR大类排名 / 名</td><td class="muted">大类 Best Sellers Rank 数字和分类名</td><td class="dim">关闭</td></tr>
+        <tr><td>BSR小类排名 / 名</td><td class="muted">子分类排名数字和分类名</td><td class="dim">关闭</td></tr>
+      </tbody>
+    </table>
+    <div class="tip">点击 <strong>列排序</strong> 按钮可拖拽调整列的显示顺序，顺序同步到导出 Excel。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">通知和对比开关</div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">启用对比</div>
+        <div class="card-desc">开启后才会将实际值与参考数据对比并标红。关闭则只抓取不对比。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">群通知 / 个人通知</div>
+        <div class="card-desc">控制本次巡查完成后是否发送钉钉通知。需在设置里提前配置好凭证。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 05 参考数据 -->
+<div class="chapter" id="ch5">
+  <div class="chapter-header">
+    <span class="chapter-num">05</span>
+    <span class="chapter-title">对比数据（参考数据）</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">导入 Excel</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">点击 <strong>下载模板</strong> 获取标准格式文件</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">在模板里填写数据，ASIN 和站点为必填，其余按需填写</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">拖拽文件到上传区，或点击选择（支持 .xlsx / .xls / .csv）</div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">导入成功后，ASIN 自动填入监控面板对应站点，预览表格同步刷新</div>
+      </div>
+    </div>
+    <div class="danger">站点列必须填写二字码（US、CA、AU、MX），不能填域名。ASIN 或站点为空将导致整批导入失败。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Excel 列说明</div>
+    <table class="data-table">
+      <thead><tr><th>列名</th><th>示例</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>ASIN <span class="tag tag-required">必填</span></td><td class="muted">B0D6GH17XJ</td><td class="dim">10位大写字母数字</td></tr>
+        <tr><td>站点 <span class="tag tag-required">必填</span></td><td class="muted">US</td><td class="dim">二字站点码</td></tr>
+        <tr><td>常用名</td><td class="muted">按摩枪黑色</td><td class="dim">显示在结果表和钉钉通知中，方便识别</td></tr>
+        <tr><td>期望售价</td><td class="muted">127.98</td><td class="dim">纯数字，不含货币符号</td></tr>
+        <tr><td>期望划线价</td><td class="muted">159.99</td><td class="dim">纯数字</td></tr>
+        <tr><td>期望活动标</td><td class="muted">N/A</td><td class="dim">无活动时填 N/A</td></tr>
+        <tr><td>期望AC标</td><td class="muted">N/A</td><td class="dim">无 AC 标时填 N/A</td></tr>
+        <tr><td>期望Coupon</td><td class="muted">N/A</td><td class="dim">无优惠券时填 N/A</td></tr>
+        <tr><td>期望星级</td><td class="muted">4.5</td><td class="dim">数字</td></tr>
+        <tr><td>期望评论数</td><td class="muted">1234</td><td class="dim">纯数字</td></tr>
+        <tr><td>期望卖家</td><td class="muted">RENPHO Wellness</td><td class="dim">Buy Box 期望卖家名称</td></tr>
+        <tr><td>期望库存</td><td class="muted">In Stock</td><td class="dim">In Stock / Out of Stock</td></tr>
+        <tr><td>期望BSR大类排名</td><td class="muted">7954</td><td class="dim">纯数字，不含 # 号</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 06 开始巡查 -->
+<div class="chapter" id="ch6">
+  <div class="chapter-header">
+    <span class="chapter-num">06</span>
+    <span class="chapter-title">开始巡查</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">启动流程</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">确认「巡检站点」区已填好 ASIN，字段和通知开关已按需配置</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">点击 <strong>开始巡店</strong>，进度条开始更新，日志 Tab 实时滚动</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">巡查完成后结果表格自动刷新，钉钉通知自动发送（如已开启）</div>
+      </div>
+    </div>
+    <div class="tip">如果之前已有巡查结果，按钮显示为「继续巡店」，点击只抓取未完成的任务。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">停止、重试与清除</div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">停止</div>
+        <div class="card-desc">立即中断巡查，计时器停止，状态显示「已取消」。已完成的结果保留。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">重试失败项</div>
+        <div class="card-desc">巡查结束后，只重新抓取失败的 ASIN，自动降低并发速度避免再次触发封锁。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">清除结果</div>
+        <div class="card-desc">清空当前结果表格，进度条隐藏，开始全新一轮巡查。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">任务状态说明</div>
+    <div class="status-list">
+      <div class="status-item">
+        <span class="status-badge badge-success">成功</span>
+        <div class="status-desc">页面正常加载，所有字段数据已抓取</div>
+      </div>
+      <div class="status-item">
+        <span class="status-badge badge-failed">失败</span>
+        <div class="status-desc">
+          <strong>网络异常：</strong>自动重试最多 3 次，仍失败后标记，可手动重试<br>
+          <strong>商品不存在（404）：</strong>ASIN 填错或商品已被删除<br>
+          <strong>商品已下架：</strong>页面跳转到其他 ASIN，系统自动识别并提示跳转目标
+        </div>
+      </div>
+      <div class="status-item">
+        <span class="status-badge badge-captcha">验证码</span>
+        <div class="status-desc">Amazon 触发人机验证。在设置里开启「显示抓取窗口」，手动完成验证后点「重试失败项」</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 07 结果查看 -->
+<div class="chapter" id="ch7">
+  <div class="chapter-header">
+    <span class="chapter-num">07</span>
+    <span class="chapter-title">结果查看与导出</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">标红规则</div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">价格偏差</div>
+        <div class="card-desc">实际售价或划线价与期望值不同时，对应单元格标红。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">文本变化</div>
+        <div class="card-desc">活动标、AC标、Coupon、卖家、库存等字段与期望不一致时标红。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">BSR 排名下降</div>
+        <div class="card-desc">BSR 数字变大（排名下降）时标红；数字变小（排名上升）时标绿。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">历史对比</div>
+        <div class="card-desc">与上次巡查结果对比，有变化时在历史列显示差异。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">产品信息查看</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8">
+      开启「产品信息」字段后，结果表中出现「查看」按钮，点击弹出 Product Information 的完整键值对，包含 BSR、型号、重量、尺寸等所有原始字段。
+    </p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">导出 Excel</div>
+    <p style="font-size:14px;color:var(--text-muted);margin-bottom:12px">点击工具栏「导出 Excel」，生成包含两个 Sheet 的文件：</p>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Sheet 1：巡查明细</div>
+        <div class="card-desc">所有 ASIN 的完整数据，列顺序与界面一致</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Sheet 2：异常汇总</div>
+        <div class="card-desc">只包含有异常的 ASIN，方便快速定位问题</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 08 钉钉通知 -->
+<div class="chapter" id="ch8">
+  <div class="chapter-header">
+    <span class="chapter-num">08</span>
+    <span class="chapter-title">钉钉通知</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">通知时机</div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-title">有异常时</div>
+        <div class="card-desc">任意字段与期望值不符，通知里按站点分组列出所有差异项（绿色=期望，红色=实际）。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">无异常时</div>
+        <div class="card-desc">同样发送，显示「本次巡查无异常，所有商品数据与参考值一致」+ 汇总数据。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">抓取失败时</div>
+        <div class="card-desc">在通知里列出失败 ASIN 和失败原因，需人工处理。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">通知内容示例（有异常）</div>
+    <div class="dingtalk-preview">
+      <div class="dt-title">亚马逊巡店报告</div>
+      <div>· 时间: 2026/7/30 09:30:00</div>
+      <br>
+      <div class="dt-site">US · amazon.com</div>
+      <br>
+      <div class="dt-asin">B0D6GH17XJ · 按摩枪黑色</div>
+      <div>· <span class="dt-normal">售价: 期望 <code>$127.98</code></span> → <span class="dt-alert">实际 <code>$99.99</code></span></div>
+      <div>· <span class="dt-normal">活动标: 期望 <code>N/A</code></span> → <span class="dt-alert">实际 <code>Limited-time deal</code></span></div>
+      <br>
+      <div class="dt-site">AU · amazon.com.au</div>
+      <br>
+      <div class="dt-asin">B09NND18SK · 人体秤黑色</div>
+      <div>· <span class="dt-normal">卖家: 期望 <code>Renpho Wellness AU</code></span> → <span class="dt-alert">实际 <code>N/A</code></span></div>
+      <br>
+      <div class="dt-muted">汇总　共: 20　成功: 19　失败: 1　验证码: 0　用时: 3分42秒</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">通知内容示例（无异常）</div>
+    <div class="dingtalk-preview">
+      <div class="dt-title">亚马逊巡店报告</div>
+      <div>· 时间: 2026/7/30 09:30:00</div>
+      <br>
+      <div class="dt-normal">本次巡查无异常，所有商品数据与参考值一致。</div>
+      <br>
+      <div class="dt-muted">汇总　共: 20　成功: 20　失败: 0　验证码: 0　用时: 3分15秒</div>
+    </div>
+  </div>
+</div>
+
+<!-- 09 定时任务 -->
+<div class="chapter" id="ch9">
+  <div class="chapter-header">
+    <span class="chapter-num">09</span>
+    <span class="chapter-title">定时任务</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">配置步骤</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">先在「监控」面板配置好 ASIN 和站点（定时触发时读取这份数据）</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">切换到「定时任务」Tab，选择快捷预设或填写 Cron 表达式</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">右侧显示「有效」后，点击 <strong>保存定时配置</strong></div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">打开标题旁的 <strong>启用开关</strong>，立即生效，无需重启</div>
+      </div>
+    </div>
+    <div class="tip">修改 ASIN 列表或巡查参数后，定时任务下次触发时自动读取最新配置，无需重新保存。</div>
+    <div class="warn">电脑休眠或关机时定时任务无法触发，建议关闭自动睡眠，或开启开机自启动保持软件运行。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">常用 Cron 表达式</div>
+    <table class="data-table">
+      <thead><tr><th>表达式</th><th>含义</th></tr></thead>
+      <tbody>
+        <tr><td><code>0 9 * * 1-5</code></td><td class="muted">工作日每天早上 9 点</td></tr>
+        <tr><td><code>0 9,18 * * *</code></td><td class="muted">每天早 9 点和晚 6 点</td></tr>
+        <tr><td><code>0 */4 * * *</code></td><td class="muted">每 4 小时一次</td></tr>
+        <tr><td><code>0 9 * * 1</code></td><td class="muted">每周一早 9 点</td></tr>
+      </tbody>
+    </table>
+    <div class="tip" style="margin-top:14px">
+      <strong>Cron 表达式格式说明：</strong>由 5 个字段组成，用空格分隔：<br>
+      <code>分钟(0-59) 小时(0-23) 日(1-31) 月(1-12) 星期(0-7，0和7均表示周日)</code><br><br>
+      常用符号：<code>*</code> 表示每个单位；<code>*/4</code> 表示每隔 4 个单位；<code>1-5</code> 表示范围；<code>9,18</code> 表示多个值。<br>
+      例：<code>0 9 * * 1-5</code> = 分钟为 0、小时为 9、日期任意、月份任意、星期一到五 = 工作日每天早 9:00。
+    </div>
+  </div>
+</div>
+
+<!-- 10 历史与日志 -->
+<div class="chapter" id="ch10">
+  <div class="chapter-header">
+    <span class="chapter-num">10</span>
+    <span class="chapter-title">历史记录与日志</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">巡店历史</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:14px">
+      自动保存近 <strong style="color:var(--text)">10 次</strong>巡查记录，每条显示时间、总数、成功/失败数和用时。点击某条记录，右侧展开该次所有 ASIN 的抓取状态和价格等核心字段，可对比不同时间的数据变化。
+    </p>
+    <div class="tip">历史快照只保存核心字段（价格、卖家、库存等），不包含产品信息详情。</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">日志 Tab</div>
+    <p style="font-size:14px;color:var(--text-muted);line-height:1.8;margin-bottom:14px">
+      巡查过程中实时显示每条任务状态，包含开始抓取、完成（含售价）、重试、失败原因、配送地初始化结果等。最多保留 <strong style="color:var(--text)">500 条</strong>，超出后自动丢弃旧记录。
+    </p>
+    <div class="tip">遇到问题时，日志 Tab 是排查原因的第一入口，可以看到完整的原始错误信息。</div>
+  </div>
+</div>
+
+<!-- 11 常见问题 -->
+<div class="chapter" id="ch11">
+  <div class="chapter-header">
+    <span class="chapter-num">11</span>
+    <span class="chapter-title">常见情况处理</span>
+  </div>
+
+  <div class="section">
+    <table class="data-table">
+      <thead><tr><th>现象</th><th>原因</th><th>处理方式</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>状态显示「验证码」</td>
+          <td class="muted">Amazon 触发人机验证</td>
+          <td class="muted">在设置里开启「显示抓取窗口」，手动完成验证，再点「重试失败项」</td>
+        </tr>
+        <tr>
+          <td>售价显示 N/A</td>
+          <td class="muted">商品当前没有 Buy Box，可能缺货或竞争失败</td>
+          <td class="muted">登录 Amazon 后台确认商品和竞争状态</td>
+        </tr>
+        <tr>
+          <td>部分任务失败</td>
+          <td class="muted">网络抖动或 Amazon 临时限速</td>
+          <td class="muted">系统自动重试 3 次，仍失败可手动点「重试失败项」</td>
+        </tr>
+        <tr>
+          <td>商品已下架</td>
+          <td class="muted">页面跳转到其他 ASIN</td>
+          <td class="muted">系统自动识别并提示跳转目标 ASIN，确认商品状态</td>
+        </tr>
+        <tr>
+          <td>商品不存在（404）</td>
+          <td class="muted">ASIN 填错或商品已删除</td>
+          <td class="muted">核查 ASIN 是否正确</td>
+        </tr>
+        <tr>
+          <td>价格与实际不符</td>
+          <td class="muted">配送邮编设置错误导致价格因地区不同</td>
+          <td class="muted">检查「站点管理」里邮编是否正确</td>
+        </tr>
+        <tr>
+          <td>定时任务不触发</td>
+          <td class="muted">启用开关未打开，或电脑处于休眠</td>
+          <td class="muted">确认开关已开，关闭电脑自动睡眠</td>
+        </tr>
+        <tr>
+          <td>结果数量比导入少</td>
+          <td class="muted">同站点下重复 ASIN 自动去重</td>
+          <td class="muted">正常现象，同一 ASIN 只抓取一次</td>
+        </tr>
+        <tr>
+          <td>其他站点字段为空</td>
+          <td class="muted">该站点尚未专项适配，页面结构有差异</td>
+          <td class="muted">当前已验证站点为 US / CA / AU / MX，其他站点人工核对</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr>
+
+  <div style="text-align:center;padding:48px 0 24px;color:var(--text-dim)">
+    <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px">开始使用</div>
+    <div style="font-size:14px">遇到问题随时反馈，持续迭代优化</div>
+  </div>
+
+</div>
+
+</main>
+
+<script>
+const chapters = document.querySelectorAll('.chapter, .cover');
+const links = document.querySelectorAll('#toc a');
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.id;
+      links.forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+      });
+    }
+  });
+}, { rootMargin: '-10% 0px -80% 0px' });
+
+chapters.forEach(c => observer.observe(c));
+</script>
+</body>
+</html>

@@ -13,7 +13,7 @@
     <header class="header">
       <div class="header-left">
         <img src="../assets/logo.png" alt="RENPHO" class="header-logo" style="height:24px;width:auto;object-fit:contain;">
-        <span class="version" style="margin-left:6px;font-size:11px;color:var(--text-muted)">监控助手 v1.0.0</span>
+        <span id="appVersion" class="version" style="margin-left:6px;font-size:11px;color:var(--text-muted)">监控助手</span>
       </div>
       <div class="header-center">
         <span class="status-badge" id="statusBadge">
@@ -22,8 +22,8 @@
         </span>
       </div>
       <div class="header-right">
-        <button id="btnTheme" class="btn-icon-only" title="切换主题">🌙</button>
-        <button id="btnHelp" class="btn-icon-only" title="使用帮助">?</button>
+        <button id="btnTheme" class="btn-header" title="切换主题"><span id="themeIcon">🌙</span> 主题</button>
+        <button id="btnAbout" class="btn-header" title="关于">ⓘ 关于</button>
       </div>
     </header>
 
@@ -77,7 +77,7 @@
               <div style="display:flex;gap:8px;align-items:center">
                 <button id="btnAddGroup" class="btn btn-outline" style="font-size:12px;padding:4px 10px">新增站点</button>
                 <button id="btnClearGroups" class="btn btn-outline" style="font-size:12px;padding:4px 10px">清空站点</button>
-                <button id="btnCollapseInput" class="btn-ghost-sm" style="font-size:16px;padding:2px 8px;line-height:1" title="折叠/展开">⌃</button>
+                <button id="btnCollapseInput" class="btn-ghost-sm collapse-toggle-btn" title="折叠/展开"><span class="collapse-arrow">▲</span></button>
               </div>
             </div>
             <div class="site-groups" id="siteGroups"></div>
@@ -194,7 +194,7 @@
                 <div class="progress-fill" id="progressFill"></div>
               </div>
             </div>
-            <div class="table-scroll">
+            <div class="table-scroll" id="tableScroll">
               <table class="results-table" id="resultsTable">
                 <thead>
                   <tr>
@@ -221,20 +221,15 @@
                     <th class="col-history" id="colHistory">上次</th>
                   </tr>
                 </thead>
-                <tbody id="resultsBody">
-                  <tr class="empty-row">
-                    <td colspan="23">
-                      <div class="empty-state">
-                        <span class="empty-icon">◎</span>
-                        <p>点击「开始巡店」查看结果</p>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
+                <tbody id="resultsBody"></tbody>
               </table>
+            <div class="empty-state" id="emptyState">
+              <span class="empty-icon">◎</span>
+              <p>点击「开始巡店」查看结果</p>
             </div>
-          </div>
-        </div>
+            </div><!-- /table-scroll -->
+          </div><!-- /result-card -->
+        </div><!-- /tab-patrol -->
 
         <!-- ====== Tab: 参考数据 ====== -->
         <div class="tab-panel scrollable" id="tab-import">
@@ -242,6 +237,11 @@
             <div class="card-header">
               <span class="card-title">导入参考数据</span>
               <span class="card-hint">上传Excel预设参考值，巡店时自动对比标红</span>
+            </div>
+            <div class="import-rules">
+              <p><span class="import-rules-required">必填列</span>：<strong>ASIN</strong>（10位大写字母数字）、<strong>站点</strong>（二字码，如 US / CA / AU / MX）</p>
+              <p>可选列：常用名、期望售价、期望划线价、期望活动标、期望AC标、期望Coupon、期望星级、期望评论数、期望卖家、期望库存、期望BSR大类排名、期望BSR大类名、期望BSR小类排名、期望BSR小类名</p>
+              <p>导入时若存在 ASIN 为空、站点为空或站点不在系统站点列表内的行，整批导入将被拒绝。</p>
             </div>
             <div class="import-row">
               <div class="upload-zone" id="uploadZone">
@@ -563,9 +563,56 @@
               <span class="setting-hint">开启后巡店时可看到后台打开的 Amazon 页面，便于调试</span>
             </div>
           </section>
+
+          <!-- 选择器调试器 -->
+          <section class="card">
+            <div class="card-header">
+              <span class="card-title">选择器调试器</span>
+              <span class="card-hint">在真实 Amazon 页面上拾取元素选择器</span>
+            </div>
+            <div class="settings-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+              <div class="setting-item">
+                <label>站点</label>
+                <select id="debugSite" class="text-input" style="height:32px"></select>
+              </div>
+              <div class="setting-item">
+                <label>ASIN <span style="font-weight:400;color:var(--text-muted)">（可选）</span></label>
+                <input type="text" id="debugAsin" class="text-input" placeholder="B0XXXXXXXX" style="text-transform:uppercase">
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="btnOpenDebugger" class="btn btn-primary">打开调试器</button>
+              <span class="setting-hint" style="margin:0">打开后在 Amazon 页面右侧出现调试面板，点击任意元素即可识别选择器</span>
+            </div>
+          </section>
         </div>
 
       </main>
+    </div>
+  </div>
+
+  <!-- 关于弹框 -->
+  <div class="product-info-overlay" id="aboutOverlay" style="display:none">
+    <div class="about-dialog">
+      <div class="product-info-modal-header">
+        <span>关于</span>
+        <button class="product-info-modal-close" id="btnAboutClose">✕</button>
+      </div>
+      <div class="about-body">
+        <div class="about-logo-row">
+          <img src="../assets/logo.png" alt="RENPHO" style="height:32px;width:auto;object-fit:contain;">
+          <div class="about-app-name">亚马逊监控助手<span id="aboutVersion" class="about-version"></span></div>
+        </div>
+        <div class="about-divider"></div>
+        <table class="about-table">
+          <tr><td>开发者</td><td>Hollis Huo</td></tr>
+          <tr><td>联系邮箱</td><td><a href="#" class="about-link" data-url="mailto:Hollis@renpho.com">Hollis@renpho.com</a></td></tr>
+          <tr><td>运行环境</td><td id="aboutRuntime"></td></tr>
+          <tr><td>数据存储</td><td id="aboutDataPath"></td></tr>
+        </table>
+        <div class="about-divider"></div>
+        <p class="about-desc">本软件仅供内部使用，用于监控 Amazon 商品数据。<br>未经授权，禁止对外传播或商业使用。</p>
+      </div>
     </div>
   </div>
 

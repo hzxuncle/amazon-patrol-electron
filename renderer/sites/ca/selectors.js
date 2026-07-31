@@ -1,6 +1,8 @@
 'use strict';
 const CA_SELECTORS = {
-  price: ['.a-price[data-a-size="xl"] .a-offscreen'],
+  price: [
+    '.a-price[data-a-size="xl"] .a-offscreen',
+  ],
   listPrice: ['.basisPrice .a-price .a-offscreen'],
   rating: ['#acrPopover .a-icon-alt'],
   reviews: ['#acrCustomerReviewText'],

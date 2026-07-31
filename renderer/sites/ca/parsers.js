@@ -37,25 +37,21 @@ function extractProductDetails() {
   }
 
   // CA 额外：detailBullets（BSR/Date First Available 等额外字段）
+  // CA 结构：span:not(.a-text-bold) 包含完整的 "key ‏ : ‎ value"，直接按第一个 : 切割
   const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
   if (bulletRows.length) {
     const sectionData = {};
     bulletRows.forEach(row => {
-      const keyEl = row.querySelector('.a-text-bold');
       const valEl = row.querySelector('span:not(.a-text-bold)');
-      if (!keyEl || !valEl) return;
-      const key = keyEl.textContent.replace(/[‏‎‏‎:：]/g, '').replace(/\s+/g, ' ').trim();
-      let val = valEl.textContent.replace(/\s+/g, ' ').trim();
+      if (!valEl) return;
+      const raw = valEl.textContent.replace(/[‎‏]/g, '').replace(/\s+/g, ' ').trim();
+      const colonIdx = raw.indexOf(':');
+      if (colonIdx <= 0) return;
+      const key = raw.slice(0, colonIdx).trim();
+      const val = raw.slice(colonIdx + 1).trim();
       if (!key || !val) return;
       if (val.includes('out of 5 stars') || val.includes('P.when') ||
           key.includes('Customer Reviews')) return;
-      const keyClean = key.replace(/[‏‎\s]/g, '').toLowerCase();
-      const valNorm = val.replace(/[‏‎]/g, '').replace(/\s+/g, ' ');
-      const colonIdx = valNorm.indexOf(':');
-      if (colonIdx > 0 && colonIdx < 40) {
-        const prefix = valNorm.slice(0, colonIdx).trim().toLowerCase().replace(/\s/g, '');
-        if (prefix === keyClean) val = valNorm.slice(colonIdx + 1).trim();
-      }
       sectionData[key] = val;
     });
     if (Object.keys(sectionData).length > 0) {

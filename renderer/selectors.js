@@ -204,6 +204,8 @@ const SELECTOR_CONFIG = {
 
   // ============ 活动/Deal标签 ============
   dealBadge: [
+    // 倒计时活动（Ends in HH:MM:SS）— 内容最干净
+    '.detailpage-dealBadge-countdown-timer',
     // Deal专用组件 - 最精准（参考 B0D96373RS / B0FZHST8J7 的结构）
     '#dealBadgeSupportingText span',
     '#dealBadgeSupportingText',
@@ -339,9 +341,13 @@ const SITE_OVERRIDES = {
  * @returns {Array} 选择器列表
  */
 function getSelectors(hostname, field) {
+  // 优先使用 tab-manager 注入的站点专用合并选择器
+  if (window.__SITE_SELECTORS__ && window.__SITE_SELECTORS__[field]) {
+    return window.__SITE_SELECTORS__[field];
+  }
+  // fallback：旧版逻辑
   const defaults = SELECTOR_CONFIG[field] || [];
   const overrides = (SITE_OVERRIDES[hostname] && SITE_OVERRIDES[hostname][field]) || [];
-  // 站点覆盖放在前面优先使用
   return [...overrides, ...defaults];
 }
 

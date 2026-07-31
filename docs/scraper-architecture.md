@@ -23,7 +23,7 @@ content.js（所有站点共用一套解析/归一化逻辑）
 
 | 字段 | 精确选择器 | 备注 |
 |------|-----------|------|
-| price | `.a-price[data-a-size="xl"] .a-offscreen` | 四站点全部命中，`#corePriceDisplay...` 命中但返回空 |
+| price | `.a-price[data-a-size="xl"] .a-offscreen` | US/CA/MX 命中；AU 的 `data-a-size` 不稳定（实测出现过 `l`、`s`），`xl` 可能返回空，依赖 `_base` fallback 链兜底 |
 | listPrice | `.basisPrice .a-price .a-offscreen` | 四站点全部命中，值正确 |
 | seller | `a#sellerProfileTriggerId` | 其余 7 个选择器全部 ❌ |
 | stock | `#availability span` | 四站点命中，但 MX 返回 `Disponible`（西班牙文） |
@@ -66,21 +66,33 @@ renderer/sites/
 
 ### 覆盖机制
 
-站点文件只写与 `_base` 有差异的部分，`index.js` 按文件存在与否决定使用哪个实现：
+站点文件只写与 `_base` 有差异的部分，`index.js` 按文件存在与否决定使用哪个实现。
+
+**选择器合并规则（数组字段）：**
+
+```
+最终选择器列表 = [站点专用] + [_base] + [站点 Fallback]
+```
+
+- **站点专用**（`site/selectors.js` 里的字段）：精准选择器，优先匹配
+- **_base**：通用兜底，站点专用失败后依次尝试
+- **站点 Fallback**（`${field}Fallback` 字段）：最低优先级兜底，追加到最末尾
+
+`priceFallback` 示例：
 
 ```js
-// index.js 合并逻辑（伪代码）
-function getScraper(siteCode) {
-  const base = require('./_base');
-  const siteDir = `./${siteCode.toLowerCase()}`;
-  return {
-    selectors:   tryRequire(`${siteDir}/selectors`)   || base.selectors,
-    parsers:     tryRequire(`${siteDir}/parsers`)     || base.parsers,
-    normalizers: tryRequire(`${siteDir}/normalizers`) || base.normalizers,
-    scraper:     tryRequire(`${siteDir}/scraper`)     || base.scraper,
-  };
-}
+// au/selectors.js
+price: ['.a-price[data-a-size="xl"] .a-offscreen'],   // 精准，优先
+priceFallback: ['.olpWrapper.a-size-small'],           // 最末兜底（如无 Featured Offer 时的第三方报价）
 ```
+
+最终合并结果：
+
+```
+[AU 精准] → [_base 全部] → [AU priceFallback]
+```
+
+所有字段均支持 `${field}Fallback`，不限于 price。
 
 ### 为何选择 `_base` 而非完全独立
 

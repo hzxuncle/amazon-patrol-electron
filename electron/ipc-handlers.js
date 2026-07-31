@@ -6,6 +6,7 @@ const https = require('https');
 const store = require('./store');
 const tabManager = require('./tab-manager');
 const scheduler = require('./scheduler');
+const selectorDebugger = require('./selector-debugger');
 
 // ========== 状态 ==========
 let activePatrol = null;
@@ -134,7 +135,32 @@ function processQueue(config) {
         broadcastUpdate(result);
       } catch (err) {
         const key = `${task.asin}_${task.site}`;
-        retryMap[key] = (retryMap[key] || 0) + 1;
+        const rawMsg = err.message || '';
+
+        // 错误分类
+        const isNetworkError = rawMsg.includes('ERR_ABORTED') || rawMsg.includes('ERR_CONNECTION') ||
+          rawMsg.includes('ERR_NETWORK') || rawMsg.includes('ERR_TIMED_OUT') ||
+          rawMsg.includes('ERR_NAME_NOT_RESOLVED') || rawMsg.includes('net::');
+        const isTimeout = rawMsg.includes('抓取超时');
+
+        // 友好错误描述
+        let friendlyError;
+        if (isNetworkError) friendlyError = '网络异常，页面加载失败';
+        else if (isTimeout) friendlyError = '抓取超时，页面响应过慢';
+        else friendlyError = '抓取失败';
+
+        // 网络异常和超时自动重试（最多3次），其他错误直接记录失败
+        const retryCount = retryMap[key] || 0;
+        if ((isNetworkError || isTimeout) && retryCount < 3 && activePatrol) {
+          retryMap[key] = retryCount + 1;
+          tabLog(`[TabManager] ⚠️ ${friendlyError}，第 ${retryMap[key]} 次重试: ${task.asin} @ ${task.site} | 原因: ${rawMsg}`);
+          await sleep(config.retryDelay || 2000);
+          taskQueue.unshift(task);
+          continue;
+        }
+
+        retryMap[key] = retryCount + 1;
+        tabLog(`[TabManager] ❌ 失败: ${task.asin} @ ${task.site} | ${friendlyError} | 原因: ${rawMsg}`);
         const errorResult = {
           asin: task.asin, site: task.site, index: task.index,
           title: '', price: '', listPrice: '', rating: '', reviews: '',
@@ -142,7 +168,7 @@ function processQueue(config) {
           dealBadge: 'N/A', acBadge: 'N/A', coupon: 'N/A',
           url: `https://${task.site}/dp/${task.asin}`,
           timestamp: new Date().toISOString(),
-          status: 'failed', error: err.message || 'Tab操作失败',
+          status: 'failed', error: friendlyError,
           retryCount: retryMap[key]
         };
         completedResults.push(errorResult);
@@ -215,14 +241,13 @@ async function onPatrolComplete() {
     const phones = patrolSettings.dingtalkPersonalPhones || '';
     const personalEnabled = patrolSettings.enablePersonalNotify && personalCredentials.appKey && phones;
 
-    if ((webhookEnabled || personalEnabled) && references.length > 0) {
+    if (webhookEnabled || personalEnabled) {
       const text = await buildDingTalkText(summary);
       if (text && webhookEnabled) {
         sendDingTalkWebhook(text, patrolSettings.dingtalkWebhook).catch(e =>
           console.error('[Patrol] 群通知失败:', e.message));
       }
       if (text && personalEnabled) {
-        // 手机号转 userId 后发送
         sendDingTalkPersonalByPhone(text, personalCredentials, phones).catch(e =>
           console.error('[Patrol] 个人通知失败:', e.message));
       }
@@ -417,16 +442,20 @@ async function buildDingTalkText(summary) {
     }
   });
 
-  if (siteMap.size === 0) return null;
-
   const time = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
-  let text = `## 亚马逊巡店异常报告\n\n- **时间**: ${time}\n`;
+  let text = `## 亚马逊巡店报告\n\n- **时间**: ${time}\n`;
+
+  if (siteMap.size === 0) {
+    text += `\n---\n\n<font color=#07b807>✅ 本次巡查无异常，所有商品数据与参考值一致。</font>\n`;
+    text += `\n---\n\n> **汇总**　共: ${summary.total}　<font color=#07b807>成功: ${summary.success}</font>　<font color=#ff4d4f>失败: ${summary.failed}</font>　验证码: ${summary.captcha}　用时: ${formatTime(summary.elapsed)}\n`;
+    return text;
+  }
 
   siteMap.forEach((items, site) => {
     const siteLabel = getSiteLabel(site);
     const siteInfo = sites.find(s => s.code === site);
     const domain = siteInfo ? siteInfo.domain : site;
-    text += `\n---\n\n#### ${siteLabel} · ${domain}\n`;
+    text += `\n---\n\n#### <font color=#5b5edb>${siteLabel} · ${domain}</font>\n`;
 
     items.forEach(item => {
       const nameStr = item.alias ? ` · ${item.alias}` : '';
@@ -435,8 +464,8 @@ async function buildDingTalkText(summary) {
         text += `- **原因**: <font color=#fa8c16>${item.error}</font>\n`;
       } else {
         item.diffs.forEach(d => {
-          const actual = d.actual !== '' && d.actual !== null && d.actual !== undefined
-            ? `\`${d.actual}\`` : '`(空)`';
+          const actual = (d.actual !== '' && d.actual !== null && d.actual !== undefined)
+            ? `\`${d.actual}\`` : '`N/A`';
           text += `- **${d.field}**: <font color=#07b807>期望 \`${d.expected}\`</font> → <font color=#ff4d4f>实际 ${actual}</font>\n`;
         });
       }
@@ -572,6 +601,26 @@ function register() {
   ipcMain.handle('GET_SITES', () => {
     return store.get('sites') || require('./sites-data').buildDefaultSites();
   });
+
+  ipcMain.handle('GET_APP_VERSION', () => app.getVersion());
+
+  ipcMain.handle('OPEN_SELECTOR_DEBUGGER', async (e, { asin, siteCode, theme }) => {
+    await selectorDebugger.openDebugger(asin, siteCode, theme);
+    return { success: true };
+  });
+
+  ipcMain.handle('GET_SELECTOR_CAPTURES', async () => {
+    return selectorDebugger.getCaptures();
+  });
+
+  ipcMain.handle('GET_APP_INFO', () => ({
+    version: app.getVersion(),
+    electronVersion: process.versions.electron,
+    chromeVersion: process.versions.chrome,
+    nodeVersion: process.versions.node,
+    platform: process.platform,
+    dataPath: app.getPath('userData'),
+  }));
 
   ipcMain.handle('OPEN_EXTERNAL', (e, url) => {
     if (url && (url.startsWith('https://') || url.startsWith('http://'))) {

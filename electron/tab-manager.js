@@ -168,6 +168,64 @@ async function injectAndScrape(win, asin, config) {
 
   const siteCode = config._siteCode || '';
 
+  // 检测并跳过拦截页（在 scraper.js 稳定等待后执行，此时页面已完全渲染）
+  const interceptResult = await win.webContents.executeJavaScript(`
+    (function() {
+      // 已有商品内容，不是拦截页
+      if (document.querySelector('#productTitle,#title,.a-price,#availability')) return { status: 'none' };
+
+      // 404 页面，不是拦截页
+      if (/page not found|404/i.test(document.title)) return { status: '404' };
+
+      const bodyText = document.body ? document.body.innerText : '';
+      const bodyLen = bodyText.replace(/\\s+/g,' ').trim().length;
+      // 页面内容太长，不像拦截页
+      if (bodyLen > 600) return { status: 'none' };
+
+      // 找所有可点击元素，优先匹配已知文本，否则取第一个非空按钮
+      const candidates = Array.from(document.querySelectorAll('a,button,input[type="submit"]'));
+      const knownBtn = candidates.find(el =>
+        /continuar|continue shopping|weiter einkaufen|continuer|continua|買い物を続ける|doorgaan|continuar comprando/i
+          .test(el.textContent || el.value || '')
+      );
+      const fallbackBtn = candidates.find(el => (el.textContent || el.value || '').replace(/\\s+/g,' ').trim().length > 2);
+      const btn = knownBtn || fallbackBtn;
+
+      if (btn) { btn.click(); return { status: 'clicked', btnText: (btn.textContent || btn.value || '').trim().slice(0, 60) }; }
+
+      return {
+        status: 'no_button',
+        url: location.href,
+        title: document.title.slice(0, 80),
+        bodySnippet: bodyText.replace(/\\s+/g,' ').trim().slice(0, 200),
+        buttons: candidates.slice(0, 10).map(el => ({
+          tag: el.tagName, id: el.id || '',
+          cls: el.className?.toString().slice(0, 60) || '',
+          text: (el.textContent || el.value || '').replace(/\\s+/g,' ').trim().slice(0, 60)
+        }))
+      };
+    })()
+  `).catch(() => ({ status: 'none' }));
+  if (interceptResult.status === '404') {
+    tabLog(`[TabManager] ⚠️ 商品页不存在（404）: ${asin} @ ${siteCode}`);
+    return {
+      asin, site: siteCode, status: 'failed', error: '商品页面不存在（404）',
+      title: '', price: '', listPrice: '', rating: '', reviews: '',
+      seller: '', stock: '', parentAsin: 'N/A',
+      dealBadge: 'N/A', acBadge: 'N/A', coupon: 'N/A',
+      url: win.webContents.getURL(), timestamp: new Date().toISOString()
+    };
+  } else if (interceptResult.status === 'clicked') {
+    tabLog(`[TabManager] 检测到拦截页，已自动点击继续: ${asin} @ ${siteCode} 按钮="${interceptResult.btnText}"`);
+    await waitForLoad(win);
+  } else if (interceptResult.status === 'no_button') {
+    tabLog(`[TabManager] ⚠️ 检测到拦截页但未找到按钮: ${asin} @ ${siteCode}`);
+    tabLog(`[TabManager] [拦截页诊断] url: ${interceptResult.url}`);
+    tabLog(`[TabManager] [拦截页诊断] title: ${interceptResult.title}`);
+    tabLog(`[TabManager] [拦截页诊断] body: ${interceptResult.bodySnippet}`);
+    tabLog(`[TabManager] [拦截页诊断] 可点击元素: ${JSON.stringify(interceptResult.buttons)}`);
+  }
+
   // 注入 site code，供 scraper 使用
   await win.webContents.executeJavaScript(`window.__SITE_CODE__ = ${JSON.stringify(siteCode)}`);
 

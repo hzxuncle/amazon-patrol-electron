@@ -1,0 +1,663 @@
+'use strict';
+
+/**
+ * 选择器调试面板 — 注入到 Amazon 页面的自包含脚本
+ * 运行于 BrowserWindow 的页面上下文，不依赖 Node.js
+ */
+(function () {
+  if (window.__SELECTOR_DEBUGGER_LOADED__) return;
+  window.__SELECTOR_DEBUGGER_LOADED__ = true;
+
+  // ── 状态 ──────────────────────────────────────────────────────
+  let pickMode = false;
+  let hoveredEl = null;
+  const captures = [];   // { selector, candidates, textContent, innerText, offscreen, ts }
+
+  // ── 生成候选选择器（按稳定性排序）──────────────────────────────
+  function buildCandidates(el) {
+    const results = [];
+
+    function push(type, selector, stars) {
+      if (!selector) return;
+      try {
+        const hits = document.querySelectorAll(selector);
+        if (hits.length === 0) return;
+        results.push({ type, selector, stars, hits: hits.length });
+      } catch (e) { /* 无效选择器跳过 */ }
+    }
+
+    // ⭐⭐⭐⭐⭐ ID
+    if (el.id) push('ID', `#${CSS.escape(el.id)}`, 5);
+
+    // ⭐⭐⭐⭐ Amazon 专有数据属性
+    const aSize = el.getAttribute('data-a-size');
+    if (aSize) push('Amazon属性', `.a-price[data-a-size="${aSize}"] .a-offscreen`, 4);
+    const featureName = el.closest('[data-feature-name]')?.getAttribute('data-feature-name');
+    if (featureName) push('feature-name', `[data-feature-name="${featureName}"] .a-offscreen`, 4);
+    const componentType = el.closest('[data-component-type]')?.getAttribute('data-component-type');
+    if (componentType) push('component-type', `[data-component-type="${componentType}"]`, 4);
+
+    // ⭐⭐⭐⭐ 祖先 ID + 后代
+    let ancestor = el.parentElement;
+    let depth = 0;
+    while (ancestor && depth < 5) {
+      if (ancestor.id) {
+        const tag = el.tagName.toLowerCase();
+        const cls = [...el.classList].slice(0, 2).map(c => `.${CSS.escape(c)}`).join('');
+        push('祖先ID+后代', `#${CSS.escape(ancestor.id)} ${tag}${cls}`, 4);
+        push('祖先ID+后代', `#${CSS.escape(ancestor.id)} .a-offscreen`, 3);
+        break;
+      }
+      ancestor = ancestor.parentElement;
+      depth++;
+    }
+
+    // ⭐⭐⭐ 有意义的 class 组合（过滤掉纯样式 class）
+    const meaningfulCls = [...el.classList].filter(c =>
+      !c.match(/^(a-size|a-color|a-spacing|a-section|a-row|a-col|a-padding|a-margin|a-text|a-align|a-float|a-expander|a-truncate|a-hidden|a-visible|a-clear|sg-|_|sc-)/)
+    );
+    if (meaningfulCls.length > 0) {
+      push('语义类', meaningfulCls.slice(0, 3).map(c => `.${CSS.escape(c)}`).join(''), 3);
+    }
+
+    // ⭐⭐ 标签 + class
+    const tagCls = el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map(c => `.${CSS.escape(c)}`).join('');
+    push('标签+类', tagCls, 2);
+
+    // ⭐ CSS 路径（兜底，始终唯一但不稳定）
+    push('CSS路径', buildCssPath(el), 1);
+
+    // 去重
+    const seen = new Set();
+    return results.filter(r => {
+      if (seen.has(r.selector)) return false;
+      seen.add(r.selector);
+      return true;
+    });
+  }
+
+  function buildCssPath(el) {
+    const parts = [];
+    let cur = el;
+    while (cur && cur !== document.body) {
+      let selector = cur.tagName.toLowerCase();
+      if (cur.id) {
+        selector = `#${CSS.escape(cur.id)}`;
+        parts.unshift(selector);
+        break;
+      }
+      const siblings = cur.parentElement
+        ? [...cur.parentElement.children].filter(c => c.tagName === cur.tagName)
+        : [];
+      if (siblings.length > 1) {
+        const idx = siblings.indexOf(cur) + 1;
+        selector += `:nth-of-type(${idx})`;
+      }
+      parts.unshift(selector);
+      cur = cur.parentElement;
+    }
+    return parts.join(' > ');
+  }
+
+  // ── 提取值 ────────────────────────────────────────────────────
+  function extractValues(el) {
+    const textContent = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const innerText = (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const offscreenEl = el.classList.contains('a-offscreen') ? el : el.querySelector('.a-offscreen');
+    const offscreen = offscreenEl ? (offscreenEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
+    const attrVal = el.value || el.getAttribute('data-value') || el.getAttribute('content') || '';
+    return { textContent, innerText, offscreen, attrVal };
+  }
+
+  // ── 高亮样式 ──────────────────────────────────────────────────
+  function getThemeVars() {
+    const dark = (window.__SD_THEME__ === 'dark');
+    return dark ? {
+      bg:        '#111827',
+      bgHeader:  '#131a2b',
+      bgInput:   '#0a0f1a',
+      bgHover:   '#182032',
+      border:    '#1a2940',
+      accent:    '#00e5ff',
+      success:   '#00e676',
+      warning:   '#ffab00',
+      danger:    '#ff3d47',
+      textPri:   '#e0e6f0',
+      textSec:   '#7a8ba0',
+      textMuted: '#455570',
+      valueClr:  '#c0caf5',
+      selectorClr:'#00e676',
+      tabBg:     '#131a2b',
+    } : {
+      bg:        '#ffffff',
+      bgHeader:  '#f5f6fa',
+      bgInput:   '#f5f6fa',
+      bgHover:   '#f0f1f8',
+      border:    '#e2e4ef',
+      accent:    '#5b5edb',
+      success:   '#00a854',
+      warning:   '#fa8c16',
+      danger:    '#f5222d',
+      textPri:   '#1a1d2e',
+      textSec:   '#5a5e7a',
+      textMuted: '#9a9eb8',
+      valueClr:  '#5b5edb',
+      selectorClr:'#00a854',
+      tabBg:     '#f5f6fa',
+    };
+  }
+
+  function injectStyle() {
+    if (document.getElementById('__sd_style__')) return;
+    const v = getThemeVars();
+    const style = document.createElement('style');
+    style.id = '__sd_style__';
+    style.textContent = `
+      #__sd_panel__ {
+        position: fixed; top: 0; right: 0; width: 360px; height: 100vh;
+        background: ${v.bg}; color: ${v.textPri};
+        font-family: 'Cascadia Code','Fira Code','JetBrains Mono','Consolas',monospace;
+        font-size: 12px; z-index: 2147483647; display: flex; flex-direction: column;
+        border-left: 2px solid ${v.accent}; box-shadow: -4px 0 24px rgba(0,0,0,0.18);
+        transition: transform 0.2s;
+      }
+      #__sd_panel__.collapsed { transform: translateX(332px); }
+      #__sd_expand_tab__ {
+        display: none; position: absolute; left: -28px; top: 50%;
+        transform: translateY(-50%);
+        width: 28px; height: 80px;
+        background: ${v.accent}; border-radius: 6px 0 0 6px;
+        cursor: pointer; writing-mode: vertical-rl;
+        font-size: 11px; color: ${v.bg}; font-weight: 700;
+        align-items: center; justify-content: center;
+        letter-spacing: 2px; user-select: none;
+      }
+      #__sd_panel__.collapsed #__sd_expand_tab__ { display: flex; }
+      #__sd_header__ {
+        padding: 8px 12px; background: ${v.bgHeader}; border-bottom: 1px solid ${v.border};
+        display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+      }
+      #__sd_header__ .title { color: ${v.accent}; font-weight: 700; font-size: 13px; }
+      #__sd_header__ .controls { display: flex; gap: 6px; align-items: center; }
+      #__sd_tabs__ {
+        display: flex; border-bottom: 1px solid ${v.border}; flex-shrink: 0;
+        background: ${v.tabBg};
+      }
+      .sd-tab {
+        flex: 1; padding: 7px 4px; text-align: center; cursor: pointer;
+        color: ${v.textMuted}; font-size: 11px; border-bottom: 2px solid transparent;
+        transition: all 0.15s;
+      }
+      .sd-tab.active { color: ${v.accent}; border-bottom-color: ${v.accent}; }
+      .sd-tab-panel { flex: 1; overflow-y: auto; padding: 10px; display: none; }
+      .sd-tab-panel.active { display: block; }
+      .sd-btn {
+        padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer;
+        font-size: 11px; font-family: inherit; transition: all 0.15s;
+      }
+      .sd-btn-pick { background: ${v.success}; color: ${v.bg}; }
+      .sd-btn-pick.active { background: ${v.danger}; color: #fff; }
+      .sd-btn-ghost { background: transparent; color: ${v.textMuted}; border: 1px solid ${v.border}; }
+      .sd-btn-ghost:hover { color: ${v.textPri}; border-color: ${v.textSec}; }
+      .sd-capture-card {
+        background: ${v.bgInput}; border: 1px solid ${v.border}; border-radius: 6px;
+        margin-bottom: 8px; overflow: hidden;
+      }
+      .sd-capture-card-header {
+        padding: 7px 10px; display: flex; justify-content: space-between;
+        align-items: center; border-bottom: 1px solid ${v.border}; cursor: pointer;
+      }
+      .sd-capture-card-header:hover { background: ${v.bgHover}; }
+      .sd-capture-ts { color: ${v.textMuted}; font-size: 10px; }
+      .sd-capture-body { padding: 8px 10px; display: none; }
+      .sd-capture-body.open { display: block; }
+      .sd-section-label {
+        font-size: 10px; color: ${v.textMuted}; text-transform: uppercase;
+        letter-spacing: 0.5px; margin: 8px 0 4px;
+      }
+      .sd-section-label:first-child { margin-top: 0; }
+      .sd-candidate {
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 6px; border-radius: 4px; margin-bottom: 3px;
+        background: ${v.bgHover}; cursor: pointer;
+      }
+      .sd-candidate:hover { background: ${v.border}; }
+      .sd-stars { color: ${v.warning}; font-size: 10px; flex-shrink: 0; }
+      .sd-selector { color: ${v.selectorClr}; flex: 1; word-break: break-all; font-size: 11px; }
+      .sd-hits { font-size: 10px; flex-shrink: 0; }
+      .sd-hits.ok { color: ${v.success}; }
+      .sd-hits.warn { color: ${v.warning}; }
+      .sd-hits.bad { color: ${v.danger}; }
+      .sd-value-row { display: flex; gap: 6px; margin-bottom: 4px; align-items: flex-start; }
+      .sd-value-label { color: ${v.textMuted}; font-size: 10px; flex-shrink: 0; width: 64px; }
+      .sd-value { color: ${v.valueClr}; word-break: break-all; font-size: 11px; }
+      .sd-value.empty { color: ${v.border}; font-style: italic; }
+      .sd-del-btn {
+        background: none; border: none; color: ${v.textMuted}; cursor: pointer;
+        font-size: 14px; padding: 0 2px; line-height: 1;
+      }
+      .sd-del-btn:hover { color: ${v.danger}; }
+      .sd-input {
+        width: 100%; background: ${v.bgInput}; border: 1px solid ${v.border};
+        color: ${v.textPri}; border-radius: 4px; padding: 6px 8px;
+        font-family: inherit; font-size: 11px; box-sizing: border-box;
+        outline: none; margin-bottom: 6px;
+      }
+      .sd-input:focus { border-color: ${v.accent}; }
+      .sd-test-result {
+        background: ${v.bgInput}; border-radius: 4px; padding: 8px;
+        margin-top: 6px; font-size: 11px;
+      }
+      .sd-test-hit { color: ${v.success}; margin-bottom: 4px; }
+      .sd-test-item {
+        padding: 3px 0; border-bottom: 1px solid ${v.border}; color: ${v.valueClr};
+      }
+      .sd-test-item:last-child { border-bottom: none; }
+      .sd-test-none { color: ${v.danger}; }
+      .sd-copy-btn {
+        font-size: 10px; padding: 1px 6px; border-radius: 3px;
+        border: 1px solid ${v.border}; background: transparent; color: ${v.textMuted};
+        cursor: pointer; margin-left: 4px;
+      }
+      .sd-copy-btn:hover { color: ${v.textPri}; border-color: ${v.accent}; }
+      .sd-copy-btn.copied { color: ${v.success}; border-color: ${v.success}; }
+      .__sd_highlight__ {
+        outline: 2px solid ${v.danger} !important;
+        outline-offset: 2px !important;
+        background: rgba(245,34,45,0.08) !important;
+        cursor: crosshair !important;
+      }
+      .__sd_captured__ {
+        outline: 2px solid ${v.success} !important;
+        outline-offset: 2px !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // ── 面板 HTML ─────────────────────────────────────────────────
+  function buildPanel() {
+    // 让页面内容区域腾出右边空间，避免面板遮挡
+    document.body.style.marginRight = '360px';
+    document.body.style.boxSizing = 'border-box';
+
+    const panel = document.createElement('div');
+    panel.id = '__sd_panel__';
+    panel.innerHTML = `
+      <div id="__sd_expand_tab__" title="展开面板">调试</div>
+      <div id="__sd_header__">
+        <span class="title">🔍 选择器调试</span>
+        <div class="controls">
+          <button class="sd-btn sd-btn-pick" id="__sd_pick__">拾取</button>
+          <button class="sd-btn sd-btn-ghost" id="__sd_clear__">清空</button>
+          <button class="sd-btn sd-btn-ghost" id="__sd_collapse__" title="收起 (ESC)">◀</button>
+        </div>
+      </div>
+      <div id="__sd_tabs__">
+        <div class="sd-tab active" data-tab="capture">拾取 <span id="__sd_capture_count__">0</span></div>
+        <div class="sd-tab" data-tab="test">实时测试</div>
+        <div class="sd-tab" data-tab="history">历史 <span id="__sd_history_count__">0</span></div>
+      </div>
+      <div class="sd-tab-panel active" id="__sd_panel_capture__">
+        <div id="__sd_capture_list__">
+          <div style="color:#565f89;text-align:center;padding:32px 0;font-size:11px;">
+            点击「拾取」按钮后<br>在页面上点击任意元素
+          </div>
+        </div>
+      </div>
+      <div class="sd-tab-panel" id="__sd_panel_test__">
+        <div style="color:#565f89;font-size:11px;margin-bottom:6px;">输入 CSS 选择器，实时查看命中结果</div>
+        <input class="sd-input" id="__sd_test_input__" placeholder="例：#productTitle  或  .a-price .a-offscreen" />
+        <div id="__sd_test_result__"></div>
+      </div>
+      <div class="sd-tab-panel" id="__sd_panel_history__">
+        <div id="__sd_history_list__">
+          <div style="color:#565f89;text-align:center;padding:32px 0;font-size:11px;">暂无历史</div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+    return panel;
+  }
+
+  // ── 渲染拾取列表 ──────────────────────────────────────────────
+  function renderCaptures() {
+    const list = document.getElementById('__sd_capture_list__');
+    const count = document.getElementById('__sd_capture_count__');
+    if (!list) return;
+    count.textContent = captures.length;
+
+    if (captures.length === 0) {
+      list.innerHTML = `<div style="color:#565f89;text-align:center;padding:32px 0;font-size:11px;">点击「拾取」按钮后<br>在页面上点击任意元素</div>`;
+      return;
+    }
+
+    list.innerHTML = captures.map((c, i) => {
+      const topCandidate = c.candidates[0];
+      const preview = topCandidate ? topCandidate.selector.slice(0, 40) : '—';
+      const hasValue = c.values.innerText || c.values.offscreen || c.values.attrVal;
+      const valuePreview = (c.values.offscreen || c.values.innerText || c.values.attrVal || '').slice(0, 30);
+
+      return `
+        <div class="sd-capture-card">
+          <div class="sd-capture-card-header" data-idx="${i}">
+            <div>
+              <div style="color:#9ece6a;font-size:11px;margin-bottom:2px">${escHtml(preview)}${topCandidate?.selector.length > 40 ? '…' : ''}</div>
+              <div style="color:#bb9af7;font-size:10px">${escHtml(valuePreview) || '<span style="color:#3b4261">空值</span>'}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span class="sd-capture-ts">${c.ts}</span>
+              <button class="sd-del-btn" data-del="${i}">×</button>
+            </div>
+          </div>
+          <div class="sd-capture-body" id="__sd_body_${i}__">
+            <div class="sd-section-label">候选选择器（按稳定性排序）</div>
+            ${c.candidates.map(cd => {
+              const hitsClass = cd.hits === 1 ? 'ok' : cd.hits <= 5 ? 'warn' : 'bad';
+              const hitsLabel = cd.hits === 1 ? '唯一✓' : `${cd.hits}个`;
+              return `
+                <div class="sd-candidate" data-sel="${escHtml(cd.selector)}">
+                  <span class="sd-stars">${'★'.repeat(cd.stars)}${'☆'.repeat(5 - cd.stars)}</span>
+                  <span class="sd-selector">${escHtml(cd.selector)}</span>
+                  <span class="sd-hits ${hitsClass}">${hitsLabel}</span>
+                  <button class="sd-copy-btn" data-copy="${escHtml(cd.selector)}">复制</button>
+                </div>
+              `;
+            }).join('')}
+            <div class="sd-section-label" style="margin-top:10px">提取值</div>
+            ${renderValueRow('textContent', c.values.textContent)}
+            ${renderValueRow('innerText', c.values.innerText)}
+            ${renderValueRow('a-offscreen', c.values.offscreen)}
+            ${renderValueRow('attr/value', c.values.attrVal)}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 展开/折叠
+    list.querySelectorAll('.sd-capture-card-header').forEach(hdr => {
+      hdr.addEventListener('click', (e) => {
+        if (e.target.closest('.sd-del-btn, .sd-copy-btn')) return;
+        const idx = hdr.dataset.idx;
+        const body = document.getElementById(`__sd_body_${idx}__`);
+        if (body) body.classList.toggle('open');
+      });
+    });
+
+    // 删除
+    list.querySelectorAll('.sd-del-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.del);
+        captures.splice(idx, 1);
+        renderCaptures();
+        renderHistory();
+      });
+    });
+
+    // 复制
+    list.querySelectorAll('.sd-copy-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+          btn.textContent = '✓';
+          btn.classList.add('copied');
+          setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+        });
+      });
+    });
+
+    // 鼠标悬停候选选择器时高亮页面元素
+    list.querySelectorAll('.sd-candidate').forEach(item => {
+      item.addEventListener('mouseenter', () => {
+        clearHighlights('__sd_hover_hl__');
+        try {
+          document.querySelectorAll(item.dataset.sel).forEach(el => {
+            el.classList.add('__sd_hover_hl__');
+          });
+        } catch (e) {}
+      });
+      item.addEventListener('mouseleave', () => clearHighlights('__sd_hover_hl__'));
+    });
+
+    // 默认展开第一张卡片
+    const firstBody = document.getElementById('__sd_body_0__');
+    if (firstBody) firstBody.classList.add('open');
+  }
+
+  function renderValueRow(label, val) {
+    const display = val ? escHtml(val) : '(空)';
+    const cls = val ? '' : 'empty';
+    const copyBtn = val ? `<button class="sd-copy-btn" data-copy="${escHtml(val)}" style="margin-left:4px">复制</button>` : '';
+    return `
+      <div class="sd-value-row">
+        <span class="sd-value-label">${label}</span>
+        <span class="sd-value ${cls}">${display}${copyBtn}</span>
+      </div>
+    `;
+  }
+
+  // ── 历史 Tab ──────────────────────────────────────────────────
+  const history = [];
+  function renderHistory() {
+    const list = document.getElementById('__sd_history_list__');
+    const count = document.getElementById('__sd_history_count__');
+    if (!list) return;
+    count.textContent = history.length;
+    if (history.length === 0) {
+      list.innerHTML = `<div style="color:#565f89;text-align:center;padding:32px 0;font-size:11px;">暂无历史</div>`;
+      return;
+    }
+    list.innerHTML = history.slice().reverse().map((h, i) => `
+      <div style="padding:6px 0;border-bottom:1px solid #292e42">
+        <div style="color:#9ece6a;font-size:11px;margin-bottom:2px">${escHtml(h.selector)}</div>
+        <div style="color:#bb9af7;font-size:10px">${escHtml(h.value)}</div>
+        <div style="color:#565f89;font-size:10px;margin-top:2px">${h.ts}</div>
+      </div>
+    `).join('');
+  }
+
+  // ── 实时测试 Tab ──────────────────────────────────────────────
+  let testTimer = null;
+  function initTestTab() {
+    const input = document.getElementById('__sd_test_input__');
+    const result = document.getElementById('__sd_test_result__');
+    if (!input) return;
+
+    input.addEventListener('input', () => {
+      clearTimeout(testTimer);
+      testTimer = setTimeout(() => runTest(input.value.trim(), result), 300);
+    });
+  }
+
+  function runTest(selector, container) {
+    if (!selector) { container.innerHTML = ''; return; }
+    try {
+      const els = [...document.querySelectorAll(selector)];
+      if (els.length === 0) {
+        container.innerHTML = `<div class="sd-test-result"><div class="sd-test-none">❌ 未命中任何元素</div></div>`;
+        clearHighlights('__sd_test_hl__');
+        return;
+      }
+      clearHighlights('__sd_test_hl__');
+      els.forEach(el => el.classList.add('__sd_test_hl__'));
+
+      const hitsClass = els.length === 1 ? 'ok' : els.length <= 5 ? 'warn' : 'bad';
+      container.innerHTML = `
+        <div class="sd-test-result">
+          <div class="sd-test-hit sd-hits ${hitsClass}">命中 ${els.length} 个元素</div>
+          ${els.slice(0, 10).map((el, i) => {
+            const offscreen = el.querySelector('.a-offscreen');
+            const val = (offscreen?.textContent || el.innerText || el.textContent || el.value || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+            return `<div class="sd-test-item">[${i + 1}] ${escHtml(val) || '<span style="color:#3b4261">(空)</span>'}</div>`;
+          }).join('')}
+          ${els.length > 10 ? `<div style="color:#565f89;font-size:10px;margin-top:4px">…还有 ${els.length - 10} 个</div>` : ''}
+        </div>
+      `;
+
+      // 复制按钮绑定
+      container.querySelectorAll('.sd-copy-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+            btn.textContent = '✓'; btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+          });
+        });
+      });
+    } catch (e) {
+      container.innerHTML = `<div class="sd-test-result"><div class="sd-test-none">⚠️ 选择器语法错误: ${escHtml(e.message)}</div></div>`;
+    }
+  }
+
+  // ── 高亮辅助 ──────────────────────────────────────────────────
+  function clearHighlights(cls) {
+    document.querySelectorAll(`.${cls}`).forEach(el => el.classList.remove(cls));
+  }
+
+  // ── 拾取模式事件 ──────────────────────────────────────────────
+  function onMouseOver(e) {
+    const panel = document.getElementById('__sd_panel__');
+    if (!pickMode || !e.target || panel?.contains(e.target)) return;
+    if (hoveredEl) hoveredEl.classList.remove('__sd_highlight__');
+    hoveredEl = e.target;
+    hoveredEl.classList.add('__sd_highlight__');
+  }
+
+  function onClick(e) {
+    const panel = document.getElementById('__sd_panel__');
+    if (!pickMode || panel?.contains(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const el = e.target;
+    if (hoveredEl) hoveredEl.classList.remove('__sd_highlight__');
+
+    const candidates = buildCandidates(el);
+    const values = extractValues(el);
+    const ts = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    const topSel = candidates[0]?.selector || buildCssPath(el);
+
+    const capture = { candidates, values, ts, el };
+    captures.unshift(capture);
+
+    // 历史记录
+    history.push({ selector: topSel, value: values.offscreen || values.innerText || values.textContent, ts });
+
+    // 捕获后给元素加绿色标记
+    el.classList.add('__sd_captured__');
+    setTimeout(() => el.classList.remove('__sd_captured__'), 2000);
+
+    renderCaptures();
+    renderHistory();
+
+    // 切换到拾取 Tab
+    switchTab('capture');
+  }
+
+  // ── Tab 切换 ──────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.sd-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    document.querySelectorAll('.sd-tab-panel').forEach(p => p.classList.toggle('active', p.id === `__sd_panel_${name}__`));
+    if (name === 'test') {
+      // 测试 Tab 清理高亮
+      clearHighlights('__sd_hover_hl__');
+    }
+  }
+
+  // ── HTML 转义 ─────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── 初始化 ────────────────────────────────────────────────────
+  function init() {
+    injectStyle();
+
+    const v = getThemeVars();
+    const extraStyle = document.createElement('style');
+    extraStyle.textContent = `
+      .__sd_hover_hl__ { outline: 2px dashed ${v.warning} !important; outline-offset: 2px !important; background: rgba(250,140,22,0.08) !important; }
+      .__sd_test_hl__ { outline: 2px solid ${v.accent} !important; outline-offset: 2px !important; background: rgba(91,94,219,0.08) !important; }
+    `;
+    document.head.appendChild(extraStyle);
+
+    const panel = buildPanel();
+    renderCaptures();
+    renderHistory();
+    initTestTab();
+
+    // 拾取按钮
+    document.getElementById('__sd_pick__').addEventListener('click', () => {
+      pickMode = !pickMode;
+      const btn = document.getElementById('__sd_pick__');
+      btn.textContent = pickMode ? '停止拾取' : '拾取';
+      btn.classList.toggle('active', pickMode);
+      document.body.style.cursor = pickMode ? 'crosshair' : '';
+      if (!pickMode && hoveredEl) {
+        hoveredEl.classList.remove('__sd_highlight__');
+        hoveredEl = null;
+      }
+    });
+
+    // 清空
+    document.getElementById('__sd_clear__').addEventListener('click', () => {
+      captures.length = 0;
+      renderCaptures();
+    });
+
+    // 折叠 / 展开
+    function toggleCollapse() {
+      const collapsed = panel.classList.toggle('collapsed');
+      document.getElementById('__sd_collapse__').textContent = collapsed ? '▶' : '◀';
+      document.body.style.marginRight = collapsed ? '28px' : '360px';
+    }
+    document.getElementById('__sd_collapse__').addEventListener('click', toggleCollapse);
+    document.getElementById('__sd_expand_tab__').addEventListener('click', toggleCollapse);
+
+    // ESC：拾取模式中取消拾取；已收起时展开
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (pickMode) {
+        // 取消拾取模式
+        pickMode = false;
+        const btn = document.getElementById('__sd_pick__');
+        if (btn) { btn.textContent = '拾取'; btn.classList.remove('active'); }
+        document.body.style.cursor = '';
+        if (hoveredEl) { hoveredEl.classList.remove('__sd_highlight__'); hoveredEl = null; }
+      } else if (panel.classList.contains('collapsed')) {
+        // 展开面板
+        toggleCollapse();
+      }
+    }, true);
+
+    // Tab 切换
+    document.querySelectorAll('.sd-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        clearHighlights('__sd_hover_hl__');
+        clearHighlights('__sd_test_hl__');
+        switchTab(tab.dataset.tab);
+      });
+    });
+
+    // 鼠标事件
+    document.addEventListener('mouseover', onMouseOver, true);
+    document.addEventListener('click', onClick, true);
+  }
+
+  // 等 DOM 就绪
+  if (document.body) {
+    init();
+  } else {
+    document.addEventListener('DOMContentLoaded', init);
+  }
+
+  // 暴露给主进程用于获取捕获结果
+  window.__SD_GET_CAPTURES__ = () => captures.map(c => ({
+    topSelector: c.candidates[0]?.selector || '',
+    candidates: c.candidates,
+    values: c.values,
+    ts: c.ts
+  }));
+
+})();

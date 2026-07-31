@@ -1,4 +1,4 @@
-# 亚马逊监控助手 v1.0.0
+# 亚马逊监控助手 v1.1.0
 
 将 Chrome 扩展版（`amazon-patrol`）改造为 Windows + Mac 双平台桌面应用，保留全部巡检功能，新增系统托盘、开机自启动、钉钉通知、产品信息抓取、站点管理等功能。
 
@@ -34,7 +34,7 @@ Electron 版新增：
 ### 开发模式
 
 ```bash
-# 安装依赖（需 Node.js ≥16）
+# 安装依赖（需 Node.js ≥22.12.0）
 # 国内网络建议加镜像参数，否则 Electron 二进制下载会很慢
 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install --registry=https://registry.npmmirror.com
 
@@ -440,7 +440,7 @@ node-schedule 每分钟 tick
 
 - `content.js` 通过 `executeJavaScript` 注入真实 Chromium 页面（非无头浏览器）
 - `nodeIntegration: false`，避免 `window.require` 被 Amazon 检测
-- UA 设置为 Chrome 120 真实 User-Agent，去掉 Electron 标记
+- UA 动态读取 `process.versions.chrome` 生成真实 User-Agent，随 Electron 升级自动更新，去掉 Electron 标记
 - 每个站点首次抓取前通过 AJAX 设置配送地邮编，后续任务复用 Cookie
 - MutationObserver 等待 DOM 稳定后再抓取
 - 随机延迟 + 模拟滚动
@@ -500,6 +500,49 @@ node-schedule 每分钟 tick
 ### 调试
 
 开发模式（`npm start`）下主窗口自动打开 DevTools，可在 Console 查看所有执行日志。也可在「日志」标签页查看实时抓取日志。设置面板开启「显示抓取窗口」后巡店时可见后台 Amazon 页面。
+
+## 多用户使用注意（统一出口 IP）
+
+多人同时使用时，若公司网络为统一出口 IP，Amazon 会看到同一 IP 短时间内大量请求，触发验证码或封锁的概率大幅上升。
+
+**当前缓解措施：**
+- 各用户错开巡查时间，避免同时触发
+- 并发设为 1，页面间隔拉长到 8-10 秒
+- 只启用必要字段，减少重试
+
+**待解决方案（TODO）：**
+- **代理 IP 轮换**：每个请求走不同 IP，改造 tab-manager 注入代理配置（需付费代理服务）
+- **服务端统一调度**：一台独立 IP 的服务器集中跑，客户端只查看结果（架构改动较大）
+- **分时错峰**：定时任务强制错开触发时间（改动小，效果有限）
+
+## 与爬虫框架对比
+
+| 维度 | 爬虫框架（Scrapy/Playwright）| 本方案 |
+|------|------|------|
+| 浏览器指纹 | headless 特征明显，易被检测 | 真实 Chromium，无 headless 特征 |
+| JS 渲染 | 需额外配置无头浏览器 | 原生支持动态渲染 |
+| Cookie 管理 | 需手动维护 | Electron session 自动管理 |
+| 部署门槛 | 需服务器环境 | 本地安装即用 |
+| 选择器维护 | 需后端改动部署 | 改文件重启即可 |
+| 并发能力 | 异步高并发，可达数百 | 受本地机器限制 |
+| 代理支持 | 原生支持代理池和 IP 轮换 | 需额外开发 |
+| 指纹随机化 | 有成熟插件（playwright-stealth）| 需自行实现 |
+| 适用规模 | 百万级批量抓取 | 几十到几百量级定期监控 |
+
+**抓取内容准确性对比：**
+
+| 维度 | HTTP 型（Scrapy）| 浏览器型（Playwright/Puppeteer）| 本方案 |
+|------|------|------|------|
+| JS 渲染内容 | ❌ 拿到空壳 HTML，JS 注入的价格/库存无法直接获取 | ✅ 渲染后抓取 | ✅ 渲染后抓取 |
+| 动态价格 | 需额外解析 `window.P.when` 等 JSON 数据 | 直接取 DOM 值 | 直接取 DOM 值 |
+| Headless 检测 | 不涉及 | ⚠️ Amazon 会对 headless 返回不同内容或隐藏价格 | ✅ 真实 Chromium，无 headless 特征 |
+| 内容一致性 | 与真实浏览器可能不同 | 可能被 Amazon 针对性干扰 | 与用户浏览器看到的完全一致 |
+
+**结论**：
+- **抓取准确性**：本方案 ≈ Playwright/Puppeteer > HTTP 型爬虫，且在 headless 检测对抗上优于前者
+- **反检测能力**：本方案 > Playwright/Puppeteer（headless）> HTTP 型爬虫
+- **规模化能力**：HTTP 型爬虫 > Playwright/Puppeteer > 本方案
+- **适用场景**：本方案专为小规模高准确率定期监控设计，不适合百万级批量抓取
 
 ## 注意事项
 

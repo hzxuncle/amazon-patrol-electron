@@ -4,20 +4,22 @@
   "description": "亚马逊监控助手桌面版",
   "main": "electron/main.js",
   "engines": {
-    "node": ">=16",
-    "npm": ">=8"
+    "node": ">=22.12.0",
+    "npm": ">=10"
   },
   "scripts": {
-    "start": "electron . --dev",
+    "start": "cross-env NODE_OPTIONS= electron . --dev",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win --mac"
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "node-schedule": "^2.1.1"
   },
   "devDependencies": {
-    "electron": "^28.3.3",
+    "cross-env": "^7.0.3",
+    "electron": "^43.2.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
@@ -26,6 +28,11 @@
     "artifactName": "${productName}.${ext}",
     "directories": {
       "output": "dist"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "hzxuncle",
+      "repo": "amazon-patrol-electron"
     },
     "files": [
       "electron/**/*",

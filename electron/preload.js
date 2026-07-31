@@ -55,5 +55,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSites: (sites) => ipcRenderer.invoke('SAVE_SITES', sites),
 
   // 在系统默认浏览器打开链接
-  openExternal: (url) => ipcRenderer.invoke('OPEN_EXTERNAL', url)
+  openExternal: (url) => ipcRenderer.invoke('OPEN_EXTERNAL', url),
+
+  // 应用版本与环境信息
+  getAppVersion: () => ipcRenderer.invoke('GET_APP_VERSION'),
+  getAppInfo: () => ipcRenderer.invoke('GET_APP_INFO'),
+
+  // 选择器调试器
+  openSelectorDebugger: (asin, siteCode, theme) => ipcRenderer.invoke('OPEN_SELECTOR_DEBUGGER', { asin, siteCode, theme }),
+  getSelectorCaptures: () => ipcRenderer.invoke('GET_SELECTOR_CAPTURES')
 });

@@ -2,9 +2,9 @@
 
 /**
  * 通用选择器配置（所有站点共用 fallback）
- * 从 renderer/selectors/common.js 迁移，重命名导出为 BASE_SELECTORS
+ * 基于实测数据精简，已删除全站点无效的选择器
  */
-const BASE_SELECTORS = {
+const COMMON_SELECTORS = {
 
   price: [
     // xl 价格块 — 实测 US/CA/AU/MX 全部命中，值正确
@@ -12,7 +12,6 @@ const BASE_SELECTORS = {
     '.a-price.aok-align-center[data-a-size="xl"] .a-offscreen',
     // 核心价格模块（注意：命中但值可能为空，需外层检查）
     '#corePriceDisplay_desktop_feature_div .a-price .a-offscreen',
-    '#corePrice_feature_div .a-offscreen',
     '#corePrice_desktop .a-price .a-offscreen',
     // 通用价格 span
     'span.a-price[data-a-size="xl"] span.a-offscreen',
@@ -23,7 +22,8 @@ const BASE_SELECTORS = {
     '#priceblock_ourprice',
     '#priceblock_dealprice',
     '#priceblock_saleprice',
-    // 注：span.a-price:not(.a-text-price) span.a-offscreen 已删除 — 全页匹配会命中推荐轮播区价格
+    // 兜底
+    'span.a-price:not(.a-text-price) span.a-offscreen'
   ],
 
   listPrice: [
@@ -33,12 +33,12 @@ const BASE_SELECTORS = {
     // 独立划线价
     '#listPrice',
     '#listPriceValue',
+    '.a-price.a-text-price .a-offscreen',
     '#pep-list-price .a-price .a-offscreen',
-    // 以下为全页匹配，已注释 — querySelector 取第一个命中元素，商品无划线价时会误取推荐区价格
-    // '.a-price.a-text-price .a-offscreen',
-    // '.a-text-price .a-offscreen',
-    // '#listPriceBlock .a-text-strike',
-    // '.a-text-price[data-a-size="b"] .a-offscreen'
+    // 以下命中但可能误值，放靠后
+    '.a-text-price .a-offscreen',
+    '#listPriceBlock .a-text-strike',
+    '.a-text-price[data-a-size="b"] .a-offscreen'
   ],
 
   rating: [
@@ -178,9 +178,9 @@ const BASE_SELECTORS = {
     { type: 'attr', selector: '#variation_color_name', attr: 'data-parent-asin' },
     { type: 'attr', selector: 'div[id*="twister"]', attr: 'data-parent-asin' },
     { type: 'attr', selector: '#native_dropdown_selected_size_name', attr: 'data-parent-asin' },
-    { type: 'regex', pattern: '"parentAsin"\\s*:\\s*"([A-Z0-9]+)"' },
-    { type: 'regex', pattern: "'parentAsin'\\s*:\\s*'([A-Z0-9]+)'" },
-    { type: 'regex', pattern: 'parentAsin["\']?\\s*[:=]\\s*["\']([A-Z0-9]+)["\']' },
+    { type: 'regex', regex: /"parentAsin"\s*:\s*"([A-Z0-9]+)"/ },
+    { type: 'regex', regex: /'parentAsin'\s*:\s*'([A-Z0-9]+)'/ },
+    { type: 'regex', regex: /parentAsin["']?\s*[:=]\s*["']([A-Z0-9]+)["']/ },
     { type: 'attr', selector: 'input[name="parentAsin"]', attr: 'value' },
     { type: 'attr', selector: 'input[id*="parentAsin"]', attr: 'value' }
   ],
@@ -198,4 +198,6 @@ const BASE_SELECTORS = {
   ]
 };
 
-if (typeof module !== 'undefined' && module.exports) module.exports = BASE_SELECTORS;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = COMMON_SELECTORS;
+}

@@ -191,7 +191,15 @@
       { match: /prime\s*day\s*deal/i, label: 'Prime Day Deal' },
       { match: /black\s*friday\s*deal/i, label: 'Black Friday Deal' },
       { match: /save\s+\d+%/i, label: rawText },
-      { match: /\d+%\s*claimed/i, label: rawText }
+      { match: /\d+%\s*claimed/i, label: rawText },
+      // 多语言活动标（MX/ES/IT/FR/DE 等）
+      { match: /promoci[oó]n/i, label: rawText },          // MX/ES: Promoción
+      { match: /oferta/i, label: rawText },                 // MX/ES: Oferta
+      { match: /offre\s*(du\s*moment)?/i, label: rawText }, // FR: Offre du moment
+      { match: /angebot/i, label: rawText },                // DE: Angebot
+      { match: /offerta/i, label: rawText },                // IT: Offerta
+      { match: /セール|特価|タイムセール/i, label: rawText }, // JP
+      { match: /할인|특가/i, label: rawText },               // KR
     ];
 
     for (const p of patterns) {
@@ -318,9 +326,20 @@
       error: ''
     };
 
-    // 提取ASIN
+    // 提取ASIN，检测重定向
     const asinMatch = window.location.pathname.match(/\/dp\/([A-Z0-9]{10})/);
-    result.asin = asinMatch ? asinMatch[1] : '';
+    const actualAsin = asinMatch ? asinMatch[1] : '';
+    const targetAsin = (options.asin || '').toUpperCase();
+
+    if (targetAsin && actualAsin && actualAsin !== targetAsin) {
+      // 页面跳转到其他 ASIN，原商品已下架
+      result.asin = targetAsin;
+      result.status = 'failed';
+      result.error = `商品已下架，页面跳转至 ${actualAsin}`;
+      return result;
+    }
+
+    result.asin = actualAsin;
 
     // 辅助：判断某个字段是否启用。null=全部启用
     function isEnabled(field) {
@@ -488,16 +507,16 @@
     }
 
     // 执行抓取（默认启用稳定性感知）
-    let result = await scrapePageData({ useStability, enabledFields });
+    let result = await scrapePageData({ useStability, enabledFields, asin: message.asin || '' });
     result.asin = result.asin || (message.asin || '');
 
-    // 核心数据重试
+    // 核心数据重试（失败/重定向不重试）
     let scrapeRetries = 0;
-    while ((!result.price || !result.title) && scrapeRetries < maxRetries) {
+    while (result.status !== 'failed' && (!result.price || !result.title) && scrapeRetries < maxRetries) {
       await sleep(retryDelay);
       window.scrollBy({ top: 100, behavior: 'smooth' });
       await randomSleep(500, 1000);
-      result = await scrapePageData({ useStability: false, enabledFields });
+      result = await scrapePageData({ useStability: false, enabledFields, asin: message.asin || '' });
       result.asin = result.asin || (message.asin || '');
       scrapeRetries++;
     }

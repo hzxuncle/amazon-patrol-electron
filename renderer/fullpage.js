@@ -87,6 +87,10 @@ let historySnapshots = {};
 
 // ========== Init ==========
 document.addEventListener('DOMContentLoaded', async () => {
+  window.electronAPI.getAppVersion().then(v => {
+    const el = document.getElementById('appVersion');
+    if (el) el.textContent = `监控助手 v${v}`;
+  });
   initTheme();
   initTabs();
   initSettingsSliders();
@@ -97,6 +101,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLogTab();
   initHistoryTab();
   initProductInfoOverlay();
+  initAboutDialog();
+  initSelectorDebugger();
   await initSitesTab();
   await initSiteGroups();
   initInputCollapse();
@@ -119,6 +125,7 @@ function initTabs() {
       $(`#tab-${name}`).classList.add('active');
     });
   });
+
 }
 
 // ========== Settings ==========
@@ -511,18 +518,27 @@ function processFile(file) {
         expectedBsrSubCategory:  String(r['期望BSR小类名'] || r['Expected BSR Sub Category'] || r['expectedBsrSubCategory'] || '').trim(),
       })).filter(r => r.asin);
 
-      // 将站点标识规范化为二字码（code）
-      rows.forEach(r => {
-        if (!r.site) return;
-        // 如果已经是代码形式（不含点号），转为大写即可
-        if (!r.site.includes('.')) {
-          r.site = r.site.toUpperCase();
-          return;
-        }
-        // 如果是域名形式（www.amazon.ca 或 amazon.ca），查找对应 code
-        const found = sitesData.find(s => `www.${s.domain}` === r.site || s.domain === r.site);
-        if (found && found.code) r.site = found.code;
+      // 站点统一转大写
+      rows.forEach(r => { if (r.site) r.site = r.site.toUpperCase(); });
+
+      // 校验：ASIN 和站点不能为空，站点必须是二字码
+      const validCodes = new Set(sitesData.map(s => s.code));
+      const invalidRows = rows.filter(r => {
+        if (!r.asin) return true;
+        if (!r.site) return true;
+        if (!/^[A-Z]{2}$/.test(r.site) || !validCodes.has(r.site)) return true;
+        return false;
       });
+
+      if (invalidRows.length > 0) {
+        const preview = invalidRows.slice(0, 5).map(r =>
+          `ASIN: ${r.asin || '(空)'} / 站点: ${r.site || '(空)'}`
+        ).join('\n');
+        const more = invalidRows.length > 5 ? `\n...共 ${invalidRows.length} 行` : '';
+        await showAlert('导入校验失败',
+          `以下行 ASIN 或站点无效（站点须为系统内二字码，如 US、CA、AU）：\n\n${preview}${more}`);
+        return;
+      }
 
       const now = new Date().toISOString();
       referenceData = { importedAt: now, fileName: file.name, rows };
@@ -661,7 +677,7 @@ function initInputCollapse() {
     content.style.display = display;
     addBtn.style.display = display;
     clearBtn.style.display = display;
-    btn.textContent = collapsed ? '⌄' : '⌃';
+    btn.querySelector('.collapse-arrow').style.transform = collapsed ? 'rotate(180deg)' : '';
     btn.title = collapsed ? '展开' : '折叠';
     hint.textContent = collapsed ? '（已折叠）' : '';
     section.style.maxHeight = collapsed ? '' : '38vh';
@@ -669,6 +685,7 @@ function initInputCollapse() {
 
   btn.addEventListener('click', toggle);
   titleBtn.addEventListener('click', toggle);
+  toggle(); // 默认折叠
 }
 
 async function initSiteGroups() {
@@ -894,6 +911,7 @@ async function startPatrol() {
 async function stopPatrol() {
   await window.electronAPI.sendMessage('STOP_PATROL', {});
   patrolRunning = false;
+  stopTimer();
   updateUiStopped();
 }
 
@@ -916,6 +934,7 @@ async function clearResults() {
   dom.btnExport.disabled = true;
   dom.btnRetry.disabled = true;
   dom.btnStart.innerHTML = '<span>▶</span> 开始巡店';
+  dom.progressSection.style.display = 'none';
 }
 
 // ========== UI State ==========
@@ -939,7 +958,7 @@ function updateUiStopped() {
   dom.btnStart.innerHTML = hasRemaining ? '<span>▶</span> 继续巡店' : '<span>▶</span> 开始巡店';
   dom.btnStop.disabled = true;
   dom.btnExport.disabled = allResults.length === 0;
-  dom.progressStatus.textContent = '已停止';
+  dom.progressStatus.innerHTML = '<span style="color:var(--warning,#fa8c16)">⏹ 已取消</span>';
   dom.statusDot.className = 'status-dot';
   dom.statusLabel.textContent = '就绪';
 }
@@ -1242,12 +1261,14 @@ function renderAllResults() {
 
   const orderedEnabled = fieldOrder.filter(f => enabled.includes(f));
 
+  const emptyState = document.getElementById('emptyState');
   if (!allResults.length) {
-    const colSpan = document.querySelectorAll('#resultsTable thead th:not([style*="display: none"]):not([style*="display:none"])').length || 15;
-    dom.resultsBody.innerHTML = `<tr class="empty-row"><td colspan="${colSpan}"><div class="empty-state"><span class="empty-icon">◎</span><p>点击「开始巡店」查看结果</p></div></td></tr>`;
+    if (emptyState) emptyState.style.display = '';
+    dom.resultsBody.innerHTML = '';
     dom.resultsSummary.textContent = '准备就绪';
     return;
   }
+  if (emptyState) emptyState.style.display = 'none';
 
   dom.resultsBody.innerHTML = allResults.map(r => {
     const ref = findRef(r.asin, r.site);
@@ -1284,7 +1305,7 @@ function showAlert(title, message) {
     overlay.innerHTML = `
       <div class="confirm-dialog">
         <div class="confirm-dialog-header"><span>${esc(title)}</span></div>
-        <div class="confirm-dialog-body"><p>${esc(message)}</p></div>
+        <div class="confirm-dialog-body"><p>${esc(message).replace(/\n/g, '<br>')}</p></div>
         <div class="confirm-dialog-footer">
           <button class="btn btn-primary confirm-ok">确定</button>
         </div>
@@ -1328,6 +1349,61 @@ function showConfirmDialog(title, lines, confirmText = '确认', cancelText = '�
       if (e.key === 'Escape') { overlay.remove(); resolve(false); document.removeEventListener('keydown', onKey); }
       if (e.key === 'Enter') { overlay.remove(); resolve(true); document.removeEventListener('keydown', onKey); }
     });
+  });
+}
+
+function initSelectorDebugger() {
+  const btnOpen = document.getElementById('btnOpenDebugger');
+  const debugSite = document.getElementById('debugSite');
+  const debugAsin = document.getElementById('debugAsin');
+  if (!btnOpen || !debugSite) return;
+
+  // 填充站点下拉（复用 enabledSites）
+  async function populateSites() {
+    const allSites = await window.electronAPI.getSites();
+    const enabled = allSites.filter(s => s.enabled);
+    debugSite.innerHTML = enabled.map(s =>
+      `<option value="${s.code}">${s.code} · ${s.domain}</option>`
+    ).join('');
+  }
+  populateSites();
+
+  btnOpen.addEventListener('click', async () => {
+    const siteCode = debugSite.value;
+    const asin = debugAsin.value.trim().toUpperCase();
+    btnOpen.disabled = true;
+    btnOpen.textContent = '正在打开...';
+    try {
+      const theme = document.documentElement.getAttribute('data-theme') || 'light';
+      await window.electronAPI.openSelectorDebugger(asin || null, siteCode, theme);
+    } finally {
+      btnOpen.disabled = false;
+      btnOpen.textContent = '打开调试器';
+    }
+  });
+}
+
+function initAboutDialog() {
+  const overlay = document.getElementById('aboutOverlay');
+  const btnOpen = document.getElementById('btnAbout');
+  const btnClose = document.getElementById('btnAboutClose');
+
+  btnOpen.addEventListener('click', async () => {
+    const info = await window.electronAPI.getAppInfo();
+    document.getElementById('aboutVersion').textContent = ` v${info.version}`;
+    document.getElementById('aboutRuntime').textContent =
+      `Electron ${info.electronVersion} / Chrome ${info.chromeVersion} / Node ${info.nodeVersion}`;
+    document.getElementById('aboutDataPath').textContent = info.dataPath;
+    overlay.style.display = '';
+  });
+
+  btnClose.addEventListener('click', () => { overlay.style.display = 'none'; });
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
+
+  // 邮件链接用系统默认邮件客户端打开
+  overlay.addEventListener('click', e => {
+    const link = e.target.closest('.about-link[data-url]');
+    if (link) { e.preventDefault(); window.electronAPI.openExternal(link.dataset.url); }
   });
 }
 
@@ -2043,5 +2119,6 @@ function initTheme() {
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   const btn = document.getElementById('btnTheme');
-  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.textContent = theme === 'dark' ? '☀️' : '🌙';
 }

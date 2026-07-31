@@ -149,6 +149,14 @@ body::before { display: none; }
   transition: all 0.2s;
 }
 .btn-icon-only:hover { border-color: var(--accent-dim); color: var(--accent); }
+.btn-header {
+  height: 28px; padding: 0 10px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: all 0.2s;
+}
+.btn-header:hover { border-color: var(--accent-dim); color: var(--accent); }
 
 /* ===== Main Layout ===== */
 .main-layout { display: flex; flex: 1; overflow: hidden; }
@@ -255,6 +263,8 @@ body::before { display: none; }
   transition: all 0.15s; font-family: var(--font-sans);
 }
 .btn-ghost-sm:hover { border-color: var(--accent); color: var(--accent); background: rgba(91,94,219,0.05); }
+.collapse-toggle-btn { display: inline-flex; align-items: center; justify-content: center; padding: 2px 8px; }
+.collapse-arrow { font-size: 10px; line-height: 1; transition: transform 0.2s; display: block; }
 
 /* ===== 巡店面板布局 ===== */
 
@@ -366,6 +376,7 @@ body::before { display: none; }
 }
 .result-card > .table-scroll {
   flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
 }
 .result-card-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -450,7 +461,7 @@ body::before { display: none; }
 
 /* 空状态 */
 .empty-row td { text-align: center; padding: 48px 0 !important; }
-.empty-state { color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.empty-state { color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; flex: 1; min-height: 0; }
 .empty-icon { font-size: 40px; color: var(--border); }
 
 /* ===== Cards ===== */
@@ -475,6 +486,10 @@ body::before { display: none; }
 .upload-content .link { color: var(--accent); cursor: pointer; text-decoration: underline; }
 .upload-hint { font-size: 11px !important; color: var(--text-muted) !important; margin-top: 6px !important; }
 .import-actions { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.import-rules { font-size: 12px; color: var(--text-muted); line-height: 1.8; margin-bottom: 12px; }
+.import-rules p { margin: 0; }
+.import-rules strong { color: var(--text-secondary); }
+.import-rules-required { color: var(--danger, #ff4d4f); font-weight: 600; }
 
 /* ===== Settings ===== */
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -768,3 +783,34 @@ body::before { display: none; }
 .col-order-item.drag-over { border-color: var(--accent); background: rgba(91,94,219,0.08); }
 .col-order-handle { color: var(--text-muted); font-size: 14px; cursor: grab; }
 .col-order-hint { padding: 6px 16px 0; font-size: 11px; color: var(--text-muted); }
+
+/* ===== 关于弹框 ===== */
+.about-dialog {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); width: 400px; max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.about-body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 0; }
+.about-logo-row {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+}
+.about-app-name {
+  font-size: 15px; font-weight: 600; color: var(--text-primary);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.about-version {
+  font-size: 11px; font-weight: 400; color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.about-divider { height: 1px; background: var(--border); margin: 12px 0; }
+.about-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.about-table td { padding: 5px 0; vertical-align: top; }
+.about-table td:first-child { color: var(--text-muted); width: 80px; }
+.about-table td:last-child { color: var(--text-primary); }
+.about-link { color: var(--accent); text-decoration: none; }
+.about-link:hover { text-decoration: underline; }
+.about-desc {
+  font-size: 11px; color: var(--text-muted); line-height: 1.6;
+  margin: 0;
+}

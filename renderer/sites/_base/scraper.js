@@ -13,14 +13,22 @@ function getSite() {
 /**
  * 多层fallback选择器查询
  */
+function getTextWithoutScripts(el) {
+  let text = '';
+  el.childNodes.forEach(node => {
+    if (node.nodeName === 'SCRIPT' || node.nodeName === 'STYLE') return;
+    text += node.textContent || '';
+  });
+  return text.replace(/\s+/g, ' ').trim() || el.childNodes.length === 0 && (el.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 function queryWithFallback(selectors) {
   for (const sel of selectors) {
     try {
       if (typeof sel === 'string') {
         const el = document.querySelector(sel);
         if (el) {
-          const text = el.textContent || el.innerText || '';
-          const cleaned = text.replace(/\s+/g, ' ').trim();
+          const cleaned = getTextWithoutScripts(el);
           if (cleaned) return cleaned;
         }
       } else if (sel.type === 'attr') {
@@ -30,11 +38,13 @@ function queryWithFallback(selectors) {
           if (val) return val.replace(/\s+/g, ' ').trim();
         }
       } else if (sel.type === 'regex') {
-        const html = document.documentElement.innerHTML;
+        const pattern = sel.pattern || (sel.regex && sel.regex.source);
+        if (!pattern) continue;
+        const re = new RegExp(pattern);
         const scripts = document.querySelectorAll('script');
         let allScriptContent = '';
         scripts.forEach(s => { allScriptContent += s.textContent + '\n'; });
-        const match = (html + allScriptContent).match(sel.regex);
+        const match = allScriptContent.match(re);
         if (match && match[1]) return match[1].replace(/\s+/g, ' ').trim();
       }
     } catch (e) { continue; }
@@ -117,6 +127,11 @@ function checkPageType() {
 
   const isSearchPage = document.querySelector('[data-component-type="s-search-result"]');
   if (isSearchPage) return 'search';
+
+  const is404 = document.querySelector('#error-page') ||
+    document.querySelector('.error-page') ||
+    (document.title && /404|page not found|找不到页面/i.test(document.title));
+  if (is404) return '404';
 
   const hasPrice = document.querySelector('.a-price');
   const hasTitle = document.querySelector('#productTitle') || document.querySelector('#title');
@@ -354,6 +369,17 @@ async function handleScrape(message) {
       dealBadge: 'N/A', acBadge: 'N/A', coupon: 'N/A',
       url: window.location.href, timestamp: new Date().toISOString(),
       status: 'failed', error: '页面不是商品详情页'
+    };
+  }
+
+  if (pageType === '404') {
+    return {
+      asin: message.asin || '', site: getSite(),
+      title: '', price: '', listPrice: '', rating: '', reviews: '',
+      seller: '', stock: '', parentAsin: 'N/A',
+      dealBadge: 'N/A', acBadge: 'N/A', coupon: 'N/A',
+      url: window.location.href, timestamp: new Date().toISOString(),
+      status: 'failed', error: '商品页面不存在（404）'
     };
   }
 
