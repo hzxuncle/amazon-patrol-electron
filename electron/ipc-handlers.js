@@ -635,9 +635,8 @@ function register() {
   });
 
   // 更新相关
-  const mainModule = require('./main');
-
   ipcMain.handle('START_DOWNLOAD', async () => {
+    const mainModule = require('./main');
     mainModule.startUpdateDownload();
   });
 
