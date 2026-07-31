@@ -616,6 +616,53 @@
     </div>
   </div>
 
+  <!-- 发现新版本弹框 -->
+  <div class="product-info-overlay" id="updateAvailableOverlay" style="display:none">
+    <div class="about-dialog" style="max-width:480px">
+      <div class="product-info-modal-header">
+        <span>发现新版本</span>
+      </div>
+      <div class="about-body">
+        <p style="margin:0 0 8px;font-size:15px;font-weight:600">亚马逊监控助手 <span id="updateVersion"></span> 已发布</p>
+        <pre id="updateNotes" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:10px 12px;font-size:13px;white-space:pre-wrap;max-height:240px;overflow-y:auto;margin:0 0 16px"></pre>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn-secondary" id="btnUpdateSkip">暂不更新</button>
+          <button class="btn-primary" id="btnUpdateNow">立即更新</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下载进度模态框（无法关闭） -->
+  <div class="product-info-overlay" id="updateProgressOverlay" style="display:none">
+    <div class="about-dialog" style="max-width:400px">
+      <div class="product-info-modal-header">
+        <span>正在下载更新</span>
+      </div>
+      <div class="about-body">
+        <p style="margin:0 0 12px;color:var(--text-secondary,#666)">请稍候，下载完成后将自动安装并重启...</p>
+        <div class="progress-track" style="height:10px;border-radius:5px;background:var(--bg-secondary,#eee);overflow:hidden;margin-bottom:8px">
+          <div id="updateProgressFill" style="height:100%;width:0%;background:var(--primary,#1677ff);transition:width 0.3s ease;border-radius:5px"></div>
+        </div>
+        <p id="updateProgressText" style="text-align:center;margin:0;font-size:13px;color:var(--text-secondary,#666)">0%</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 安装后更新说明弹框 -->
+  <div class="product-info-overlay" id="updateChangelogOverlay" style="display:none">
+    <div class="about-dialog" style="max-width:480px">
+      <div class="product-info-modal-header">
+        <span>更新完成</span>
+        <button class="product-info-modal-close" id="btnChangelogClose">✕</button>
+      </div>
+      <div class="about-body">
+        <p style="margin:0 0 8px;font-size:15px;font-weight:600">已更新至 <span id="changelogVersion"></span></p>
+        <pre id="changelogNotes" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:10px 12px;font-size:13px;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin:0"></pre>
+      </div>
+    </div>
+  </div>
+
   <script src="lib/xlsx.full.min.js"></script>
   <script src="lib/cron.js"></script>
   <script src="fullpage.js"></script>
