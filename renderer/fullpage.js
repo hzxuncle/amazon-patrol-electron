@@ -2122,3 +2122,75 @@ function applyTheme(theme) {
   const icon = document.getElementById('themeIcon');
   if (icon) icon.textContent = theme === 'dark' ? '☀️' : '🌙';
 }
+
+// ========== 自动更新 UI ==========
+(function initUpdateUI() {
+  if (!window.electronAPI) return;
+
+  let pendingVersion = null;
+
+  // --- 发现新版本弹框 ---
+  window.electronAPI.onUpdateAvailable(({ version, releaseNotes, isMandatory }) => {
+    pendingVersion = version;
+    const overlay = document.getElementById('updateAvailableOverlay');
+    document.getElementById('updateVersion').textContent = 'v' + version;
+    // 去掉 [强制更新] 标记再展示
+    const displayNotes = releaseNotes.replace(/^\[强制更新\]\s*/i, '').trim();
+    document.getElementById('updateNotes').textContent = displayNotes || '暂无更新说明';
+    const skipBtn = document.getElementById('btnUpdateSkip');
+    skipBtn.style.display = isMandatory ? 'none' : '';
+    overlay.style.display = 'flex';
+  });
+
+  document.getElementById('btnUpdateNow').addEventListener('click', () => {
+    document.getElementById('updateAvailableOverlay').style.display = 'none';
+    document.getElementById('updateProgressOverlay').style.display = 'flex';
+    window.electronAPI.startUpdateDownload();
+  });
+
+  document.getElementById('btnUpdateSkip').addEventListener('click', () => {
+    if (pendingVersion) window.electronAPI.skipUpdateVersion(pendingVersion);
+    document.getElementById('updateAvailableOverlay').style.display = 'none';
+    pendingVersion = null;
+  });
+
+  // --- 下载进度 ---
+  window.electronAPI.onUpdateProgress(({ percent }) => {
+    document.getElementById('updateProgressFill').style.width = percent + '%';
+    document.getElementById('updateProgressText').textContent = percent + '%';
+  });
+
+  // --- 下载完成（安装前） ---
+  window.electronAPI.onUpdateDownloaded(() => {
+    document.getElementById('updateProgressFill').style.width = '100%';
+    document.getElementById('updateProgressText').textContent = '100% — 即将重启安装...';
+  });
+
+  // --- 启动时检测：上次是否刚完成更新 ---
+  Promise.all([
+    window.electronAPI.storage.get('lastVersion'),
+    window.electronAPI.getAppVersion()
+  ]).then(([lastVersion, currentVersion]) => {
+    if (!lastVersion) return;
+    if (!currentVersion || lastVersion === currentVersion) return;
+
+    // 版本已变，清除记录，展示 changelog
+    window.electronAPI.storage.set('lastVersion', null);
+
+    const owner = 'hzxuncle';
+    const repo = 'amazon-patrol-electron';
+    fetch(`https://api.github.com/repos/${owner}/${repo}/releases/tags/v${currentVersion}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const notes = data && data.body ? data.body.replace(/^\[强制更新\]\s*/i, '').trim() : '';
+        document.getElementById('changelogVersion').textContent = 'v' + currentVersion;
+        document.getElementById('changelogNotes').textContent = notes || '暂无更新说明';
+        document.getElementById('updateChangelogOverlay').style.display = 'flex';
+      })
+      .catch(() => {});
+  });
+
+  document.getElementById('btnChangelogClose').addEventListener('click', () => {
+    document.getElementById('updateChangelogOverlay').style.display = 'none';
+  });
+})();
