@@ -158,39 +158,63 @@ function initSites() {
 
 // ========== 自动更新 ==========
 function initAutoUpdater() {
-  // 开发模式不检查更新
   if (process.env.NODE_ENV === 'development' || process.argv.includes('--dev')) return;
 
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  // 用户点击「立即更新」后才下载
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('update-available', (info) => {
-    console.log(`[Updater] 发现新版本: ${info.version}`);
+    const skipped = store.get('skippedUpdateVersion');
+    const notes = typeof info.releaseNotes === 'string'
+      ? info.releaseNotes
+      : (Array.isArray(info.releaseNotes)
+          ? info.releaseNotes.map(n => n.note || '').join('\n')
+          : '');
+    const isMandatory = notes.trimStart().startsWith('[强制更新]');
+
+    // 普通更新且用户已跳过该版本，不弹框
+    if (!isMandatory && skipped === info.version) return;
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('UPDATE_AVAILABLE', {
+        version: info.version,
+        releaseNotes: notes,
+        isMandatory
+      });
+    }
   });
 
-  autoUpdater.on('update-downloaded', (info) => {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: '发现新版本',
-      message: `亚马逊监控助手 v${info.version} 已下载完成`,
-      detail: '点击「立即重启」自动安装新版本，或稍后手动重启软件完成更新。',
-      buttons: ['立即重启', '稍后再说'],
-      defaultId: 0,
-      cancelId: 1
-    }).then(({ response }) => {
-      if (response === 0) autoUpdater.quitAndInstall();
-    });
+  autoUpdater.on('download-progress', (progress) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('UPDATE_PROGRESS', { percent: Math.floor(progress.percent) });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    // 安装前记录当前版本，重启后用于展示 changelog
+    store.set('lastVersion', app.getVersion());
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('UPDATE_DOWNLOADED', {});
+    }
+    // 短暂延迟后退出安装（给渲染进程时间关闭进度框）
+    setTimeout(() => autoUpdater.quitAndInstall(false, true), 1500);
   });
 
   autoUpdater.on('error', (err) => {
     console.error('[Updater] 检查更新失败:', err.message);
   });
 
-  // 启动 5 秒后检查，避免影响启动速度
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(e => console.error('[Updater]', e.message));
   }, 5000);
 }
+
+function startUpdateDownload() {
+  autoUpdater.downloadUpdate().catch(e => console.error('[Updater] 下载失败:', e.message));
+}
+
+module.exports = { startUpdateDownload };
 
 app.whenReady().then(() => {
   store.migrate();
