@@ -7,18 +7,20 @@ const { app } = require('electron');
 const DATA_DIR = app.getPath('userData');
 
 const FILE_MAP = {
-  patrolSettings:   'settings.json',
-  cronConfig:       'settings.json',
-  appTheme:         'settings.json',
-  openAtLogin:      'settings.json',
-  patrolState:      'state.json',
-  patrolResults:    'state.json',
-  lastUpdate:       'state.json',
-  asinInputCache:   'state.json',
-  patrolHistory:    'history.json',
-  historySnapshots: 'history.json',
-  referenceData:    'reference.json',
-  sites:            'sites.json',
+  patrolSettings:        'settings.json',
+  cronConfig:            'settings.json',
+  appTheme:              'settings.json',
+  openAtLogin:           'settings.json',
+  skippedUpdateVersion:  'settings.json',
+  lastVersion:           'settings.json',
+  patrolState:           'state.json',
+  patrolResults:         'state.json',
+  lastUpdate:            'state.json',
+  asinInputCache:        'state.json',
+  patrolHistory:         'history.json',
+  historySnapshots:      'history.json',
+  referenceData:         'reference.json',
+  sites:                 'sites.json',
 };
 
 // 每个文件独立内存缓存
