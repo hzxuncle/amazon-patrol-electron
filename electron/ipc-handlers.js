@@ -633,6 +633,17 @@ function register() {
     store.set('sites', sites);
     return { success: true };
   });
+
+  // 更新相关
+  const mainModule = require('./main');
+
+  ipcMain.handle('START_DOWNLOAD', async () => {
+    mainModule.startUpdateDownload();
+  });
+
+  ipcMain.handle('SKIP_UPDATE_VERSION', async (e, version) => {
+    store.set('skippedUpdateVersion', version);
+  });
 }
 
 module.exports = { register, setMainWindow };

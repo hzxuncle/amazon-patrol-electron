@@ -23,6 +23,18 @@ ipcRenderer.on('PATROL_LOG', (e, entry) => {
   logCallbacks.forEach(cb => cb(entry));
 });
 
+const updateCallbacks = { available: [], progress: [], downloaded: [] };
+
+ipcRenderer.on('UPDATE_AVAILABLE', (e, data) => {
+  updateCallbacks.available.forEach(cb => cb(data));
+});
+ipcRenderer.on('UPDATE_PROGRESS', (e, data) => {
+  updateCallbacks.progress.forEach(cb => cb(data));
+});
+ipcRenderer.on('UPDATE_DOWNLOADED', (e, data) => {
+  updateCallbacks.downloaded.forEach(cb => cb(data));
+});
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // 消息通信（替换 chrome.runtime.sendMessage / onMessage）
   sendMessage: (action, payload) => ipcRenderer.invoke(action, payload || {}),
@@ -63,5 +75,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 选择器调试器
   openSelectorDebugger: (asin, siteCode, theme) => ipcRenderer.invoke('OPEN_SELECTOR_DEBUGGER', { asin, siteCode, theme }),
-  getSelectorCaptures: () => ipcRenderer.invoke('GET_SELECTOR_CAPTURES')
+  getSelectorCaptures: () => ipcRenderer.invoke('GET_SELECTOR_CAPTURES'),
+
+  // 自动更新
+  startUpdateDownload: () => ipcRenderer.invoke('START_DOWNLOAD'),
+  skipUpdateVersion: (version) => ipcRenderer.invoke('SKIP_UPDATE_VERSION', version),
+  onUpdateAvailable: (cb) => updateCallbacks.available.push(cb),
+  onUpdateProgress: (cb) => updateCallbacks.progress.push(cb),
+  onUpdateDownloaded: (cb) => updateCallbacks.downloaded.push(cb),
 });
