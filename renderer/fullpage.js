@@ -2154,6 +2154,12 @@ function applyTheme(theme) {
     pendingVersion = null;
   });
 
+  // --- 下载出错（解除进度弹框卡死）---
+  window.electronAPI.onUpdateError(() => {
+    document.getElementById('updateProgressOverlay').style.display = 'none';
+    document.getElementById('updateAvailableOverlay').style.display = 'none';
+  });
+
   // --- 下载进度 ---
   window.electronAPI.onUpdateProgress(({ percent }) => {
     document.getElementById('updateProgressFill').style.width = percent + '%';
@@ -2175,7 +2181,7 @@ function applyTheme(theme) {
     if (!currentVersion || lastVersion === currentVersion) return;
 
     // 版本已变，清除记录，展示 changelog
-    window.electronAPI.storage.set('lastVersion', null);
+    window.electronAPI.storage.remove('lastVersion');
 
     const owner = 'hzxuncle';
     const repo = 'amazon-patrol-electron';

@@ -203,6 +203,9 @@ function initAutoUpdater() {
 
   autoUpdater.on('error', (err) => {
     console.error('[Updater] 检查更新失败:', err.message);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('UPDATE_ERROR', { message: err.message });
+    }
   });
 
   setTimeout(() => {

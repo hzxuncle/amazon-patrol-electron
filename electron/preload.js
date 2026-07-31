@@ -23,7 +23,7 @@ ipcRenderer.on('PATROL_LOG', (e, entry) => {
   logCallbacks.forEach(cb => cb(entry));
 });
 
-const updateCallbacks = { available: [], progress: [], downloaded: [] };
+const updateCallbacks = { available: [], progress: [], downloaded: [], error: [] };
 
 ipcRenderer.on('UPDATE_AVAILABLE', (e, data) => {
   updateCallbacks.available.forEach(cb => cb(data));
@@ -33,6 +33,9 @@ ipcRenderer.on('UPDATE_PROGRESS', (e, data) => {
 });
 ipcRenderer.on('UPDATE_DOWNLOADED', (e, data) => {
   updateCallbacks.downloaded.forEach(cb => cb(data));
+});
+ipcRenderer.on('UPDATE_ERROR', (e, data) => {
+  updateCallbacks.error.forEach(cb => cb(data));
 });
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -83,4 +86,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateAvailable: (cb) => updateCallbacks.available.push(cb),
   onUpdateProgress: (cb) => updateCallbacks.progress.push(cb),
   onUpdateDownloaded: (cb) => updateCallbacks.downloaded.push(cb),
+  onUpdateError: (cb) => updateCallbacks.error.push(cb),
 });
