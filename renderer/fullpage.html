@@ -624,7 +624,7 @@
       </div>
       <div class="about-body">
         <p style="margin:0 0 8px;font-size:15px;font-weight:600">亚马逊监控助手 <span id="updateVersion"></span> 已发布</p>
-        <pre id="updateNotes" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:10px 12px;font-size:13px;white-space:pre-wrap;max-height:240px;overflow-y:auto;margin:0 0 16px"></pre>
+        <div id="updateNotes" style="font-size:13px;max-height:240px;overflow-y:auto;margin:0 0 16px;line-height:1.7"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button class="btn-secondary" id="btnUpdateSkip">暂不更新</button>
           <button class="btn-primary" id="btnUpdateNow">立即更新</button>
@@ -651,14 +651,14 @@
 
   <!-- 安装后更新说明弹框 -->
   <div class="product-info-overlay" id="updateChangelogOverlay" style="display:none">
-    <div class="about-dialog" style="max-width:480px">
+    <div class="about-dialog" style="max-width:460px">
       <div class="product-info-modal-header">
-        <span>更新完成</span>
+        <span></span>
         <button class="product-info-modal-close" id="btnChangelogClose">✕</button>
       </div>
-      <div class="about-body">
-        <p style="margin:0 0 8px;font-size:15px;font-weight:600">已更新至 <span id="changelogVersion"></span></p>
-        <pre id="changelogNotes" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:10px 12px;font-size:13px;white-space:pre-wrap;max-height:300px;overflow-y:auto;margin:0"></pre>
+      <div class="about-body" style="padding:8px 24px 28px">
+        <p style="margin:0 0 16px;font-size:18px;font-weight:600">亚马逊监控助手 <span id="changelogVersion"></span></p>
+        <div id="changelogNotes" style="font-size:13px;max-height:320px;overflow-y:auto;line-height:1.8;color:var(--text-primary,#333)"></div>
       </div>
     </div>
   </div>

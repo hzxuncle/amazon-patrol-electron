@@ -2129,14 +2129,30 @@ function applyTheme(theme) {
 
   let pendingVersion = null;
 
+  function renderMarkdown(md) {
+    if (!md) return '<p style="color:var(--text-secondary,#999)">暂无更新说明</p>';
+    const escaped = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped.split('\n').map(line => {
+      if (/^#{1,3}\s/.test(line)) {
+        const text = line.replace(/^#+\s/, '');
+        return `<p style="font-weight:600;margin:10px 0 4px">${text}</p>`;
+      }
+      if (/^[-*]\s/.test(line)) {
+        const text = line.replace(/^[-*]\s/, '');
+        return `<p style="margin:3px 0;padding-left:12px">· ${text}</p>`;
+      }
+      if (line.trim() === '') return '';
+      return `<p style="margin:3px 0">${line}</p>`;
+    }).join('');
+  }
+
   // --- 发现新版本弹框 ---
   window.electronAPI.onUpdateAvailable(({ version, releaseNotes, isMandatory }) => {
     pendingVersion = version;
     const overlay = document.getElementById('updateAvailableOverlay');
     document.getElementById('updateVersion').textContent = 'v' + version;
-    // 去掉 [强制更新] 标记再展示
     const displayNotes = releaseNotes.replace(/^\[强制更新\]\s*/i, '').trim();
-    document.getElementById('updateNotes').textContent = displayNotes || '暂无更新说明';
+    document.getElementById('updateNotes').innerHTML = renderMarkdown(displayNotes);
     const skipBtn = document.getElementById('btnUpdateSkip');
     skipBtn.style.display = isMandatory ? 'none' : '';
     overlay.style.display = 'flex';
@@ -2190,7 +2206,7 @@ function applyTheme(theme) {
       .then(data => {
         const notes = data && data.body ? data.body.replace(/^\[强制更新\]\s*/i, '').trim() : '';
         document.getElementById('changelogVersion').textContent = 'v' + currentVersion;
-        document.getElementById('changelogNotes').textContent = notes || '暂无更新说明';
+        document.getElementById('changelogNotes').innerHTML = renderMarkdown(notes);
         document.getElementById('updateChangelogOverlay').style.display = 'flex';
       })
       .catch(() => {});

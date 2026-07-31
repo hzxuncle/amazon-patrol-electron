@@ -10,6 +10,7 @@ const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
 let tray = null;
+let isQuitting = false;
 
 // ========== 主窗口 ==========
 function createWindow() {
@@ -34,8 +35,9 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
-  // 关闭时隐藏到托盘，不退出
+  // 关闭时隐藏到托盘，不退出（安装更新时允许真正退出）
   mainWindow.on('close', (e) => {
+    if (isQuitting) return;
     e.preventDefault();
     mainWindow.hide();
   });
@@ -198,7 +200,7 @@ function initAutoUpdater() {
       mainWindow.webContents.send('UPDATE_DOWNLOADED', {});
     }
     // 短暂延迟后退出安装（给渲染进程时间关闭进度框）
-    setTimeout(() => autoUpdater.quitAndInstall(false, true), 1500);
+    setTimeout(() => { isQuitting = true; autoUpdater.quitAndInstall(true, true); }, 1500);
   });
 
   autoUpdater.on('error', (err) => {
