@@ -619,142 +619,141 @@
   }
 
   function scanRegion(root) {
-    const lines = [];
+    const header = [];
     const rootSel = buildShortSelector(root);
-    lines.push(`容器: ${rootSel}  (${root.tagName.toLowerCase()}#${root.id || '—'}  class="${[...root.classList].slice(0,3).join(' ')}")`);
-    lines.push(`頁面: ${location.hostname}${location.pathname.slice(0, 60)}`);
-    lines.push('');
+    header.push(`容器: ${rootSel}  (${root.tagName.toLowerCase()}#${root.id || '—'}  class="${[...root.classList].filter(c => c !== '__sd_captured__').slice(0,3).join(' ')}")`);
+    header.push(`頁面: ${location.hostname}${location.pathname.slice(0, 60)}`);
+    header.push('');
 
-    // 判斷節點是否是噪音
-    function isNoise(el) {
-      const tag = el.tagName.toLowerCase();
-      if (['script','style','noscript','svg','path'].includes(tag)) return true;
-      // 隱藏元素（Amazon 預載模板）
-      if (el.classList.contains('aok-hidden') || el.classList.contains('a-hidden')) return true;
-      const hasSrc = el.getAttribute('src') || el.getAttribute('href') || el.getAttribute('data-video-url');
-      if (hasSrc) return false;
-      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
-      return !text;
+    const SKIP_TAGS = new Set(['script','style','noscript','svg','path','head','meta','link']);
+
+    // 唯一技術判斷：CSS display:none 意味著不可見，跳過整個子樹
+    function isInvisible(el) {
+      return window.getComputedStyle(el).display === 'none';
     }
 
-    // 判斷值是否是 CSS/JS 噪音
-    function isJunkValue(val) {
-      if (!val) return true;
-      const t = val.trimStart();
-      return t.startsWith('function') ||
-             t.startsWith('if(window') ||
-             t.startsWith('P.when') ||
-             t.startsWith('(function') ||
-             t.match(/^[\.\#][a-zA-Z][\w-]*\s*\{/) ||  // CSS 規則
-             t.startsWith('{') ||                        // JSON/JS 對象
-             t.startsWith('/*');
+    function isSkip(el) {
+      return SKIP_TAGS.has(el.tagName.toLowerCase());
     }
 
-    // 是否是葉節點（沒有有意義的子元素）
-    function isLeaf(el) {
-      return [...el.children].every(c => isNoise(c));
+    // 動態 id：純大寫字母數字且長度 ≥ 7（評論 id、卡片實例 id 等）
+    function isDynamicId(id) {
+      return !id || /^[A-Z][A-Z0-9]{6,}$/.test(id) || id.startsWith('a-autoid') || id.startsWith('CardInstance');
     }
 
-    // 取葉節點的值
-    function getLeafValue(el) {
-      const src = el.getAttribute('src') || '';
-      const href = el.getAttribute('href') || '';
+    // 葉節點的值：優先媒體屬性，再取可見文字
+    function leafValue(el) {
       const videoSrc = el.getAttribute('data-video-url') || '';
       if (videoSrc) return `[video] ${videoSrc}`;
+      const src = el.getAttribute('src') || '';
       if (src && el.tagName === 'IMG') return `[img] ${src}`;
-      if (href) return `[link] ${href}`;
+      const href = el.getAttribute('href') || '';
+      if (href && href !== '#' && !href.startsWith('javascript:')) return `[link] ${href}`;
+      // 優先取 .a-offscreen（Amazon 無障礙文字，最乾淨）
       const offscreen = el.querySelector('.a-offscreen');
-      if (offscreen) return offscreen.textContent.replace(/\s+/g, ' ').trim();
-      return (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (offscreen) return offscreen.textContent.replace(/\s+/g,' ').trim();
+      return el.textContent.replace(/\s+/g,' ').trim();
     }
 
-    // 判斷 id 是否是動態 id（如評論 id R1QA5BXQ8QMDME）
-    function isDynamicId(id) {
-      return /^[A-Z][A-Z0-9]{6,}$/.test(id);
-    }
-
-    // 生成簡短選擇器：找最近的穩定錨點（data-hook 或穩定 id），只寫錨點到葉的短路徑
-    function relSel(el) {
-      const parts = [];
+    // 簡短選擇器：從葉往上，找到穩定錨點即停，保留錨點 + 最多 2 層後代
+    function shortSel(el) {
+      const tail = [];   // 錨點之後的部分（最多 2 層）
       let cur = el;
       while (cur && cur !== root) {
-        const tag = cur.tagName.toLowerCase();
         const hook = cur.getAttribute('data-hook');
-        const hasStableId = cur.id && !isDynamicId(cur.id);
-
+        const stableId = cur.id && !isDynamicId(cur.id);
         if (hook) {
-          parts.unshift(`[data-hook="${hook}"]`);
-          break; // 找到穩定錨點，停止往上
-        } else if (hasStableId) {
-          parts.unshift(`#${cur.id}`);
-          break;
-        } else {
+          const anchor = `[data-hook="${hook}"]`;
+          return tail.length ? `${anchor} > ${tail.join(' > ')}` : anchor;
+        }
+        if (stableId) {
+          const anchor = `#${cur.id}`;
+          return tail.length ? `${anchor} > ${tail.join(' > ')}` : anchor;
+        }
+        // 只保留最後 2 層 tail，避免路徑過長
+        if (tail.length < 2) {
+          const tag = cur.tagName.toLowerCase();
           const cls = [...cur.classList].filter(c =>
-            !c.match(/^(a-size|a-color|a-spacing|a-section|a-row|a-col|a-padding|a-margin|a-text|a-align|a-float|a-expander|a-truncate|a-hidden|a-visible|__sd_)/)
-          ).slice(0, 2);
-          parts.unshift(cls.length ? tag + cls.map(c => `.${c}`).join('') : tag);
+            c.length > 2 && !c.startsWith('a-') && !c.startsWith('aok-') && !c.startsWith('__sd_')
+          ).slice(0, 1);
+          tail.unshift(cls.length ? `${tag}.${cls[0]}` : tag);
         }
         cur = cur.parentElement;
       }
-      return parts.join(' > ');
+      return tail.join(' > ') || buildShortSelector(el);
     }
 
-    // 識別重複兄弟組
+    // 分組鍵：穩定 id 的元素永遠唯一；其餘按 tag + hook + 前兩個非 Amazon 工具 class 分組
     function groupKey(el) {
-      // 有 id 的元素頁面唯一，永不分組
-      if (el.id && !isDynamicId(el.id)) return `__unique_${el.id}`;
+      if (el.id && !isDynamicId(el.id)) return `__unique__${el.id}`;
       const tag = el.tagName.toLowerCase();
-      const cls = [...el.classList].filter(c => !c.match(/^__sd_/)).slice(0, 3).join('.');
       const hook = el.getAttribute('data-hook') || '';
-      return `${tag}.${cls}[${hook}]`;
+      const cls = [...el.classList].filter(c =>
+        !c.startsWith('a-') && !c.startsWith('aok-') && !c.startsWith('__sd_')
+      ).slice(0, 2).join('.');
+      return `${tag}[${hook}].${cls}`;
     }
 
+    // walk 返回行數組；容器先收集子樹，非空才加自身標題行
     function walk(el, depth) {
-      if (depth > 8) return;
-      const indent = '  '.repeat(depth);
-      const children = [...el.children].filter(c => !isNoise(c));
+      if (depth > 8 || isSkip(el) || isInvisible(el)) return [];
 
-      // 把子元素按 groupKey 分組，找出重複的
-      const groups = new Map();
-      for (const child of children) {
-        const key = groupKey(child);
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(child);
+      const children = [...el.children].filter(c => !isSkip(c));
+      if (children.length === 0) {
+        // 真葉節點
+        const val = leafValue(el);
+        if (!val || val.length < 2) return [];
+        const display = val.length > 150 ? val.slice(0, 150) + '…' : val;
+        return [`${'  '.repeat(depth)}${shortSel(el)}  →  "${display}"`];
       }
 
-      const seen = new Set();
+      // 按 groupKey 分組
+      const groups = new Map();
       for (const child of children) {
-        const key = groupKey(child);
-        const group = groups.get(key);
+        const k = groupKey(child);
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(child);
+      }
+
+      const output = [];
+      const seen = new Set();
+      const indent = '  '.repeat(depth);
+
+      for (const child of children) {
+        if (isInvisible(child)) continue;
+        const k = groupKey(child);
+        const group = groups.get(k);
 
         if (group.length > 1) {
-          // 重複組：只展開第一個作範例
-          if (!seen.has(key)) {
-            seen.add(key);
-            lines.push(`${indent}── 重複組 [${group.length} 個]  ${buildShortSelector(child)}`);
-            lines.push(`${indent}   範例 (第 1 個):`);
-            walk(child, depth + 2);
+          if (!seen.has(k)) {
+            seen.add(k);
+            const childLines = walk(child, depth + 2);
+            if (childLines.length > 0) {
+              output.push(`${indent}── 重複組 [${group.length} 個]  ${buildShortSelector(child)}`);
+              output.push(`${indent}   範例:`);
+              output.push(...childLines);
+            }
           }
         } else {
-          // 唯一節點
-          if (isLeaf(child)) {
-            const val = getLeafValue(child);
-            if (val && val.length > 0 && !isJunkValue(val)) {
-              const display = val.length > 150 ? val.slice(0, 150) + '…' : val;
-              lines.push(`${indent}${relSel(child)}  →  "${display}"`);
+          const childLines = walk(child, depth + 1);
+          if (childLines.length > 0) {
+            // 如果子樹只有一行且就是葉值，直接輸出，不加容器標題
+            if (childLines.length === 1 && childLines[0].includes('  →  ')) {
+              output.push(...childLines);
+            } else {
+              output.push(`${indent}${shortSel(child)}`);
+              output.push(...childLines);
             }
-          } else {
-            lines.push(`${indent}${relSel(child)}`);
-            walk(child, depth + 1);
           }
         }
       }
+      return output;
     }
 
-    walk(root, 0);
-    lines.push('');
-    lines.push(`共掃描: ${root.querySelectorAll('*').length} 個元素`);
-    return lines.join('\n');
+    const bodyLines = walk(root, 0);
+    bodyLines.push('');
+    bodyLines.push(`共掃描: ${root.querySelectorAll('*').length} 個元素`);
+    return [...header, ...bodyLines].join('\n');
   }
 
   function renderScanTab(report) {
