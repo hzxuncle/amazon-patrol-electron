@@ -10,8 +10,10 @@
 
   // ── 状态 ──────────────────────────────────────────────────────
   let pickMode = false;
+  let scanMode = false;
   let hoveredEl = null;
   const captures = [];   // { selector, candidates, textContent, innerText, offscreen, ts }
+  let scanReport = '';   // 最近一次區域掃描的文字報告
 
   // ── 生成候选选择器（按稳定性排序）──────────────────────────────
   function buildCandidates(el) {
@@ -330,20 +332,27 @@
         <span class="title">🔍 选择器调试</span>
         <div class="controls">
           <button class="sd-btn sd-btn-pick" id="__sd_pick__">拾取</button>
+          <button class="sd-btn sd-btn-pick" id="__sd_scan__" style="background:#7c3aed">掃描區域</button>
           <button class="sd-btn sd-btn-ghost" id="__sd_clear__">清空</button>
           <button class="sd-btn sd-btn-ghost" id="__sd_collapse__" title="收起 (ESC)">◀</button>
         </div>
       </div>
       <div id="__sd_tabs__">
         <div class="sd-tab active" data-tab="capture">拾取 <span id="__sd_capture_count__">0</span></div>
-        <div class="sd-tab" data-tab="test">实时测试</div>
-        <div class="sd-tab" data-tab="history">历史 <span id="__sd_history_count__">0</span></div>
+        <div class="sd-tab" data-tab="scan">掃描</div>
+        <div class="sd-tab" data-tab="test">測試</div>
+        <div class="sd-tab" data-tab="history">歷史 <span id="__sd_history_count__">0</span></div>
       </div>
       <div class="sd-tab-panel active" id="__sd_panel_capture__">
         <div id="__sd_capture_list__">
           <div style="color:#565f89;text-align:center;padding:32px 0;font-size:11px;">
             点击「拾取」按钮后<br>在页面上点击任意元素
           </div>
+        </div>
+      </div>
+      <div class="sd-tab-panel" id="__sd_panel_scan__">
+        <div style="color:#565f89;text-align:center;padding:32px 0;font-size:11px;">
+          點擊「掃描區域」按鈕後<br>在頁面上點選任意容器元素
         </div>
       </div>
       <div class="sd-tab-panel" id="__sd_panel_test__">
@@ -587,6 +596,93 @@
     }
   }
 
+  // ── 區域掃描 ─────────────────────────────────────────────────
+  function buildShortSelector(el) {
+    if (el.id) return `#${el.id}`;
+    const tag = el.tagName.toLowerCase();
+    const cls = [...el.classList].filter(c =>
+      !c.match(/^(a-size|a-color|a-spacing|a-section|a-row|a-col|a-padding|a-margin|a-text|a-align|a-float|a-expander|a-truncate|a-hidden|a-visible|sg-|sc-)/)
+    ).slice(0, 2).map(c => `.${c}`).join('');
+    return tag + cls;
+  }
+
+  function extractNodeValue(el) {
+    const src = el.getAttribute('src') || el.querySelector('img')?.getAttribute('src') || '';
+    const href = el.getAttribute('href') || '';
+    const videoSrc = el.getAttribute('data-video-url') || el.querySelector('video')?.getAttribute('src') || '';
+    if (src) return `[img] ${src}`;
+    if (videoSrc) return `[video] ${videoSrc}`;
+    if (href) return `[link] ${href}`;
+    const offscreen = el.querySelector('.a-offscreen');
+    if (offscreen) return offscreen.textContent.replace(/\s+/g, ' ').trim();
+    return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function scanRegion(root) {
+    const lines = [];
+    const rootSel = buildShortSelector(root);
+    lines.push(`容器: ${rootSel}  (${root.tagName.toLowerCase()}#${root.id || '—'}  class="${[...root.classList].slice(0,3).join(' ')}")`);
+    lines.push(`頁面: ${location.hostname}${location.pathname.slice(0, 60)}`);
+    lines.push('');
+
+    // 找直接有意義的子節點（帶文本或媒體）
+    function walk(el, depth) {
+      if (depth > 6) return;
+      const children = [...el.children];
+      for (const child of children) {
+        const val = extractNodeValue(child);
+        const childSel = buildShortSelector(child);
+        const indent = '  '.repeat(depth);
+        const hasContent = val && val.length > 1;
+        const childCount = child.children.length;
+
+        if (hasContent) {
+          const display = val.length > 120 ? val.slice(0, 120) + '…' : val;
+          lines.push(`${indent}${childSel}  →  "${display}"`);
+        } else if (childCount > 0) {
+          lines.push(`${indent}${childSel}  [${childCount} 子元素]`);
+        }
+
+        // 只有無內容的容器才繼續遞歸
+        if (!hasContent && childCount > 0) {
+          walk(child, depth + 1);
+        }
+      }
+    }
+
+    walk(root, 1);
+    lines.push('');
+    lines.push(`共掃描: ${root.querySelectorAll('*').length} 個元素`);
+    return lines.join('\n');
+  }
+
+  function renderScanTab(report) {
+    const container = document.getElementById('__sd_panel_scan__');
+    if (!container) return;
+    const v = getThemeVars();
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="color:${v.textMuted};font-size:11px">點擊容器元素後生成報告</span>
+        <button class="sd-copy-btn" id="__sd_scan_copy__" style="font-size:11px;padding:3px 10px">複製全部</button>
+      </div>
+      <pre id="__sd_scan_pre__" style="
+        background:${v.bgInput};border:1px solid ${v.border};border-radius:4px;
+        padding:8px;font-size:10px;line-height:1.6;white-space:pre-wrap;word-break:break-all;
+        color:${v.valueClr};margin:0;max-height:calc(100vh - 160px);overflow-y:auto;
+      ">${report ? escHtml(report) : '尚無掃描結果'}</pre>
+    `;
+    const copyBtn = document.getElementById('__sd_scan_copy__');
+    if (copyBtn && report) {
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(report).then(() => {
+          copyBtn.textContent = '已複製 ✓';
+          copyBtn.classList.add('copied');
+          setTimeout(() => { copyBtn.textContent = '複製全部'; copyBtn.classList.remove('copied'); }, 2000);
+        });
+      });
+    }
+  }
+
   // ── 高亮辅助 ──────────────────────────────────────────────────
   function clearHighlights(cls) {
     document.querySelectorAll(`.${cls}`).forEach(el => el.classList.remove(cls));
@@ -595,7 +691,7 @@
   // ── 拾取模式事件 ──────────────────────────────────────────────
   function onMouseOver(e) {
     const panel = document.getElementById('__sd_panel__');
-    if (!pickMode || !e.target || panel?.contains(e.target)) return;
+    if ((!pickMode && !scanMode) || !e.target || panel?.contains(e.target)) return;
     if (hoveredEl) hoveredEl.classList.remove('__sd_highlight__');
     hoveredEl = e.target;
     hoveredEl.classList.add('__sd_highlight__');
@@ -603,13 +699,31 @@
 
   function onClick(e) {
     const panel = document.getElementById('__sd_panel__');
-    if (!pickMode || panel?.contains(e.target)) return;
+    if ((!pickMode && !scanMode) || panel?.contains(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
 
     const el = e.target;
     if (hoveredEl) hoveredEl.classList.remove('__sd_highlight__');
 
+    if (scanMode) {
+      // 區域掃描模式：遞歸輸出容器下所有內容
+      el.classList.add('__sd_captured__');
+      setTimeout(() => el.classList.remove('__sd_captured__'), 2000);
+
+      scanReport = scanRegion(el);
+      renderScanTab(scanReport);
+      switchTab('scan');
+
+      // 掃描完自動退出掃描模式
+      scanMode = false;
+      const btn = document.getElementById('__sd_scan__');
+      if (btn) { btn.textContent = '掃描區域'; btn.classList.remove('active'); }
+      document.body.style.cursor = '';
+      return;
+    }
+
+    // 普通拾取模式
     const candidates = buildCandidates(el);
     const values = extractValues(el);
     const ts = new Date().toLocaleTimeString('zh-CN', { hour12: false });
@@ -618,17 +732,13 @@
     const capture = { candidates, values, ts, el };
     captures.unshift(capture);
 
-    // 历史记录
     history.push({ selector: topSel, value: values.offscreen || values.innerText || values.textContent, ts });
 
-    // 捕获后给元素加绿色标记
     el.classList.add('__sd_captured__');
     setTimeout(() => el.classList.remove('__sd_captured__'), 2000);
 
     renderCaptures();
     renderHistory();
-
-    // 切换到拾取 Tab
     switchTab('capture');
   }
 
@@ -672,6 +782,25 @@
       btn.classList.toggle('active', pickMode);
       document.body.style.cursor = pickMode ? 'crosshair' : '';
       if (!pickMode && hoveredEl) {
+        hoveredEl.classList.remove('__sd_highlight__');
+        hoveredEl = null;
+      }
+    });
+
+    // 掃描區域按鈕
+    document.getElementById('__sd_scan__').addEventListener('click', () => {
+      // 互斥：關閉拾取模式
+      if (pickMode) {
+        pickMode = false;
+        const pickBtn = document.getElementById('__sd_pick__');
+        if (pickBtn) { pickBtn.textContent = '拾取'; pickBtn.classList.remove('active'); }
+      }
+      scanMode = !scanMode;
+      const btn = document.getElementById('__sd_scan__');
+      btn.textContent = scanMode ? '取消掃描' : '掃描區域';
+      btn.classList.toggle('active', scanMode);
+      document.body.style.cursor = scanMode ? 'cell' : '';
+      if (!scanMode && hoveredEl) {
         hoveredEl.classList.remove('__sd_highlight__');
         hoveredEl = null;
       }
