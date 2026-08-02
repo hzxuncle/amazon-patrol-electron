@@ -54,6 +54,7 @@
       "sign": null
     },
     "mac": {
+      "artifactName": "amazon-patrol-${version}-${arch}-mac.${ext}",
       "target": [
         { "target": "zip", "arch": ["x64", "arm64"] }
       ],
