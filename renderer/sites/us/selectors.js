@@ -9,5 +9,9 @@ const US_SELECTORS = {
   title: ['#productTitle'],
   dealBadge: ['.detailpage-dealBadge-countdown-timer', '#dealBadgeSupportingText span'],
   acBadge: ['.mvt-ac-badge-rectangle', '#acBadge_feature_div span.a-size-small'],
+  coupon: [
+    '[id^="greenBadgepct"]',    // 百分比優惠，如 "Save 5%"
+    '[id^="greenBadgedollar"]', // 美元金額優惠，如 "Save $2.00"
+  ],
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = US_SELECTORS;

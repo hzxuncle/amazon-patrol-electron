@@ -64,6 +64,32 @@
     const tagCls = el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map(c => `.${CSS.escape(c)}`).join('');
     push('标签+类', tagCls, 2);
 
+    // ⭐⭐⭐⭐ 整組兄弟（點中一個，識別同類重複結構）
+    const parent = el.parentElement;
+    if (parent) {
+      const tag = el.tagName.toLowerCase();
+      const elCls = [...el.classList].filter(c => c.length > 0);
+      const siblings = [...parent.children].filter(c =>
+        c !== el && c.tagName === el.tagName &&
+        elCls.some(cls => c.classList.contains(cls))
+      );
+      if (siblings.length > 0) {
+        const allSiblings = [el, ...siblings];
+        const commonCls = elCls.filter(cls =>
+          allSiblings.every(s => s.classList.contains(cls)) &&
+          !cls.match(/^(a-size|a-color|a-spacing|a-section|a-row|a-col|a-padding|a-margin|a-text|a-align|a-float|a-expander|a-truncate|a-hidden|a-visible)/)
+        );
+        if (commonCls.length > 0) {
+          const groupSel = parent.id
+            ? `#${CSS.escape(parent.id)} ${tag}.${commonCls.slice(0, 2).map(c => CSS.escape(c)).join('.')}`
+            : `${tag}.${commonCls.slice(0, 2).map(c => CSS.escape(c)).join('.')}`;
+          push('整組兄弟', groupSel, 4);
+        } else if (parent.id) {
+          push('整組兄弟', `#${CSS.escape(parent.id)} > ${tag}`, 3);
+        }
+      }
+    }
+
     // ⭐ CSS 路径（兜底，始终唯一但不稳定）
     push('CSS路径', buildCssPath(el), 1);
 
@@ -101,12 +127,27 @@
 
   // ── 提取值 ────────────────────────────────────────────────────
   function extractValues(el) {
-    const textContent = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-    const innerText = (el.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const textContent = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    const innerText = (el.innerText || '').replace(/\s+/g, ' ').trim();
     const offscreenEl = el.classList.contains('a-offscreen') ? el : el.querySelector('.a-offscreen');
     const offscreen = offscreenEl ? (offscreenEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
     const attrVal = el.value || el.getAttribute('data-value') || el.getAttribute('content') || '';
-    return { textContent, innerText, offscreen, attrVal };
+
+    // 圖片：優先取元素自身，再找後代 img
+    const imgEl = (el.tagName === 'IMG') ? el : el.querySelector('img');
+    const src = el.getAttribute('src') || imgEl?.getAttribute('src') || imgEl?.currentSrc || '';
+    const srcset = el.getAttribute('srcset') || imgEl?.getAttribute('srcset') || '';
+    const dataSrc = el.getAttribute('data-src') || el.getAttribute('data-lazy-src') || imgEl?.getAttribute('data-src') || '';
+
+    // 視頻：優先取元素自身，再找後代 video/source
+    const videoEl = (el.tagName === 'VIDEO') ? el : el.querySelector('video');
+    const sourceEl = el.querySelector('source');
+    const videoSrc = el.getAttribute('data-video-url') || videoEl?.getAttribute('src') || sourceEl?.getAttribute('src') || '';
+
+    // 鏈接
+    const href = el.getAttribute('href') || el.closest('a')?.getAttribute('href') || '';
+
+    return { textContent, innerText, offscreen, attrVal, src, srcset, dataSrc, videoSrc, href };
   }
 
   // ── 高亮样式 ──────────────────────────────────────────────────
@@ -367,8 +408,13 @@
             <div class="sd-section-label" style="margin-top:10px">提取值</div>
             ${renderValueRow('textContent', c.values.textContent)}
             ${renderValueRow('innerText', c.values.innerText)}
-            ${renderValueRow('a-offscreen', c.values.offscreen)}
-            ${renderValueRow('attr/value', c.values.attrVal)}
+            ${c.values.offscreen ? renderValueRow('a-offscreen', c.values.offscreen) : ''}
+            ${c.values.attrVal ? renderValueRow('attr/value', c.values.attrVal) : ''}
+            ${c.values.src ? renderValueRow('src', c.values.src) : ''}
+            ${c.values.dataSrc ? renderValueRow('data-src', c.values.dataSrc) : ''}
+            ${c.values.srcset ? renderValueRow('srcset', c.values.srcset) : ''}
+            ${c.values.videoSrc ? renderValueRow('video-src', c.values.videoSrc) : ''}
+            ${c.values.href ? renderValueRow('href', c.values.href) : ''}
           </div>
         </div>
       `;
@@ -425,16 +471,47 @@
     if (firstBody) firstBody.classList.add('open');
   }
 
+  const PREVIEW_LEN = 80;
+  let _expandCounter = 0;
+
   function renderValueRow(label, val) {
-    const display = val ? escHtml(val) : '(空)';
-    const cls = val ? '' : 'empty';
-    const copyBtn = val ? `<button class="sd-copy-btn" data-copy="${escHtml(val)}" style="margin-left:4px">复制</button>` : '';
+    if (!val) return `
+      <div class="sd-value-row">
+        <span class="sd-value-label">${label}</span>
+        <span class="sd-value empty">(空)</span>
+      </div>`;
+
+    const copyBtn = `<button class="sd-copy-btn" data-copy="${escHtml(val)}" style="margin-left:4px">复制</button>`;
+
+    if (val.length <= PREVIEW_LEN) {
+      return `
+        <div class="sd-value-row">
+          <span class="sd-value-label">${label}</span>
+          <span class="sd-value">${escHtml(val)}${copyBtn}</span>
+        </div>`;
+    }
+
+    const id = `__sd_expand_${_expandCounter++}__`;
+    const preview = escHtml(val.slice(0, PREVIEW_LEN));
+    const full = escHtml(val);
     return `
       <div class="sd-value-row">
         <span class="sd-value-label">${label}</span>
-        <span class="sd-value ${cls}">${display}${copyBtn}</span>
-      </div>
-    `;
+        <span class="sd-value">
+          <span id="${id}_short">${preview}<span style="color:#9a9eb8">…</span>
+            <button class="sd-copy-btn" onclick="
+              document.getElementById('${id}_short').style.display='none';
+              document.getElementById('${id}_full').style.display='inline';
+            " style="margin-left:4px">展開</button>
+          </span>
+          <span id="${id}_full" style="display:none">${full}${copyBtn}
+            <button class="sd-copy-btn" onclick="
+              document.getElementById('${id}_short').style.display='inline';
+              document.getElementById('${id}_full').style.display='none';
+            " style="margin-left:4px">收起</button>
+          </span>
+        </span>
+      </div>`;
   }
 
   // ── 历史 Tab ──────────────────────────────────────────────────
