@@ -653,24 +653,32 @@
       return (el.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
-    // 生成相對於 root 的選擇器
+    // 判斷 id 是否是動態 id（如評論 id R1QA5BXQ8QMDME）
+    function isDynamicId(id) {
+      return /^[A-Z][A-Z0-9]{6,}$/.test(id);
+    }
+
+    // 生成簡短選擇器：找最近的穩定錨點（data-hook 或穩定 id），只寫錨點到葉的短路徑
     function relSel(el) {
       const parts = [];
       let cur = el;
       while (cur && cur !== root) {
-        let seg = cur.tagName.toLowerCase();
-        if (cur.id) seg = `#${cur.id}`;
-        else {
-          const dataHook = cur.getAttribute('data-hook');
-          if (dataHook) seg = `[data-hook="${dataHook}"]`;
-          else {
-            const cls = [...cur.classList].filter(c =>
-              !c.match(/^(a-size|a-color|a-spacing|a-section|a-row|a-col|a-padding|a-margin|a-text|a-align|a-float|a-expander|a-truncate|a-hidden|a-visible|__sd_)/)
-            ).slice(0, 2);
-            if (cls.length) seg = cur.tagName.toLowerCase() + cls.map(c => `.${c}`).join('');
-          }
+        const tag = cur.tagName.toLowerCase();
+        const hook = cur.getAttribute('data-hook');
+        const hasStableId = cur.id && !isDynamicId(cur.id);
+
+        if (hook) {
+          parts.unshift(`[data-hook="${hook}"]`);
+          break; // 找到穩定錨點，停止往上
+        } else if (hasStableId) {
+          parts.unshift(`#${cur.id}`);
+          break;
+        } else {
+          const cls = [...cur.classList].filter(c =>
+            !c.match(/^(a-size|a-color|a-spacing|a-section|a-row|a-col|a-padding|a-margin|a-text|a-align|a-float|a-expander|a-truncate|a-hidden|a-visible|__sd_)/)
+          ).slice(0, 2);
+          parts.unshift(cls.length ? tag + cls.map(c => `.${c}`).join('') : tag);
         }
-        parts.unshift(seg);
         cur = cur.parentElement;
       }
       return parts.join(' > ');
