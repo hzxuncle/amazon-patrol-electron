@@ -625,14 +625,29 @@
     lines.push(`頁面: ${location.hostname}${location.pathname.slice(0, 60)}`);
     lines.push('');
 
-    // 判斷節點是否是噪音（用 textContent 不觸發重排）
+    // 判斷節點是否是噪音
     function isNoise(el) {
       const tag = el.tagName.toLowerCase();
       if (['script','style','noscript','svg','path'].includes(tag)) return true;
+      // 隱藏元素（Amazon 預載模板）
+      if (el.classList.contains('aok-hidden') || el.classList.contains('a-hidden')) return true;
       const hasSrc = el.getAttribute('src') || el.getAttribute('href') || el.getAttribute('data-video-url');
       if (hasSrc) return false;
       const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
       return !text;
+    }
+
+    // 判斷值是否是 CSS/JS 噪音
+    function isJunkValue(val) {
+      if (!val) return true;
+      const t = val.trimStart();
+      return t.startsWith('function') ||
+             t.startsWith('if(window') ||
+             t.startsWith('P.when') ||
+             t.startsWith('(function') ||
+             t.match(/^[\.\#][a-zA-Z][\w-]*\s*\{/) ||  // CSS 規則
+             t.startsWith('{') ||                        // JSON/JS 對象
+             t.startsWith('/*');
     }
 
     // 是否是葉節點（沒有有意義的子元素）
@@ -724,7 +739,7 @@
           // 唯一節點
           if (isLeaf(child)) {
             const val = getLeafValue(child);
-            if (val && val.length > 0) {
+            if (val && val.length > 0 && !isJunkValue(val)) {
               const display = val.length > 150 ? val.slice(0, 150) + '…' : val;
               lines.push(`${indent}${relSel(child)}  →  "${display}"`);
             }
