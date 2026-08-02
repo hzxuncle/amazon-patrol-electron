@@ -686,6 +686,8 @@
 
     // 識別重複兄弟組
     function groupKey(el) {
+      // 有 id 的元素頁面唯一，永不分組
+      if (el.id && !isDynamicId(el.id)) return `__unique_${el.id}`;
       const tag = el.tagName.toLowerCase();
       const cls = [...el.classList].filter(c => !c.match(/^__sd_/)).slice(0, 3).join('.');
       const hook = el.getAttribute('data-hook') || '';
