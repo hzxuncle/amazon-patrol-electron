@@ -625,32 +625,32 @@
     lines.push(`頁面: ${location.hostname}${location.pathname.slice(0, 60)}`);
     lines.push('');
 
-    // 判斷節點是否是噪音（不含任何有意義的文字或媒體）
+    // 判斷節點是否是噪音（用 textContent 不觸發重排）
     function isNoise(el) {
       const tag = el.tagName.toLowerCase();
       if (['script','style','noscript','svg','path'].includes(tag)) return true;
-      const text = (el.innerText || '').replace(/\s+/g, ' ').trim();
       const hasSrc = el.getAttribute('src') || el.getAttribute('href') || el.getAttribute('data-video-url');
-      return !text && !hasSrc;
+      if (hasSrc) return false;
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      return !text;
     }
 
     // 是否是葉節點（沒有有意義的子元素）
     function isLeaf(el) {
-      const meaningfulChildren = [...el.children].filter(c => !isNoise(c));
-      return meaningfulChildren.length === 0;
+      return [...el.children].every(c => isNoise(c));
     }
 
     // 取葉節點的值
     function getLeafValue(el) {
-      const src = el.getAttribute('src') || el.querySelector('img')?.getAttribute('src') || '';
+      const src = el.getAttribute('src') || '';
       const href = el.getAttribute('href') || '';
-      const videoSrc = el.getAttribute('data-video-url') || el.querySelector('video')?.getAttribute('src') || '';
+      const videoSrc = el.getAttribute('data-video-url') || '';
       if (videoSrc) return `[video] ${videoSrc}`;
       if (src && el.tagName === 'IMG') return `[img] ${src}`;
       if (href) return `[link] ${href}`;
       const offscreen = el.querySelector('.a-offscreen');
       if (offscreen) return offscreen.textContent.replace(/\s+/g, ' ').trim();
-      return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+      return (el.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
     // 生成相對於 root 的選擇器
