@@ -625,32 +625,108 @@
     lines.push(`頁面: ${location.hostname}${location.pathname.slice(0, 60)}`);
     lines.push('');
 
-    // 找直接有意義的子節點（帶文本或媒體）
-    function walk(el, depth) {
-      if (depth > 6) return;
-      const children = [...el.children];
-      for (const child of children) {
-        const val = extractNodeValue(child);
-        const childSel = buildShortSelector(child);
-        const indent = '  '.repeat(depth);
-        const hasContent = val && val.length > 1;
-        const childCount = child.children.length;
+    // 判斷節點是否是噪音（不含任何有意義的文字或媒體）
+    function isNoise(el) {
+      const tag = el.tagName.toLowerCase();
+      if (['script','style','noscript','svg','path'].includes(tag)) return true;
+      const text = (el.innerText || '').replace(/\s+/g, ' ').trim();
+      const hasSrc = el.getAttribute('src') || el.getAttribute('href') || el.getAttribute('data-video-url');
+      return !text && !hasSrc;
+    }
 
-        if (hasContent) {
-          const display = val.length > 120 ? val.slice(0, 120) + '…' : val;
-          lines.push(`${indent}${childSel}  →  "${display}"`);
-        } else if (childCount > 0) {
-          lines.push(`${indent}${childSel}  [${childCount} 子元素]`);
+    // 是否是葉節點（沒有有意義的子元素）
+    function isLeaf(el) {
+      const meaningfulChildren = [...el.children].filter(c => !isNoise(c));
+      return meaningfulChildren.length === 0;
+    }
+
+    // 取葉節點的值
+    function getLeafValue(el) {
+      const src = el.getAttribute('src') || el.querySelector('img')?.getAttribute('src') || '';
+      const href = el.getAttribute('href') || '';
+      const videoSrc = el.getAttribute('data-video-url') || el.querySelector('video')?.getAttribute('src') || '';
+      if (videoSrc) return `[video] ${videoSrc}`;
+      if (src && el.tagName === 'IMG') return `[img] ${src}`;
+      if (href) return `[link] ${href}`;
+      const offscreen = el.querySelector('.a-offscreen');
+      if (offscreen) return offscreen.textContent.replace(/\s+/g, ' ').trim();
+      return (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    // 生成相對於 root 的選擇器
+    function relSel(el) {
+      const parts = [];
+      let cur = el;
+      while (cur && cur !== root) {
+        let seg = cur.tagName.toLowerCase();
+        if (cur.id) seg = `#${cur.id}`;
+        else {
+          const dataHook = cur.getAttribute('data-hook');
+          if (dataHook) seg = `[data-hook="${dataHook}"]`;
+          else {
+            const cls = [...cur.classList].filter(c =>
+              !c.match(/^(a-size|a-color|a-spacing|a-section|a-row|a-col|a-padding|a-margin|a-text|a-align|a-float|a-expander|a-truncate|a-hidden|a-visible|__sd_)/)
+            ).slice(0, 2);
+            if (cls.length) seg = cur.tagName.toLowerCase() + cls.map(c => `.${c}`).join('');
+          }
         }
+        parts.unshift(seg);
+        cur = cur.parentElement;
+      }
+      return parts.join(' > ');
+    }
 
-        // 只有無內容的容器才繼續遞歸
-        if (!hasContent && childCount > 0) {
-          walk(child, depth + 1);
+    // 識別重複兄弟組
+    function groupKey(el) {
+      const tag = el.tagName.toLowerCase();
+      const cls = [...el.classList].filter(c => !c.match(/^__sd_/)).slice(0, 3).join('.');
+      const hook = el.getAttribute('data-hook') || '';
+      return `${tag}.${cls}[${hook}]`;
+    }
+
+    function walk(el, depth) {
+      if (depth > 8) return;
+      const indent = '  '.repeat(depth);
+      const children = [...el.children].filter(c => !isNoise(c));
+
+      // 把子元素按 groupKey 分組，找出重複的
+      const groups = new Map();
+      for (const child of children) {
+        const key = groupKey(child);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(child);
+      }
+
+      const seen = new Set();
+      for (const child of children) {
+        const key = groupKey(child);
+        const group = groups.get(key);
+
+        if (group.length > 1) {
+          // 重複組：只展開第一個作範例
+          if (!seen.has(key)) {
+            seen.add(key);
+            lines.push(`${indent}── 重複組 [${group.length} 個]  ${buildShortSelector(child)}`);
+            lines.push(`${indent}   範例 (第 1 個):`);
+            walk(child, depth + 2);
+          }
+        } else {
+          // 唯一節點
+          if (isLeaf(child)) {
+            const val = getLeafValue(child);
+            if (val && val.length > 0) {
+              const display = val.length > 150 ? val.slice(0, 150) + '…' : val;
+              lines.push(`${indent}${relSel(child)}  →  "${display}"`);
+            }
+          } else {
+            lines.push(`${indent}${relSel(child)}`);
+            walk(child, depth + 1);
+          }
         }
       }
     }
 
-    walk(root, 1);
+    walk(root, 0);
     lines.push('');
     lines.push(`共掃描: ${root.querySelectorAll('*').length} 個元素`);
     return lines.join('\n');
