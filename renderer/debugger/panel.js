@@ -13,7 +13,7 @@
   let scanMode = false;
   let hoveredEl = null;
   const captures = [];   // { selector, candidates, textContent, innerText, offscreen, ts }
-  let scanReport = '';   // 最近一次區域掃描的文字報告
+  let scanReport = '';   // 最近一次区域扫描的文字报告
 
   // ── 生成候选选择器（按稳定性排序）──────────────────────────────
   function buildCandidates(el) {
@@ -66,7 +66,7 @@
     const tagCls = el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map(c => `.${CSS.escape(c)}`).join('');
     push('标签+类', tagCls, 2);
 
-    // ⭐⭐⭐⭐ 整組兄弟（點中一個，識別同類重複結構）
+    // ⭐⭐⭐⭐ 整组兄弟（点中一个，识别同类重复结构）
     const parent = el.parentElement;
     if (parent) {
       const tag = el.tagName.toLowerCase();
@@ -85,9 +85,9 @@
           const groupSel = parent.id
             ? `#${CSS.escape(parent.id)} ${tag}.${commonCls.slice(0, 2).map(c => CSS.escape(c)).join('.')}`
             : `${tag}.${commonCls.slice(0, 2).map(c => CSS.escape(c)).join('.')}`;
-          push('整組兄弟', groupSel, 4);
+          push('整组兄弟', groupSel, 4);
         } else if (parent.id) {
-          push('整組兄弟', `#${CSS.escape(parent.id)} > ${tag}`, 3);
+          push('整组兄弟', `#${CSS.escape(parent.id)} > ${tag}`, 3);
         }
       }
     }
@@ -135,18 +135,18 @@
     const offscreen = offscreenEl ? (offscreenEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
     const attrVal = el.value || el.getAttribute('data-value') || el.getAttribute('content') || '';
 
-    // 圖片：優先取元素自身，再找後代 img
+    // 图片：优先取元素自身，再找后代 img
     const imgEl = (el.tagName === 'IMG') ? el : el.querySelector('img');
     const src = el.getAttribute('src') || imgEl?.getAttribute('src') || imgEl?.currentSrc || '';
     const srcset = el.getAttribute('srcset') || imgEl?.getAttribute('srcset') || '';
     const dataSrc = el.getAttribute('data-src') || el.getAttribute('data-lazy-src') || imgEl?.getAttribute('data-src') || '';
 
-    // 視頻：優先取元素自身，再找後代 video/source
+    // 视频：优先取元素自身，再找后代 video/source
     const videoEl = (el.tagName === 'VIDEO') ? el : el.querySelector('video');
     const sourceEl = el.querySelector('source');
     const videoSrc = el.getAttribute('data-video-url') || videoEl?.getAttribute('src') || sourceEl?.getAttribute('src') || '';
 
-    // 鏈接
+    // 链接
     const href = el.getAttribute('href') || el.closest('a')?.getAttribute('href') || '';
 
     return { textContent, innerText, offscreen, attrVal, src, srcset, dataSrc, videoSrc, href };
@@ -332,16 +332,16 @@
         <span class="title">🔍 选择器调试</span>
         <div class="controls">
           <button class="sd-btn sd-btn-pick" id="__sd_pick__">拾取</button>
-          <button class="sd-btn sd-btn-pick" id="__sd_scan__" style="background:#7c3aed">掃描區域</button>
+          <button class="sd-btn sd-btn-pick" id="__sd_scan__" style="background:#7c3aed">扫描区域</button>
           <button class="sd-btn sd-btn-ghost" id="__sd_clear__">清空</button>
           <button class="sd-btn sd-btn-ghost" id="__sd_collapse__" title="收起 (ESC)">◀</button>
         </div>
       </div>
       <div id="__sd_tabs__">
         <div class="sd-tab active" data-tab="capture">拾取 <span id="__sd_capture_count__">0</span></div>
-        <div class="sd-tab" data-tab="scan">掃描</div>
-        <div class="sd-tab" data-tab="test">測試</div>
-        <div class="sd-tab" data-tab="history">歷史 <span id="__sd_history_count__">0</span></div>
+        <div class="sd-tab" data-tab="scan">扫描</div>
+        <div class="sd-tab" data-tab="test">测试</div>
+        <div class="sd-tab" data-tab="history">历史 <span id="__sd_history_count__">0</span></div>
       </div>
       <div class="sd-tab-panel active" id="__sd_panel_capture__">
         <div id="__sd_capture_list__">
@@ -352,7 +352,7 @@
       </div>
       <div class="sd-tab-panel" id="__sd_panel_scan__">
         <div style="color:#565f89;text-align:center;padding:32px 0;font-size:11px;">
-          點擊「掃描區域」按鈕後<br>在頁面上點選任意容器元素
+          点击「扫描区域」按钮后<br>在页面上点选任意容器元素
         </div>
       </div>
       <div class="sd-tab-panel" id="__sd_panel_test__">
@@ -511,7 +511,7 @@
             <button class="sd-copy-btn" onclick="
               document.getElementById('${id}_short').style.display='none';
               document.getElementById('${id}_full').style.display='inline';
-            " style="margin-left:4px">展開</button>
+            " style="margin-left:4px">展开</button>
           </span>
           <span id="${id}_full" style="display:none">${full}${copyBtn}
             <button class="sd-copy-btn" onclick="
@@ -596,7 +596,7 @@
     }
   }
 
-  // ── 區域掃描 ─────────────────────────────────────────────────
+  // ── 区域扫描 ──────────────────────────────────────────────────
   function buildShortSelector(el) {
     if (el.id) return `#${el.id}`;
     const tag = el.tagName.toLowerCase();
@@ -622,12 +622,12 @@
     const header = [];
     const rootSel = buildShortSelector(root);
     header.push(`容器: ${rootSel}  (${root.tagName.toLowerCase()}#${root.id || '—'}  class="${[...root.classList].filter(c => c !== '__sd_captured__').slice(0,3).join(' ')}")`);
-    header.push(`頁面: ${location.hostname}${location.pathname.slice(0, 60)}`);
+    header.push(`页面: ${location.hostname}${location.pathname.slice(0, 60)}`);
     header.push('');
 
     const SKIP_TAGS = new Set(['script','style','noscript','svg','path','head','meta','link']);
 
-    // 唯一技術判斷：CSS display:none 意味著不可見，跳過整個子樹
+    // 唯一技术判断：CSS display:none 意味着不可见，跳过整个子树
     function isInvisible(el) {
       return window.getComputedStyle(el).display === 'none';
     }
@@ -636,12 +636,12 @@
       return SKIP_TAGS.has(el.tagName.toLowerCase());
     }
 
-    // 動態 id：純大寫字母數字且長度 ≥ 7（評論 id、卡片實例 id 等）
+    // 动态 id：纯大写字母数字且长度 ≥ 7（评论 id、卡片实例 id 等）
     function isDynamicId(id) {
       return !id || /^[A-Z][A-Z0-9]{6,}$/.test(id) || id.startsWith('a-autoid') || id.startsWith('CardInstance');
     }
 
-    // 葉節點的值：優先媒體屬性，再取可見文字
+    // 叶节点的值：优先媒体属性，再取可见文字
     function leafValue(el) {
       const videoSrc = el.getAttribute('data-video-url') || '';
       if (videoSrc) return `[video] ${videoSrc}`;
@@ -649,15 +649,15 @@
       if (src && el.tagName === 'IMG') return `[img] ${src}`;
       const href = el.getAttribute('href') || '';
       if (href && href !== '#' && !href.startsWith('javascript:')) return `[link] ${href}`;
-      // 優先取 .a-offscreen（Amazon 無障礙文字，最乾淨）
+      // 优先取 .a-offscreen（Amazon 无障碍文字，最干净）
       const offscreen = el.querySelector('.a-offscreen');
       if (offscreen) return offscreen.textContent.replace(/\s+/g,' ').trim();
       return el.textContent.replace(/\s+/g,' ').trim();
     }
 
-    // 簡短選擇器：從葉往上，找到穩定錨點即停，保留錨點 + 最多 2 層後代
+    // 简短选择器：从叶往上，找到稳定锚点即停，保留锚点 + 最多 2 层后代
     function shortSel(el) {
-      const tail = [];   // 錨點之後的部分（最多 2 層）
+      const tail = [];   // 锚点之后的部分（最多 2 层）
       let cur = el;
       while (cur && cur !== root) {
         const hook = cur.getAttribute('data-hook');
@@ -670,7 +670,7 @@
           const anchor = `#${cur.id}`;
           return tail.length ? `${anchor} > ${tail.join(' > ')}` : anchor;
         }
-        // 只保留最後 2 層 tail，避免路徑過長
+        // 只保留最后 2 层 tail，避免路径过长
         if (tail.length < 2) {
           const tag = cur.tagName.toLowerCase();
           const cls = [...cur.classList].filter(c =>
@@ -683,7 +683,7 @@
       return tail.join(' > ') || buildShortSelector(el);
     }
 
-    // 分組鍵：穩定 id 的元素永遠唯一；其餘按 tag + hook + 前兩個非 Amazon 工具 class 分組
+    // 分组键：稳定 id 的元素永远唯一；其余按 tag + hook + 前两个非 Amazon 工具 class 分组
     function groupKey(el) {
       if (el.id && !isDynamicId(el.id)) return `__unique__${el.id}`;
       const tag = el.tagName.toLowerCase();
@@ -694,20 +694,20 @@
       return `${tag}[${hook}].${cls}`;
     }
 
-    // walk 返回行數組；容器先收集子樹，非空才加自身標題行
+    // walk 返回行数组；容器先收集子树，非空才加自身标题行
     function walk(el, depth) {
       if (depth > 8 || isSkip(el) || isInvisible(el)) return [];
 
       const children = [...el.children].filter(c => !isSkip(c));
       if (children.length === 0) {
-        // 真葉節點
+        // 真叶节点
         const val = leafValue(el);
         if (!val || val.length < 2) return [];
         const display = val.length > 150 ? val.slice(0, 150) + '…' : val;
         return [`${'  '.repeat(depth)}${shortSel(el)}  →  "${display}"`];
       }
 
-      // 按 groupKey 分組
+      // 按 groupKey 分组
       const groups = new Map();
       for (const child of children) {
         const k = groupKey(child);
@@ -729,15 +729,15 @@
             seen.add(k);
             const childLines = walk(child, depth + 2);
             if (childLines.length > 0) {
-              output.push(`${indent}── 重複組 [${group.length} 個]  ${buildShortSelector(child)}`);
-              output.push(`${indent}   範例:`);
+              output.push(`${indent}── 重复组 [${group.length} 个]  ${buildShortSelector(child)}`);
+              output.push(`${indent}   示例:`);
               output.push(...childLines);
             }
           }
         } else {
           const childLines = walk(child, depth + 1);
           if (childLines.length > 0) {
-            // 如果子樹只有一行且就是葉值，直接輸出，不加容器標題
+            // 如果子树只有一行且就是叶值，直接输出，不加容器标题
             if (childLines.length === 1 && childLines[0].includes('  →  ')) {
               output.push(...childLines);
             } else {
@@ -752,7 +752,7 @@
 
     const bodyLines = walk(root, 0);
     bodyLines.push('');
-    bodyLines.push(`共掃描: ${root.querySelectorAll('*').length} 個元素`);
+    bodyLines.push(`共扫描: ${root.querySelectorAll('*').length} 个元素`);
     return [...header, ...bodyLines].join('\n');
   }
 
@@ -762,22 +762,22 @@
     const v = getThemeVars();
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="color:${v.textMuted};font-size:11px">點擊容器元素後生成報告</span>
-        <button class="sd-copy-btn" id="__sd_scan_copy__" style="font-size:11px;padding:3px 10px">複製全部</button>
+        <span style="color:${v.textMuted};font-size:11px">点击容器元素后生成报告</span>
+        <button class="sd-copy-btn" id="__sd_scan_copy__" style="font-size:11px;padding:3px 10px">复制全部</button>
       </div>
       <pre id="__sd_scan_pre__" style="
         background:${v.bgInput};border:1px solid ${v.border};border-radius:4px;
         padding:8px;font-size:10px;line-height:1.6;white-space:pre-wrap;word-break:break-all;
         color:${v.valueClr};margin:0;max-height:calc(100vh - 160px);overflow-y:auto;
-      ">${report ? escHtml(report) : '尚無掃描結果'}</pre>
+      ">${report ? escHtml(report) : '暂无扫描结果'}</pre>
     `;
     const copyBtn = document.getElementById('__sd_scan_copy__');
     if (copyBtn && report) {
       copyBtn.addEventListener('click', () => {
         navigator.clipboard.writeText(report).then(() => {
-          copyBtn.textContent = '已複製 ✓';
+          copyBtn.textContent = '已复制 ✓';
           copyBtn.classList.add('copied');
-          setTimeout(() => { copyBtn.textContent = '複製全部'; copyBtn.classList.remove('copied'); }, 2000);
+          setTimeout(() => { copyBtn.textContent = '复制全部'; copyBtn.classList.remove('copied'); }, 2000);
         });
       });
     }
@@ -807,7 +807,7 @@
     if (hoveredEl) hoveredEl.classList.remove('__sd_highlight__');
 
     if (scanMode) {
-      // 區域掃描模式：遞歸輸出容器下所有內容
+      // 区域扫描模式：递归输出容器下所有内容
       el.classList.add('__sd_captured__');
       setTimeout(() => el.classList.remove('__sd_captured__'), 2000);
 
@@ -815,10 +815,10 @@
       renderScanTab(scanReport);
       switchTab('scan');
 
-      // 掃描完自動退出掃描模式
+      // 扫描完自动退出扫描模式
       scanMode = false;
       const btn = document.getElementById('__sd_scan__');
-      if (btn) { btn.textContent = '掃描區域'; btn.classList.remove('active'); }
+      if (btn) { btn.textContent = '扫描区域'; btn.classList.remove('active'); }
       document.body.style.cursor = '';
       return;
     }
@@ -887,9 +887,9 @@
       }
     });
 
-    // 掃描區域按鈕
+    // 扫描区域按钮
     document.getElementById('__sd_scan__').addEventListener('click', () => {
-      // 互斥：關閉拾取模式
+      // 互斥：关闭拾取模式
       if (pickMode) {
         pickMode = false;
         const pickBtn = document.getElementById('__sd_pick__');
@@ -897,7 +897,7 @@
       }
       scanMode = !scanMode;
       const btn = document.getElementById('__sd_scan__');
-      btn.textContent = scanMode ? '取消掃描' : '掃描區域';
+      btn.textContent = scanMode ? '取消扫描' : '扫描区域';
       btn.classList.toggle('active', scanMode);
       document.body.style.cursor = scanMode ? 'cell' : '';
       if (!scanMode && hoveredEl) {
