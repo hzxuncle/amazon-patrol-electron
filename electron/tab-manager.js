@@ -383,6 +383,11 @@ async function openTabForTask(task, config) {
     await waitForLoad(win);
     const finalUrl = win.webContents.getURL();
     if (finalUrl !== url) tabLog(`[TabManager] 重定向: ${url} → ${finalUrl}`);
+    // 诊断：读取抓取窗口的配送地和币种
+    const pageDelivery = await win.webContents.executeJavaScript(`
+      (document.querySelector('#glow-ingress-line2') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
+    `).catch(() => '');
+    if (pageDelivery) tabLog(`[TabManager] 抓取窗口配送地: ${site} → ${pageDelivery}`);
     const configWithCode = { ...config, _siteCode: site };
     const result = await injectAndScrape(win, asin, configWithCode);
     result.site = site;
