@@ -171,8 +171,8 @@ async function initDeliveryZip(site, zip) {
               locationType: 'LOCATION_INPUT',
               zipCode: ${JSON.stringify(zip)},
               deviceType: 'web',
-              storeContext: 'generic',
-              pageType: 'Gateway',
+              storeContext: 'drugstore',
+              pageType: 'Detail',
               actionSource: 'glow'
             })
           });
