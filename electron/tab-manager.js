@@ -140,13 +140,24 @@ async function initDeliveryZip(site, zip) {
 
     const diagResult = await win.webContents.executeJavaScript(`
       (async function() {
-        let pageTitle = '', bodySnippet = '', hasToken = false;
+        let pageTitle = document.title.slice(0, 60);
+        let hasToken = false;
+
+        // 等待 CSRF token 出现，最多 5 秒
+        let token = '';
+        for (let i = 0; i < 10; i++) {
+          const el = document.querySelector('input[name="anti-csrftoken-a2z"]');
+          if (el && el.value) { token = el.value; break; }
+          await new Promise(r => setTimeout(r, 500));
+        }
+        hasToken = !!token;
+
+        // 记录页面所有 hidden input，帮助定位 token 位置
+        const hiddenInputs = [...document.querySelectorAll('input[type="hidden"]')]
+          .map(el => el.name + '=' + (el.value||'').slice(0,20))
+          .slice(0, 10).join(', ');
+
         try {
-          const tokenEl = document.querySelector('input[name="anti-csrftoken-a2z"]');
-          const token = tokenEl ? tokenEl.value : '';
-          hasToken = !!token;
-          pageTitle = document.title.slice(0, 60);
-          bodySnippet = document.body ? document.body.innerText.slice(0, 300).replace(/\\s+/g,' ') : '';
           const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
             method: 'POST',
             credentials: 'include',
@@ -162,13 +173,13 @@ async function initDeliveryZip(site, zip) {
             }).toString()
           });
           const respText = await resp.text();
-          return { ok: resp.ok, status: resp.status, hasToken, pageTitle, bodySnippet, respSnippet: respText.slice(0,200) };
-        } catch(e) { return { ok: false, error: e.message, hasToken, pageTitle, bodySnippet }; }
+          return { ok: resp.ok, status: resp.status, hasToken, pageTitle, hiddenInputs, respSnippet: respText.slice(0,200) };
+        } catch(e) { return { ok: false, error: e.message, hasToken, pageTitle, hiddenInputs }; }
       })()
     `);
     tabLog(`[TabManager] [DeliveryZip 诊断] ${site} hasToken=${diagResult.hasToken} httpStatus=${diagResult.status} ok=${diagResult.ok} error=${diagResult.error||''}`);
     tabLog(`[TabManager] [DeliveryZip 诊断] pageTitle="${diagResult.pageTitle}"`);
-    tabLog(`[TabManager] [DeliveryZip 诊断] bodySnippet="${diagResult.bodySnippet}"`);
+    tabLog(`[TabManager] [DeliveryZip 诊断] hiddenInputs="${diagResult.hiddenInputs}"`);
     tabLog(`[TabManager] [DeliveryZip 诊断] respSnippet="${diagResult.respSnippet}"`);
     const ok = diagResult.ok;
 
