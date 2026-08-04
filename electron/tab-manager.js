@@ -40,24 +40,13 @@ const SITE_LANG_MAP = {
   'amazon.com.tr': 'tr_TR',
 };
 
-// 需要强制指定币种的站点（不指定时 Amazon 可能按 IP 显示其他币种）
+// 需要强制指定币种的站点（目前已验证的欧洲站点）
 const SITE_CURRENCY_MAP = {
-  'amazon.co.uk':  'GBP',
-  'amazon.de':     'EUR',
-  'amazon.fr':     'EUR',
-  'amazon.it':     'EUR',
-  'amazon.es':     'EUR',
-  'amazon.nl':     'EUR',
-  'amazon.se':     'SEK',
-  'amazon.pl':     'PLN',
-  'amazon.com.be': 'EUR',
-  'amazon.co.jp':  'JPY',
-  'amazon.in':     'INR',
-  'amazon.sg':     'SGD',
-  'amazon.com.br': 'BRL',
-  'amazon.ae':     'AED',
-  'amazon.sa':     'SAR',
-  'amazon.com.tr': 'TRY',
+  'amazon.co.uk': 'GBP',
+  'amazon.de':    'EUR',
+  'amazon.fr':    'EUR',
+  'amazon.it':    'EUR',
+  'amazon.es':    'EUR',
 };
 
 const { BUILTIN_SITES } = require('./sites-data');
