@@ -859,8 +859,9 @@ async function startPatrol() {
   const confirmed = await showConfirmDialog('开始巡店', confirmLines, '开始', '取消');
   if (!confirmed) return;
 
-  // 用户确认后立即清空上次结果并刷新 UI
+  // 用户确认后立即清空上次结果并刷新 UI，同步清 store 防止 handleStorageChange 把旧数据写回来
   allResults = [];
+  await window.electronAPI.sendMessage('CLEAR_RESULTS', {});
   renderAllResults();
 
   const res = await window.electronAPI.sendMessage('START_PATROL', {
