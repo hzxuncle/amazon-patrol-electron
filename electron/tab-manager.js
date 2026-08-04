@@ -251,10 +251,12 @@ async function _tryInitDeliveryZip(site, zip, siteUrl) {
           if (confirmBtn) {
             confirmBtn.click();
             logs.push('步骤5 点击Confirm ' + elapsed());
+            // 等待页面刷新后地址生效
+            await new Promise(r => setTimeout(r, 3000));
           } else {
             logs.push('步骤5 无Confirm按钮 ' + elapsed());
+            await new Promise(r => setTimeout(r, 3000));
           }
-          await new Promise(r => setTimeout(r, 1000));
           logs.push('完成 ' + elapsed());
           return { ok: true, logs };
         } catch(e) { return { ok: false, logs: [], reason: 'ERR:' + e.message }; }
@@ -311,7 +313,7 @@ async function _tryInitDeliveryZip(site, zip, siteUrl) {
     }
 
     if (okResult.ok) {
-      await sleep(1000);
+      await sleep(2000);
       const deliveryText = await win.webContents.executeJavaScript(`
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
