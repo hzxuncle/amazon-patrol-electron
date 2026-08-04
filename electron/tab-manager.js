@@ -325,8 +325,6 @@ async function _tryInitDeliveryZip(site, zip, siteUrl, asin) {
     }
 
     if (okResult.ok) {
-      // Confirm 后页面会刷新，等待加载完成再读取配送地
-      await waitForLoad(win);
       const deliveryText = await win.webContents.executeJavaScript(`
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
@@ -529,4 +527,18 @@ function resetSiteInit() {
   initLock = Promise.resolve();
 }
 
-module.exports = { openTabForTask, closeAll, resetSiteInit, setLogCallback };
+// 巡店开始时提前启动所有站点的配送地初始化，让 Worker 启动时直接等待已在进行中的初始化
+function prewarmDeliveryZips(sites, deliveryZips, tasks) {
+  for (const site of sites) {
+    const zip = deliveryZips[site];
+    if (!zip || initializedSites.has(site) || pendingSiteInit.has(site)) continue;
+    // 找该站点的第一个 ASIN 用于加载商品页
+    const firstTask = tasks.find(t => t.site === site);
+    const asin = firstTask ? firstTask.asin : '';
+    const p = initDeliveryZip(site, zip, asin);
+    pendingSiteInit.set(site, p);
+    p.finally(() => pendingSiteInit.delete(site));
+  }
+}
+
+module.exports = { openTabForTask, closeAll, resetSiteInit, prewarmDeliveryZips, setLogCallback };
