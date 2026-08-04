@@ -31,7 +31,7 @@ function stripNodeGuards(src) {
     // Remove module.exports guard lines (single-line form used in all base files)
     .replace(/^if\s*\(typeof module[^\n]*\n?/gm, '')
     // Remove single-line named export objects like: const AU_PARSERS = { extractProductDetails, extractBsr };
-    .replace(/^const\s+(?:BASE|MX|US|CA|AU)_[A-Z_]+\s*=\s*\{[\w\s,]*\};\s*$/gm, '')
+    .replace(/^const\s+(?:BASE|MX|US|CA|AU|UK|DE|FR|IT|ES)_[A-Z_]+\s*=\s*\{[\w\s,]*\};\s*$/gm, '')
     // Remove top-level 'use strict'; (the wrapper already has it)
     .replace(/^'use strict';\s*\n?/m, '')
     .trim();
