@@ -910,7 +910,7 @@ async function clearResults() {
 // ========== UI State ==========
 function updateUiRunning(totalCount, alreadyDone = 0) {
   dom.btnStart.disabled = true;
-  dom.btnStart.innerHTML = '<span>▶</span> 继续巡店';
+  dom.btnStart.innerHTML = '<span>▶</span> 开始巡店';
   dom.btnStop.disabled = false;
   dom.btnRetry.disabled = true;
   dom.btnExport.disabled = true;
@@ -924,8 +924,7 @@ function updateUiRunning(totalCount, alreadyDone = 0) {
 
 function updateUiStopped() {
   dom.btnStart.disabled = false;
-  const hasRemaining = allResults.length > 0;
-  dom.btnStart.innerHTML = hasRemaining ? '<span>▶</span> 继续巡店' : '<span>▶</span> 开始巡店';
+  dom.btnStart.innerHTML = '<span>▶</span> 开始巡店';
   dom.btnStop.disabled = true;
   dom.btnExport.disabled = allResults.length === 0;
   dom.progressStatus.innerHTML = '<span style="color:var(--warning,#fa8c16)">⏹ 已取消</span>';
