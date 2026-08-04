@@ -141,10 +141,13 @@ async function initDeliveryZip(site, zip) {
     const useNewEndpoint = ['UK', 'DE'].includes(site);
     const ok = await win.webContents.executeJavaScript(`
       (async function() {
-        // 等待 CSRF token 出现，最多 5 秒
+        // 等待 token 出现，最多 5 秒
+        // UK/DE 未登录时用 glow-validation-token，其他站点用 anti-csrftoken-a2z
         let token = '';
         for (let i = 0; i < 10; i++) {
-          const el = document.querySelector('input[name="anti-csrftoken-a2z"]');
+          const el = document.querySelector(
+            'input[name="glow-validation-token"], input[name="anti-csrftoken-a2z"]'
+          );
           if (el && el.value) { token = el.value; break; }
           await new Promise(r => setTimeout(r, 500));
         }
@@ -152,13 +155,7 @@ async function initDeliveryZip(site, zip) {
         ${useNewEndpoint ? `
         // UK/DE：新 endpoint（JSON + header token）
         try {
-          if (!token) {
-            // 扫描页面上所有可能含 token 的元素，帮助定位
-            const candidates = [
-              ...document.querySelectorAll('[name*="csrf"], [name*="token"], meta[name*="csrf"], meta[name*="token"]')
-            ].map(el => el.tagName + '[' + el.name + ']=' + (el.value||el.getAttribute('content')||'').slice(0,30));
-            return '__NO_TOKEN__:' + candidates.slice(0,5).join('|');
-          }
+          if (!token) return false;
           const resp = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
             method: 'POST',
             credentials: 'include',
@@ -201,10 +198,7 @@ async function initDeliveryZip(site, zip) {
       })()
     `);
 
-    if (typeof ok === 'string' && ok.startsWith('__NO_TOKEN__')) {
-      tabLog(`[TabManager] ⚠️ 配送地设置跳过：CSRF token 未获取到: ${site} 候选元素: ` + ok.slice(12));
-      initializedSites.add(site);
-    } else if (ok) {
+    if (ok) {
       // 验证配送地是否真的切换成功（读取页面上的配送地显示）
       await sleep(1000);
       const deliveryText = await win.webContents.executeJavaScript(`
