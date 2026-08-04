@@ -140,11 +140,13 @@ async function initDeliveryZip(site, zip) {
 
     const diagResult = await win.webContents.executeJavaScript(`
       (async function() {
+        let pageTitle = '', bodySnippet = '', hasToken = false;
         try {
           const tokenEl = document.querySelector('input[name="anti-csrftoken-a2z"]');
           const token = tokenEl ? tokenEl.value : '';
-          const pageTitle = document.title.slice(0, 60);
-          const bodySnippet = document.body ? document.body.innerText.slice(0, 200).replace(/\\s+/g,' ') : '';
+          hasToken = !!token;
+          pageTitle = document.title.slice(0, 60);
+          bodySnippet = document.body ? document.body.innerText.slice(0, 300).replace(/\\s+/g,' ') : '';
           const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
             method: 'POST',
             credentials: 'include',
@@ -160,8 +162,8 @@ async function initDeliveryZip(site, zip) {
             }).toString()
           });
           const respText = await resp.text();
-          return { ok: resp.ok, status: resp.status, hasToken: !!token, pageTitle, bodySnippet, respSnippet: respText.slice(0,200) };
-        } catch(e) { return { ok: false, error: e.message }; }
+          return { ok: resp.ok, status: resp.status, hasToken, pageTitle, bodySnippet, respSnippet: respText.slice(0,200) };
+        } catch(e) { return { ok: false, error: e.message, hasToken, pageTitle, bodySnippet }; }
       })()
     `);
     tabLog(`[TabManager] [DeliveryZip 诊断] ${site} hasToken=${diagResult.hasToken} httpStatus=${diagResult.status} ok=${diagResult.ok} error=${diagResult.error||''}`);
