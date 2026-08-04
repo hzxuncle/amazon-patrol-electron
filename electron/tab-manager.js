@@ -138,50 +138,37 @@ async function initDeliveryZip(site, zip) {
       tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
     }
 
-    const diagResult = await win.webContents.executeJavaScript(`
+    const ok = await win.webContents.executeJavaScript(`
       (async function() {
-        let pageTitle = document.title.slice(0, 60);
-        let hasToken = false;
-
-        // 等待 CSRF token 出现，最多 5 秒
-        let token = '';
-        for (let i = 0; i < 10; i++) {
-          const el = document.querySelector('input[name="anti-csrftoken-a2z"]');
-          if (el && el.value) { token = el.value; break; }
-          await new Promise(r => setTimeout(r, 500));
-        }
-        hasToken = !!token;
-
-        // 记录页面所有 hidden input，帮助定位 token 位置
-        const hiddenInputs = [...document.querySelectorAll('input[type="hidden"]')]
-          .map(el => el.name + '=' + (el.value||'').slice(0,20))
-          .slice(0, 10).join(', ');
-
         try {
-          const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
+          // 等待 CSRF token 出现，最多 5 秒
+          let token = '';
+          for (let i = 0; i < 10; i++) {
+            const el = document.querySelector('input[name="anti-csrftoken-a2z"]');
+            if (el && el.value) { token = el.value; break; }
+            await new Promise(r => setTimeout(r, 500));
+          }
+          const resp = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
+            headers: {
+              'Content-Type': 'application/json',
+              'anti-csrftoken-a2z': token,
+              'x-requested-with': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
               locationType: 'LOCATION_INPUT',
               zipCode: ${JSON.stringify(zip)},
-              storeContext: 'generic',
               deviceType: 'web',
+              storeContext: 'generic',
               pageType: 'Gateway',
-              actionSource: 'glow',
-              'anti-csrftoken-a2z': token
-            }).toString()
+              actionSource: 'glow'
+            })
           });
-          const respText = await resp.text();
-          return { ok: resp.ok, status: resp.status, hasToken, pageTitle, hiddenInputs, respSnippet: respText.slice(0,200) };
-        } catch(e) { return { ok: false, error: e.message, hasToken, pageTitle, hiddenInputs }; }
+          return resp.ok;
+        } catch(e) { return false; }
       })()
     `);
-    tabLog(`[TabManager] [DeliveryZip 诊断] ${site} hasToken=${diagResult.hasToken} httpStatus=${diagResult.status} ok=${diagResult.ok} error=${diagResult.error||''}`);
-    tabLog(`[TabManager] [DeliveryZip 诊断] pageTitle="${diagResult.pageTitle}"`);
-    tabLog(`[TabManager] [DeliveryZip 诊断] hiddenInputs="${diagResult.hiddenInputs}"`);
-    tabLog(`[TabManager] [DeliveryZip 诊断] respSnippet="${diagResult.respSnippet}"`);
-    const ok = diagResult.ok;
 
     if (ok) {
       initializedSites.add(site);
