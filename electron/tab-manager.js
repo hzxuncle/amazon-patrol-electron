@@ -139,14 +139,24 @@ async function initDeliveryZip(site, zip) {
     }
 
     const useUiClick = ['UK', 'DE'].includes(site);
-    const ok = await win.webContents.executeJavaScript(`
+    const jsTimeout = new Promise(resolve => setTimeout(() => resolve(false), 20000));
+    const ok = await Promise.race([jsTimeout, win.webContents.executeJavaScript(`
       (async function() {
         ${useUiClick ? `
         // UK/DE：通过点击页面 UI 弹窗设置邮编（DOM 操作，不依赖 AJAX token）
         try {
+          // 等待页面主体元素加载完成
+          for (let i = 0; i < 10; i++) {
+            if (document.getElementById('nav-global-location-popover-link')) break;
+            await new Promise(r => setTimeout(r, 500));
+          }
           if (!document.getElementById('GLUXZipUpdateInput')) {
             document.getElementById('nav-global-location-popover-link')?.click();
-            await new Promise(r => setTimeout(r, 1500));
+            // 等待弹窗出现，最多 5 秒
+            for (let i = 0; i < 10; i++) {
+              await new Promise(r => setTimeout(r, 500));
+              if (document.getElementById('GLUXZipUpdateInput')) break;
+            }
           }
           const zipInput = document.getElementById('GLUXZipUpdateInput');
           if (!zipInput) return false;
@@ -189,7 +199,7 @@ async function initDeliveryZip(site, zip) {
         } catch(e) { return false; }
         `}
       })()
-    `);
+    `)]);
 
     if (ok) {
       // 验证配送地是否真的切换成功（读取页面上的配送地显示）
