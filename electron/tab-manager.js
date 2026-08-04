@@ -111,10 +111,13 @@ async function initDeliveryZip(site, zip) {
   if (!zip || initializedSites.has(site)) return;
   const siteUrl = getSiteUrl(site);
 
-  // UK/DE 需要显示窗口才能正常触发 UI 弹窗交互
-  const needShow = ['UK', 'DE'].includes(site);
+  const useUiClickMode = ['UK', 'DE'].includes(site);
+  // UK/DE 的 popover 交互需要可见窗口，定位到屏幕外避免干扰用户
   const win = new BrowserWindow({
-    show: needShow, width: 800, height: 600,
+    show: useUiClickMode,
+    width: 800, height: 600,
+    x: -900, y: -700,  // 屏幕外，用户不可见
+    skipTaskbar: true,  // 不出现在任务栏
     webPreferences: { nodeIntegration: false, contextIsolation: false, javascript: true }
   });
   win.webContents.setUserAgent(CHROME_UA);
