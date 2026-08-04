@@ -133,6 +133,19 @@ async function initDeliveryZip(site, zip) {
   win.webContents.setUserAgent(CHROME_UA);
 
   try {
+    // 检查 session 里是否已有有效配送地 Cookie，有则直接跳过弹窗操作
+    const domain = getDomainByCode(site) || '';
+    const existingCookies = await win.webContents.session.cookies.get({ domain: '.' + domain, name: 'session-id' });
+    const i18nCookies = await win.webContents.session.cookies.get({ domain: '.' + domain, name: 'i18n-prefs' });
+    const currency = SITE_CURRENCY_COOKIE[site];
+    const i18nOk = !currency || (i18nCookies.length > 0 && i18nCookies[0].value === currency);
+    if (existingCookies.length > 0 && i18nOk) {
+      tabLog(`[TabManager] 配送地 session 已存在，跳过初始化: ${site}`);
+      initializedSites.add(site);
+      if (!win.isDestroyed()) win.close();
+      return;
+    }
+
     // 加载首页拿到 CSRF token（首页比商品页更稳定）
     await win.loadURL(siteUrl + `?language=${getSiteLang(site)}`);
     await waitForLoad(win);
