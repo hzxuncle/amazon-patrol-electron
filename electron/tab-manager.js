@@ -325,8 +325,6 @@ async function _tryInitDeliveryZip(site, zip, siteUrl, asin) {
     }
 
     if (okResult.ok) {
-      // Confirm 后页面会刷新，等待加载完成再读取配送地
-      await waitForLoad(win);
       const deliveryText = await win.webContents.executeJavaScript(`
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
