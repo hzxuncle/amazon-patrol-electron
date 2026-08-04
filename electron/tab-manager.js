@@ -138,48 +138,38 @@ async function initDeliveryZip(site, zip) {
       tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
     }
 
-    const useNewEndpoint = ['UK', 'DE'].includes(site);
+    const useUiClick = ['UK', 'DE'].includes(site);
     const ok = await win.webContents.executeJavaScript(`
       (async function() {
-        // 等待 token 出现，最多 5 秒
-        // UK/DE 未登录时用 glow-validation-token，其他站点用 anti-csrftoken-a2z
+        ${useUiClick ? `
+        // UK/DE：通过点击页面 UI 弹窗设置邮编（DOM 操作，不依赖 AJAX token）
+        try {
+          if (!document.getElementById('GLUXZipUpdateInput')) {
+            document.getElementById('nav-global-location-popover-link')?.click();
+            await new Promise(r => setTimeout(r, 1500));
+          }
+          const zipInput = document.getElementById('GLUXZipUpdateInput');
+          if (!zipInput) return false;
+          zipInput.value = ${JSON.stringify(zip)};
+          zipInput.dispatchEvent(new Event('input', { bubbles: true }));
+          const applyBtn = document.querySelector('#GLUXZipUpdate input[type="submit"]');
+          if (!applyBtn) return false;
+          applyBtn.click();
+          await new Promise(r => setTimeout(r, 1500));
+          const confirmBtn = document.getElementById('GLUXConfirmClose') ||
+                             document.querySelector('.a-popover-footer input.a-button-input');
+          if (confirmBtn) confirmBtn.click();
+          await new Promise(r => setTimeout(r, 1000));
+          return true;
+        } catch(e) { return false; }
+        ` : `
+        // 其他站点：AJAX 接口设置邮编
         let token = '';
         for (let i = 0; i < 10; i++) {
-          const el = document.querySelector(
-            'input[name="glow-validation-token"], input[name="anti-csrftoken-a2z"]'
-          );
+          const el = document.querySelector('input[name="anti-csrftoken-a2z"]');
           if (el && el.value) { token = el.value; break; }
           await new Promise(r => setTimeout(r, 500));
         }
-
-        ${useNewEndpoint ? `
-        // UK/DE：新 endpoint（JSON + header token）
-        // 未登录 session 的 token 字段名是 glow-validation-token，header 名需与之匹配
-        try {
-          if (!token) return false;
-          const tokenEl = document.querySelector('input[name="glow-validation-token"]');
-          const headerName = tokenEl ? 'glow-validation-token' : 'anti-csrftoken-a2z';
-          const resp = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-              [headerName]: token,
-              'x-requested-with': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-              locationType: 'LOCATION_INPUT',
-              zipCode: ${JSON.stringify(zip)},
-              deviceType: 'web',
-              storeContext: 'drugstore',
-              pageType: 'Detail',
-              actionSource: 'glow'
-            })
-          });
-          return resp.ok;
-        } catch(e) { return false; }
-        ` : `
-        // 其他站点：旧 endpoint（form-urlencoded + body token）
         try {
           const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
             method: 'POST',
