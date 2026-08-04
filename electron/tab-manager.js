@@ -277,20 +277,20 @@ async function initDeliveryZip(site, zip) {
     }
 
     // 无论配送地是否成功，都写入 i18n-prefs Cookie 确保币种正确
-    const currency = SITE_CURRENCY_COOKIE[site];
-    if (currency) {
+    const siteCurrency = SITE_CURRENCY_COOKIE[site];
+    if (siteCurrency) {
       const domain = getDomainByCode(site) || '';
       await win.webContents.session.cookies.set({
         url: siteUrl,
         name: 'i18n-prefs',
-        value: currency,
+        value: siteCurrency,
         domain: '.' + domain,
         path: '/',
         secure: true,
         httpOnly: false,
         expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 3600
       });
-      tabLog(`[TabManager] 币种 Cookie 已设置: ${site} → ${currency}`);
+      tabLog(`[TabManager] 币种 Cookie 已设置: ${site} → ${siteCurrency}`);
     }
   } catch (e) {
     // 初始化出错时同样标记跳过，不让异常 session 阻塞后续任务
