@@ -78,6 +78,8 @@ const CHROME_UA = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 const initializedSites = new Set();
 // 记录正在初始化中的站点，防止并发重复初始化
 const pendingSiteInit = new Map(); // site → Promise
+// 全局初始化互斥锁，保证同一时间只有一个站点在执行初始化，避免并发请求被 Amazon 断开
+let initLock = Promise.resolve();
 
 function getSiteUrl(code) {
   const domain = getDomainByCode(code);
@@ -121,17 +123,21 @@ async function initDeliveryZip(site, zip) {
   if (!zip || initializedSites.has(site)) return;
   const siteUrl = getSiteUrl(site);
 
-  // ERR_ABORTED 时重试，最多 3 次，每次等待 3 秒
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const succeeded = await _tryInitDeliveryZip(site, zip, siteUrl);
-    if (succeeded) return;
-    if (attempt < 3) {
-      tabLog(`[TabManager] 配送地初始化失败，${3}秒后重试 (${attempt}/3): ${site}`);
-      await sleep(3000);
+  // 串行执行：等待上一个站点初始化完成后再开始，避免并发触发 Amazon ERR_ABORTED
+  const myTurn = initLock.then(async () => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const succeeded = await _tryInitDeliveryZip(site, zip, siteUrl);
+      if (succeeded) return;
+      if (attempt < 3) {
+        tabLog(`[TabManager] 配送地初始化失败，3秒后重试 (${attempt}/3): ${site}`);
+        await sleep(3000);
+      }
     }
-  }
-  initializedSites.add(site);
-  tabLog(`[TabManager] ⚠️ 配送地初始化 3 次均失败，跳过: ${site}`);
+    initializedSites.add(site);
+    tabLog(`[TabManager] ⚠️ 配送地初始化 3 次均失败，跳过: ${site}`);
+  });
+  initLock = myTurn.catch(() => {});
+  await myTurn;
 }
 
 async function _tryInitDeliveryZip(site, zip, siteUrl) {
@@ -513,6 +519,7 @@ function closeAll() {
 function resetSiteInit() {
   initializedSites.clear();
   pendingSiteInit.clear();
+  initLock = Promise.resolve();
 }
 
 module.exports = { openTabForTask, closeAll, resetSiteInit, setLogCallback };
