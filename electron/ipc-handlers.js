@@ -153,14 +153,14 @@ function processQueue(config) {
         const retryCount = retryMap[key] || 0;
         if ((isNetworkError || isTimeout) && retryCount < 3 && activePatrol) {
           retryMap[key] = retryCount + 1;
-          tabLog(`[TabManager] ⚠️ ${friendlyError}，第 ${retryMap[key]} 次重试: ${task.asin} @ ${task.site} | 原因: ${rawMsg}`);
+          broadcastLog(`[TabManager] ⚠️ ${friendlyError}，第 ${retryMap[key]} 次重试: ${task.asin} @ ${task.site} | 原因: ${rawMsg}`);
           await sleep(config.retryDelay || 2000);
           taskQueue.unshift(task);
           continue;
         }
 
         retryMap[key] = retryCount + 1;
-        tabLog(`[TabManager] ❌ 失败: ${task.asin} @ ${task.site} | ${friendlyError} | 原因: ${rawMsg}`);
+        broadcastLog(`[TabManager] ❌ 失败: ${task.asin} @ ${task.site} | ${friendlyError} | 原因: ${rawMsg}`);
         const errorResult = {
           asin: task.asin, site: task.site, index: task.index,
           title: '', price: '', listPrice: '', rating: '', reviews: '',
