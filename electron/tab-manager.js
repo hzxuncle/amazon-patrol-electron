@@ -224,28 +224,27 @@ async function initDeliveryZip(site, zip) {
       `).catch(() => '');
       tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: ` + deliveryText + `）`);
 
-      // 直接写入 i18n-prefs Cookie 设置显示币种（该 Cookie 由 Amazon 读取，无需接口）
-      const currency = SITE_CURRENCY_COOKIE[site];
-      if (currency) {
-        const domain = getDomainByCode(site) || '';
-        await win.webContents.session.cookies.set({
-          url: siteUrl,
-          name: 'i18n-prefs',
-          value: currency,
-          domain: '.' + domain,
-          path: '/',
-          secure: true,
-          httpOnly: false,
-          expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 3600
-        });
-        tabLog(`[TabManager] 币种 Cookie 已设置: ${site} → ${currency}`);
-      }
-
       initializedSites.add(site);
     } else {
-      // 设置失败时标记为已初始化（跳过），避免异常 session 影响后续抓取
       initializedSites.add(site);
       tabLog(`[TabManager] ⚠️ 配送地设置失败，跳过继续抓取: ${site}`);
+    }
+
+    // 无论配送地是否成功，都写入 i18n-prefs Cookie 确保币种正确
+    const currency = SITE_CURRENCY_COOKIE[site];
+    if (currency) {
+      const domain = getDomainByCode(site) || '';
+      await win.webContents.session.cookies.set({
+        url: siteUrl,
+        name: 'i18n-prefs',
+        value: currency,
+        domain: '.' + domain,
+        path: '/',
+        secure: true,
+        httpOnly: false,
+        expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 3600
+      });
+      tabLog(`[TabManager] 币种 Cookie 已设置: ${site} → ${currency}`);
     }
   } catch (e) {
     // 初始化出错时同样标记跳过，不让异常 session 阻塞后续任务
