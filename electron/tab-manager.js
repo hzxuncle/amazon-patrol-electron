@@ -121,6 +121,21 @@ async function initDeliveryZip(site, zip) {
   if (!zip || initializedSites.has(site)) return;
   const siteUrl = getSiteUrl(site);
 
+  // ERR_ABORTED 时重试，最多 3 次，每次等待 3 秒
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const succeeded = await _tryInitDeliveryZip(site, zip, siteUrl);
+    if (succeeded) return;
+    if (attempt < 3) {
+      tabLog(`[TabManager] 配送地初始化失败，${3}秒后重试 (${attempt}/3): ${site}`);
+      await sleep(3000);
+    }
+  }
+  initializedSites.add(site);
+  tabLog(`[TabManager] ⚠️ 配送地初始化 3 次均失败，跳过: ${site}`);
+}
+
+async function _tryInitDeliveryZip(site, zip, siteUrl) {
+
   const useUiClickMode = ['UK', 'DE'].includes(site);
   // UK/DE 的 popover 交互需要可见窗口，定位到屏幕外避免干扰用户
   const win = new BrowserWindow({
@@ -271,18 +286,6 @@ async function initDeliveryZip(site, zip) {
       okResult.logs.forEach(l => tabLog(`[DeliveryZip] ${site} ${l}`));
     }
 
-    if (okResult.ok) {
-      await sleep(1000);
-      const deliveryText = await win.webContents.executeJavaScript(`
-        (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
-      `).catch(() => '');
-      tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: ` + deliveryText + `）`);
-      initializedSites.add(site);
-    } else {
-      initializedSites.add(site);
-      tabLog(`[TabManager] ⚠️ 配送地设置失败: ${site} 原因: ${okResult.reason || 'timeout'}`);
-    }
-
     // 无论配送地是否成功，都写入 i18n-prefs Cookie 确保币种正确
     const siteCurrency = SITE_CURRENCY_COOKIE[site];
     if (siteCurrency) {
@@ -299,10 +302,22 @@ async function initDeliveryZip(site, zip) {
       });
       tabLog(`[TabManager] 币种 Cookie 已设置: ${site} → ${siteCurrency}`);
     }
+
+    if (okResult.ok) {
+      await sleep(1000);
+      const deliveryText = await win.webContents.executeJavaScript(`
+        (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
+      `).catch(() => '');
+      tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: ` + deliveryText + `）`);
+      initializedSites.add(site);
+      return true;
+    } else {
+      tabLog(`[TabManager] ⚠️ 配送地设置失败: ${site} 原因: ${okResult.reason || 'timeout'}`);
+      return false;
+    }
   } catch (e) {
-    // 初始化出错时同样标记跳过，不让异常 session 阻塞后续任务
-    initializedSites.add(site);
-    tabLog(`[TabManager] ⚠️ initDeliveryZip error，跳过: ${e.message}`);
+    tabLog(`[TabManager] ⚠️ initDeliveryZip error: ${e.message}`);
+    return false;
   } finally {
     if (!win.isDestroyed()) win.close();
   }
