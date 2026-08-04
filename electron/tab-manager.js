@@ -158,7 +158,7 @@ async function _tryInitDeliveryZip(site, zip, siteUrl) {
       tabLog(`[TabManager] 配送地 session 已存在，跳过初始化: ${site}`);
       initializedSites.add(site);
       if (!win.isDestroyed()) win.close();
-      return;
+      return true;
     }
 
     // 加载首页拿到 CSRF token（首页比商品页更稳定）
@@ -218,7 +218,14 @@ async function _tryInitDeliveryZip(site, zip, siteUrl) {
               await new Promise(r => setTimeout(r, 500));
               if (document.getElementById('GLUXZipUpdateInput')) { popupFound = true; break; }
             }
-            logs.push('步骤2 邮编输入框:' + (popupFound ? '出现' : '未出现') + ' ' + elapsed());
+            if (!popupFound) {
+              // 诊断：记录页面上所有含 GLUX 或 zip 的元素
+              const gluxEls = [...document.querySelectorAll('[id*="GLUX"],[id*="glux"],[id*="zip"],[id*="Zip"]')]
+                .map(el => el.id).slice(0, 10).join(',');
+              logs.push('步骤2 邮编输入框未出现 url=' + location.href.slice(0,80) + ' glux元素=' + (gluxEls||'无') + ' ' + elapsed());
+            } else {
+              logs.push('步骤2 邮编输入框:出现 ' + elapsed());
+            }
             if (!popupFound) return { ok: false, logs, reason: 'POPUP_NOT_FOUND' };
           } else {
             logs.push('步骤2 弹窗已存在跳过 ' + elapsed());
