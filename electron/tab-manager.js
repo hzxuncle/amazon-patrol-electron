@@ -164,7 +164,7 @@ async function initDeliveryZip(site, zip) {
         } catch(e) { return { ok: false, error: e.message }; }
       })()
     `);
-    tabLog(`[TabManager] [DeliveryZip 诊断] ${site} hasToken=${diagResult.hasToken} httpStatus=${diagResult.status} ok=${diagResult.ok}`);
+    tabLog(`[TabManager] [DeliveryZip 诊断] ${site} hasToken=${diagResult.hasToken} httpStatus=${diagResult.status} ok=${diagResult.ok} error=${diagResult.error||''}`);
     tabLog(`[TabManager] [DeliveryZip 诊断] pageTitle="${diagResult.pageTitle}"`);
     tabLog(`[TabManager] [DeliveryZip 诊断] bodySnippet="${diagResult.bodySnippet}"`);
     tabLog(`[TabManager] [DeliveryZip 诊断] respSnippet="${diagResult.respSnippet}"`);
