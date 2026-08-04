@@ -138,6 +138,7 @@ async function initDeliveryZip(site, zip) {
       tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
     }
 
+    const useNewEndpoint = ['UK', 'DE'].includes(site);
     const ok = await win.webContents.executeJavaScript(`
       (async function() {
         // 等待 CSRF token 出现，最多 5 秒
@@ -148,9 +149,10 @@ async function initDeliveryZip(site, zip) {
           await new Promise(r => setTimeout(r, 500));
         }
 
-        // 先尝试新 endpoint（JSON + header token），UK/DE 实测需要此格式
+        ${useNewEndpoint ? `
+        // UK/DE：新 endpoint（JSON + header token）
         try {
-          const r1 = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
+          const resp = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
             method: 'POST',
             credentials: 'include',
             headers: {
@@ -167,12 +169,12 @@ async function initDeliveryZip(site, zip) {
               actionSource: 'glow'
             })
           });
-          if (r1.ok) return true;
-        } catch(e) {}
-
-        // 回退旧 endpoint（form-urlencoded + body token），ES/IT/FR 实测有效
+          return resp.ok;
+        } catch(e) { return false; }
+        ` : `
+        // 其他站点：旧 endpoint（form-urlencoded + body token）
         try {
-          const r2 = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
+          const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -186,10 +188,9 @@ async function initDeliveryZip(site, zip) {
               'anti-csrftoken-a2z': token
             }).toString()
           });
-          if (r2.ok) return true;
-        } catch(e) {}
-
-        return false;
+          return resp.ok;
+        } catch(e) { return false; }
+        `}
       })()
     `);
 
