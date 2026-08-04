@@ -200,7 +200,6 @@ async function _tryInitDeliveryZip(site, zip, siteUrl, asin) {
       tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
     }
 
-    const useUiClick = ['UK', 'DE'].includes(site);
     const jsTimeout = new Promise(resolve => setTimeout(() => resolve(false), 35000));
     const ok = await Promise.race([jsTimeout, win.webContents.executeJavaScript(`
       (async function() {
