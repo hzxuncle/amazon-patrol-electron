@@ -40,14 +40,6 @@ const SITE_LANG_MAP = {
   'amazon.com.tr': 'tr_TR',
 };
 
-// 需要强制指定币种的站点，key 为二字码（目前已验证的欧洲站点）
-const SITE_CURRENCY_MAP = {
-  'UK': 'GBP',
-  'DE': 'EUR',
-  'FR': 'EUR',
-  'IT': 'EUR',
-  'ES': 'EUR',
-};
 
 const { BUILTIN_SITES } = require('./sites-data');
 
@@ -93,16 +85,10 @@ function getSiteLang(code) {
   return SITE_LANG_MAP[key] || 'en_US';
 }
 
-function getCurrencyByCode(code) {
-  return SITE_CURRENCY_MAP[code] || null;
-}
-
 function buildProductUrl(site, asin) {
   const base = getSiteUrl(site);
   const lang = getSiteLang(site);
-  const currency = getCurrencyByCode(site);
-  const params = currency ? `language=${lang}&currency=${currency}` : `language=${lang}`;
-  return `${base}/dp/${asin}?${params}`;
+  return `${base}/dp/${asin}?language=${lang}`;
 }
 
 function sleep(ms) {
