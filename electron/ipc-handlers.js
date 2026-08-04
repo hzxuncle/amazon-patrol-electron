@@ -502,12 +502,6 @@ function register() {
     store.set('patrolState', { running: true, totalCount, completedCount: 0 });
     tabManager.resetSiteInit();
     broadcastLog(`🚀 巡店开始，共 ${tasks.length} 个任务，并发 ${config.concurrency || 2}`);
-
-    // 提前启动所有站点的配送地初始化（Phase 1），让 Worker 启动时直接等待
-    // 而不是等第一个任务触发后才开始初始化
-    const sitesInTasks = [...new Set(tasks.map(t => t.site))];
-    tabManager.prewarmDeliveryZips(sitesInTasks, config.deliveryZips || {}, tasks);
-
     processQueue(config);
     return { success: true, totalTasks: tasks.length };
   });
