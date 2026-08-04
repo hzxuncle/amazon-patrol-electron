@@ -174,33 +174,60 @@ async function initDeliveryZip(site, zip) {
         ${useUiClick ? `
         // UK/DE：通过点击页面 UI 弹窗设置邮编（DOM 操作，不依赖 AJAX token）
         try {
-          // 等待页面主体元素加载完成，最多 8 秒
+          const t0 = Date.now();
+          const elapsed = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
+
+          // 步骤1：等待导航栏加载完成
+          let navFound = false;
           for (let i = 0; i < 16; i++) {
-            if (document.getElementById('nav-global-location-popover-link')) break;
+            if (document.getElementById('nav-global-location-popover-link')) { navFound = true; break; }
             await new Promise(r => setTimeout(r, 500));
           }
+          console.log('[DeliveryZip] 步骤1 nav-global-location-popover-link:', navFound ? '找到' : '未找到', elapsed());
+          if (!navFound) return '__FAIL_NAV__';
+
+          // 步骤2：点击打开地址弹窗
           if (!document.getElementById('GLUXZipUpdateInput')) {
-            document.getElementById('nav-global-location-popover-link')?.click();
-            // 等待弹窗出现，最多 8 秒
+            document.getElementById('nav-global-location-popover-link').click();
+            console.log('[DeliveryZip] 步骤2 点击地址按钮', elapsed());
+            let popupFound = false;
             for (let i = 0; i < 16; i++) {
               await new Promise(r => setTimeout(r, 500));
-              if (document.getElementById('GLUXZipUpdateInput')) break;
+              if (document.getElementById('GLUXZipUpdateInput')) { popupFound = true; break; }
             }
+            console.log('[DeliveryZip] 步骤2 GLUXZipUpdateInput:', popupFound ? '出现' : '未出现', elapsed());
+            if (!popupFound) return '__FAIL_POPUP__';
+          } else {
+            console.log('[DeliveryZip] 步骤2 弹窗已存在，跳过点击', elapsed());
           }
+
+          // 步骤3：填入邮编
           const zipInput = document.getElementById('GLUXZipUpdateInput');
-          if (!zipInput) return false;
+          if (!zipInput) return '__FAIL_ZIP_INPUT__';
           zipInput.value = ${JSON.stringify(zip)};
           zipInput.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('[DeliveryZip] 步骤3 填入邮编', elapsed());
+
+          // 步骤4：点击 Apply
           const applyBtn = document.querySelector('#GLUXZipUpdate input[type="submit"]');
-          if (!applyBtn) return false;
+          if (!applyBtn) { console.log('[DeliveryZip] 步骤4 Apply 按钮未找到', elapsed()); return '__FAIL_APPLY__'; }
           applyBtn.click();
+          console.log('[DeliveryZip] 步骤4 点击 Apply', elapsed());
           await new Promise(r => setTimeout(r, 1500));
+
+          // 步骤5：点击 Confirm（部分场景出现）
           const confirmBtn = document.getElementById('GLUXConfirmClose') ||
                              document.querySelector('.a-popover-footer input.a-button-input');
-          if (confirmBtn) confirmBtn.click();
+          if (confirmBtn) {
+            confirmBtn.click();
+            console.log('[DeliveryZip] 步骤5 点击 Confirm', elapsed());
+          } else {
+            console.log('[DeliveryZip] 步骤5 无 Confirm 按钮', elapsed());
+          }
           await new Promise(r => setTimeout(r, 1000));
+          console.log('[DeliveryZip] 完成', elapsed());
           return true;
-        } catch(e) { return false; }
+        } catch(e) { return '__FAIL_ERR__:' + e.message; }
         ` : `
         // 其他站点：AJAX 接口设置邮编
         let token = '';
@@ -230,18 +257,16 @@ async function initDeliveryZip(site, zip) {
       })()
     `)]);
 
-    if (ok) {
-      // 验证配送地是否真的切换成功（读取页面上的配送地显示）
+    if (ok === true) {
       await sleep(1000);
       const deliveryText = await win.webContents.executeJavaScript(`
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
       tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: ` + deliveryText + `）`);
-
       initializedSites.add(site);
     } else {
       initializedSites.add(site);
-      tabLog(`[TabManager] ⚠️ 配送地设置失败，跳过继续抓取: ${site}`);
+      tabLog(`[TabManager] ⚠️ 配送地设置失败: ${site} 原因: ${JSON.stringify(ok)}`);
     }
 
     // 无论配送地是否成功，都写入 i18n-prefs Cookie 确保币种正确
