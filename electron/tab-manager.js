@@ -119,14 +119,14 @@ async function waitForLoad(win, maxWait = 15000) {
 
 // 通过一个临时隐藏窗口为指定站点设置配送地，设置完毕关闭
 // session 共享 Cookie，后续所有同站点窗口自动继承配送地
-async function initDeliveryZip(site, zip) {
+async function initDeliveryZip(site, zip, asin) {
   if (!zip || initializedSites.has(site)) return;
   const siteUrl = getSiteUrl(site);
 
   // 串行执行：等待上一个站点初始化完成后再开始，避免并发触发 Amazon ERR_ABORTED
   const myTurn = initLock.then(async () => {
     for (let attempt = 1; attempt <= 3; attempt++) {
-      const succeeded = await _tryInitDeliveryZip(site, zip, siteUrl);
+      const succeeded = await _tryInitDeliveryZip(site, zip, siteUrl, asin);
       if (succeeded) return;
       if (attempt < 3) {
         tabLog(`[TabManager] 配送地初始化失败，3秒后重试 (${attempt}/3): ${site}`);
@@ -140,7 +140,7 @@ async function initDeliveryZip(site, zip) {
   await myTurn;
 }
 
-async function _tryInitDeliveryZip(site, zip, siteUrl) {
+async function _tryInitDeliveryZip(site, zip, siteUrl, asin) {
 
   const useUiClickMode = ['UK', 'DE'].includes(site);
   // UK/DE 的 popover 交互需要可见窗口，定位到屏幕外避免干扰用户
@@ -167,8 +167,13 @@ async function _tryInitDeliveryZip(site, zip, siteUrl) {
       return true;
     }
 
-    // 加载首页拿到 CSRF token（首页比商品页更稳定）
-    await win.loadURL(siteUrl + `?language=${getSiteLang(site)}`);
+    // UK/DE 加载商品页（Cookie 弹窗和地址弹窗都在商品页正常渲染）
+    // 其他站点加载首页获取 CSRF token
+    const useUiClick = ['UK', 'DE'].includes(site);
+    const initUrl = (useUiClick && asin)
+      ? buildProductUrl(site, asin)
+      : siteUrl + `?language=${getSiteLang(site)}`;
+    await win.loadURL(initUrl);
     await waitForLoad(win);
 
     // 处理 Cookie 同意弹窗（部分站点首次访问会显示）
@@ -249,19 +254,21 @@ async function _tryInitDeliveryZip(site, zip, siteUrl) {
           if (!applyBtn) return { ok: false, logs, reason: 'APPLY_NOT_FOUND' };
           applyBtn.click();
           logs.push('步骤4 点击Apply ' + elapsed());
-          await new Promise(r => setTimeout(r, 1500));
+          // 等待 Confirm 按钮出现（Apply 后会出现确认框，不是刷新页面）
+          let confirmBtn = null;
+          for (let i = 0; i < 10; i++) {
+            await new Promise(r => setTimeout(r, 500));
+            confirmBtn = document.getElementById('GLUXConfirmClose') ||
+                         document.querySelector('.a-popover-footer input.a-button-input');
+            if (confirmBtn) break;
+          }
 
-          // 步骤5：点击 Confirm（部分场景出现）
-          const confirmBtn = document.getElementById('GLUXConfirmClose') ||
-                             document.querySelector('.a-popover-footer input.a-button-input');
+          // 步骤5：点击 Confirm → 页面会自动刷新
           if (confirmBtn) {
             confirmBtn.click();
             logs.push('步骤5 点击Confirm ' + elapsed());
-            // 等待页面刷新后地址生效
-            await new Promise(r => setTimeout(r, 3000));
           } else {
             logs.push('步骤5 无Confirm按钮 ' + elapsed());
-            await new Promise(r => setTimeout(r, 3000));
           }
           logs.push('完成 ' + elapsed());
           return { ok: true, logs };
@@ -319,7 +326,8 @@ async function _tryInitDeliveryZip(site, zip, siteUrl) {
     }
 
     if (okResult.ok) {
-      await sleep(2000);
+      // Confirm 后页面会刷新，等待加载完成再读取配送地
+      await waitForLoad(win);
       const deliveryText = await win.webContents.executeJavaScript(`
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
@@ -463,7 +471,7 @@ async function openTabForTask(task, config) {
   // 每站点只初始化一次配送地，并发时后续 worker 等待同一个 Promise 而不是重复初始化
   if (zip && !initializedSites.has(site)) {
     if (!pendingSiteInit.has(site)) {
-      const p = initDeliveryZip(site, zip);
+      const p = initDeliveryZip(site, zip, asin);
       pendingSiteInit.set(site, p);
       p.finally(() => pendingSiteInit.delete(site));
     }
