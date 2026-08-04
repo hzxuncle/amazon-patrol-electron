@@ -138,11 +138,13 @@ async function initDeliveryZip(site, zip) {
       tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
     }
 
-    const ok = await win.webContents.executeJavaScript(`
+    const diagResult = await win.webContents.executeJavaScript(`
       (async function() {
         try {
           const tokenEl = document.querySelector('input[name="anti-csrftoken-a2z"]');
           const token = tokenEl ? tokenEl.value : '';
+          const pageTitle = document.title.slice(0, 60);
+          const bodySnippet = document.body ? document.body.innerText.slice(0, 200).replace(/\\s+/g,' ') : '';
           const resp = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
             method: 'POST',
             credentials: 'include',
@@ -157,10 +159,16 @@ async function initDeliveryZip(site, zip) {
               'anti-csrftoken-a2z': token
             }).toString()
           });
-          return resp.ok;
-        } catch(e) { return false; }
+          const respText = await resp.text();
+          return { ok: resp.ok, status: resp.status, hasToken: !!token, pageTitle, bodySnippet, respSnippet: respText.slice(0,200) };
+        } catch(e) { return { ok: false, error: e.message }; }
       })()
     `);
+    tabLog(`[TabManager] [DeliveryZip 诊断] ${site} hasToken=${diagResult.hasToken} httpStatus=${diagResult.status} ok=${diagResult.ok}`);
+    tabLog(`[TabManager] [DeliveryZip 诊断] pageTitle="${diagResult.pageTitle}"`);
+    tabLog(`[TabManager] [DeliveryZip 诊断] bodySnippet="${diagResult.bodySnippet}"`);
+    tabLog(`[TabManager] [DeliveryZip 诊断] respSnippet="${diagResult.respSnippet}"`);
+    const ok = diagResult.ok;
 
     if (ok) {
       initializedSites.add(site);
