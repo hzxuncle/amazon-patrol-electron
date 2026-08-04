@@ -140,15 +140,17 @@ async function initDeliveryZip(site, zip) {
 
     const ok = await win.webContents.executeJavaScript(`
       (async function() {
+        // 等待 CSRF token 出现，最多 5 秒
+        let token = '';
+        for (let i = 0; i < 10; i++) {
+          const el = document.querySelector('input[name="anti-csrftoken-a2z"]');
+          if (el && el.value) { token = el.value; break; }
+          await new Promise(r => setTimeout(r, 500));
+        }
+
+        // 先尝试新 endpoint（JSON + header token），UK/DE 实测需要此格式
         try {
-          // 等待 CSRF token 出现，最多 5 秒
-          let token = '';
-          for (let i = 0; i < 10; i++) {
-            const el = document.querySelector('input[name="anti-csrftoken-a2z"]');
-            if (el && el.value) { token = el.value; break; }
-            await new Promise(r => setTimeout(r, 500));
-          }
-          const resp = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
+          const r1 = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
             method: 'POST',
             credentials: 'include',
             headers: {
@@ -165,14 +167,40 @@ async function initDeliveryZip(site, zip) {
               actionSource: 'glow'
             })
           });
-          return resp.ok;
-        } catch(e) { return false; }
+          if (r1.ok) return true;
+        } catch(e) {}
+
+        // 回退旧 endpoint（form-urlencoded + body token），ES/IT/FR 实测有效
+        try {
+          const r2 = await fetch('${siteUrl}/gp/delivery/ajax/address-change.html', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              locationType: 'LOCATION_INPUT',
+              zipCode: ${JSON.stringify(zip)},
+              storeContext: 'generic',
+              deviceType: 'web',
+              pageType: 'Gateway',
+              actionSource: 'glow',
+              'anti-csrftoken-a2z': token
+            }).toString()
+          });
+          if (r2.ok) return true;
+        } catch(e) {}
+
+        return false;
       })()
     `);
 
     if (ok) {
+      // 验证配送地是否真的切换成功（读取页面上的配送地显示）
+      await sleep(1000);
+      const deliveryText = await win.webContents.executeJavaScript(`
+        (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
+      `).catch(() => '');
+      tabLog(\`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: \${deliveryText}）\`);
       initializedSites.add(site);
-      tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}`);
     } else {
       // 设置失败时标记为已初始化（跳过），避免异常 session 影响后续抓取
       initializedSites.add(site);
