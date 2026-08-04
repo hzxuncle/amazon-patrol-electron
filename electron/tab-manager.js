@@ -176,6 +176,7 @@ async function initDeliveryZip(site, zip) {
         try {
           const t0 = Date.now();
           const elapsed = () => ((Date.now() - t0) / 1000).toFixed(1) + 's';
+          const logs = [];
 
           // 步骤1：等待导航栏加载完成
           let navFound = false;
@@ -183,36 +184,36 @@ async function initDeliveryZip(site, zip) {
             if (document.getElementById('nav-global-location-popover-link')) { navFound = true; break; }
             await new Promise(r => setTimeout(r, 500));
           }
-          console.log('[DeliveryZip] 步骤1 nav-global-location-popover-link:', navFound ? '找到' : '未找到', elapsed());
-          if (!navFound) return '__FAIL_NAV__';
+          logs.push('步骤1 nav按钮:' + (navFound ? '找到' : '未找到') + ' ' + elapsed());
+          if (!navFound) return { ok: false, logs, reason: 'NAV_NOT_FOUND' };
 
           // 步骤2：点击打开地址弹窗
           if (!document.getElementById('GLUXZipUpdateInput')) {
             document.getElementById('nav-global-location-popover-link').click();
-            console.log('[DeliveryZip] 步骤2 点击地址按钮', elapsed());
+            logs.push('步骤2 点击nav按钮 ' + elapsed());
             let popupFound = false;
             for (let i = 0; i < 16; i++) {
               await new Promise(r => setTimeout(r, 500));
               if (document.getElementById('GLUXZipUpdateInput')) { popupFound = true; break; }
             }
-            console.log('[DeliveryZip] 步骤2 GLUXZipUpdateInput:', popupFound ? '出现' : '未出现', elapsed());
-            if (!popupFound) return '__FAIL_POPUP__';
+            logs.push('步骤2 邮编输入框:' + (popupFound ? '出现' : '未出现') + ' ' + elapsed());
+            if (!popupFound) return { ok: false, logs, reason: 'POPUP_NOT_FOUND' };
           } else {
-            console.log('[DeliveryZip] 步骤2 弹窗已存在，跳过点击', elapsed());
+            logs.push('步骤2 弹窗已存在跳过 ' + elapsed());
           }
 
           // 步骤3：填入邮编
           const zipInput = document.getElementById('GLUXZipUpdateInput');
-          if (!zipInput) return '__FAIL_ZIP_INPUT__';
+          if (!zipInput) return { ok: false, logs, reason: 'ZIP_INPUT_GONE' };
           zipInput.value = ${JSON.stringify(zip)};
           zipInput.dispatchEvent(new Event('input', { bubbles: true }));
-          console.log('[DeliveryZip] 步骤3 填入邮编', elapsed());
+          logs.push('步骤3 填入邮编 ' + elapsed());
 
           // 步骤4：点击 Apply
           const applyBtn = document.querySelector('#GLUXZipUpdate input[type="submit"]');
-          if (!applyBtn) { console.log('[DeliveryZip] 步骤4 Apply 按钮未找到', elapsed()); return '__FAIL_APPLY__'; }
+          if (!applyBtn) return { ok: false, logs, reason: 'APPLY_NOT_FOUND' };
           applyBtn.click();
-          console.log('[DeliveryZip] 步骤4 点击 Apply', elapsed());
+          logs.push('步骤4 点击Apply ' + elapsed());
           await new Promise(r => setTimeout(r, 1500));
 
           // 步骤5：点击 Confirm（部分场景出现）
@@ -220,14 +221,14 @@ async function initDeliveryZip(site, zip) {
                              document.querySelector('.a-popover-footer input.a-button-input');
           if (confirmBtn) {
             confirmBtn.click();
-            console.log('[DeliveryZip] 步骤5 点击 Confirm', elapsed());
+            logs.push('步骤5 点击Confirm ' + elapsed());
           } else {
-            console.log('[DeliveryZip] 步骤5 无 Confirm 按钮', elapsed());
+            logs.push('步骤5 无Confirm按钮 ' + elapsed());
           }
           await new Promise(r => setTimeout(r, 1000));
-          console.log('[DeliveryZip] 完成', elapsed());
-          return true;
-        } catch(e) { return '__FAIL_ERR__:' + e.message; }
+          logs.push('完成 ' + elapsed());
+          return { ok: true, logs };
+        } catch(e) { return { ok: false, logs: [], reason: 'ERR:' + e.message }; }
         ` : `
         // 其他站点：AJAX 接口设置邮编
         let token = '';
@@ -257,7 +258,13 @@ async function initDeliveryZip(site, zip) {
       })()
     `)]);
 
-    if (ok === true) {
+    // 解析返回值（UK/DE 返回对象含 logs，其他站点返回 bool）
+    const okResult = (ok && typeof ok === 'object') ? ok : { ok: !!ok, logs: [] };
+    if (okResult.logs && okResult.logs.length) {
+      okResult.logs.forEach(l => tabLog(`[DeliveryZip] ${site} ${l}`));
+    }
+
+    if (okResult.ok) {
       await sleep(1000);
       const deliveryText = await win.webContents.executeJavaScript(`
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
@@ -266,7 +273,7 @@ async function initDeliveryZip(site, zip) {
       initializedSites.add(site);
     } else {
       initializedSites.add(site);
-      tabLog(`[TabManager] ⚠️ 配送地设置失败: ${site} 原因: ${JSON.stringify(ok)}`);
+      tabLog(`[TabManager] ⚠️ 配送地设置失败: ${site} 原因: ${okResult.reason || 'timeout'}`);
     }
 
     // 无论配送地是否成功，都写入 i18n-prefs Cookie 确保币种正确
