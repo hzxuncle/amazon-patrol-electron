@@ -200,7 +200,7 @@ async function initDeliveryZip(site, zip) {
       const deliveryText = await win.webContents.executeJavaScript(`
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
-      tabLog(\`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: \${deliveryText}）\`);
+      tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: ` + deliveryText + `）`);
       initializedSites.add(site);
     } else {
       // 设置失败时标记为已初始化（跳过），避免异常 session 影响后续抓取
