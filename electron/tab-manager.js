@@ -152,7 +152,13 @@ async function initDeliveryZip(site, zip) {
         ${useNewEndpoint ? `
         // UK/DE：新 endpoint（JSON + header token）
         try {
-          if (!token) return '__NO_TOKEN__';
+          if (!token) {
+            // 扫描页面上所有可能含 token 的元素，帮助定位
+            const candidates = [
+              ...document.querySelectorAll('[name*="csrf"], [name*="token"], meta[name*="csrf"], meta[name*="token"]')
+            ].map(el => el.tagName + '[' + el.name + ']=' + (el.value||el.getAttribute('content')||'').slice(0,30));
+            return '__NO_TOKEN__:' + candidates.slice(0,5).join('|');
+          }
           const resp = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
             method: 'POST',
             credentials: 'include',
@@ -195,8 +201,8 @@ async function initDeliveryZip(site, zip) {
       })()
     `);
 
-    if (ok === '__NO_TOKEN__') {
-      tabLog(`[TabManager] ⚠️ 配送地设置跳过：CSRF token 未获取到: ${site}`);
+    if (typeof ok === 'string' && ok.startsWith('__NO_TOKEN__')) {
+      tabLog(`[TabManager] ⚠️ 配送地设置跳过：CSRF token 未获取到: ${site} 候选元素: ` + ok.slice(12));
       initializedSites.add(site);
     } else if (ok) {
       // 验证配送地是否真的切换成功（读取页面上的配送地显示）
