@@ -154,14 +154,17 @@ async function initDeliveryZip(site, zip) {
 
         ${useNewEndpoint ? `
         // UK/DE：新 endpoint（JSON + header token）
+        // 未登录 session 的 token 字段名是 glow-validation-token，header 名需与之匹配
         try {
           if (!token) return false;
+          const tokenEl = document.querySelector('input[name="glow-validation-token"]');
+          const headerName = tokenEl ? 'glow-validation-token' : 'anti-csrftoken-a2z';
           const resp = await fetch('${siteUrl}/portal-migration/hz/glow/address-change?actionSource=glow', {
             method: 'POST',
             credentials: 'include',
             headers: {
               'Content-Type': 'application/json',
-              'anti-csrftoken-a2z': token,
+              [headerName]: token,
               'x-requested-with': 'XMLHttpRequest'
             },
             body: JSON.stringify({
