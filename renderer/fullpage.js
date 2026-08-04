@@ -851,9 +851,6 @@ async function startPatrol() {
     userIds:   dom.dingtalkUserIds   ? dom.dingtalkUserIds.value.trim()   : '',
   };
 
-  // 每次开始巡店都是全新任务，清除上次结果
-  allResults = [];
-
   const confirmLines = [
     `共 ${td.totalCount} 个任务`,
     `并发 ${config.concurrency} · 间隔 ${config.pageInterval/1000}s`
@@ -861,6 +858,10 @@ async function startPatrol() {
 
   const confirmed = await showConfirmDialog('开始巡店', confirmLines, '开始', '取消');
   if (!confirmed) return;
+
+  // 用户确认后立即清空上次结果并刷新 UI
+  allResults = [];
+  renderAllResults();
 
   const res = await window.electronAPI.sendMessage('START_PATROL', {
     tasks: td.tasks,
