@@ -150,25 +150,26 @@ async function initDeliveryZip(site, zip) {
     `).catch(() => false);
     if (cookieClicked) {
       await waitForLoad(win);
+      await sleep(1000); // Cookie 弹窗跳转后额外等待页面稳定
       tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
     }
 
     const useUiClick = ['UK', 'DE'].includes(site);
-    const jsTimeout = new Promise(resolve => setTimeout(() => resolve(false), 20000));
+    const jsTimeout = new Promise(resolve => setTimeout(() => resolve(false), 35000));
     const ok = await Promise.race([jsTimeout, win.webContents.executeJavaScript(`
       (async function() {
         ${useUiClick ? `
         // UK/DE：通过点击页面 UI 弹窗设置邮编（DOM 操作，不依赖 AJAX token）
         try {
-          // 等待页面主体元素加载完成
-          for (let i = 0; i < 10; i++) {
+          // 等待页面主体元素加载完成，最多 8 秒
+          for (let i = 0; i < 16; i++) {
             if (document.getElementById('nav-global-location-popover-link')) break;
             await new Promise(r => setTimeout(r, 500));
           }
           if (!document.getElementById('GLUXZipUpdateInput')) {
             document.getElementById('nav-global-location-popover-link')?.click();
-            // 等待弹窗出现，最多 5 秒
-            for (let i = 0; i < 10; i++) {
+            // 等待弹窗出现，最多 8 秒
+            for (let i = 0; i < 16; i++) {
               await new Promise(r => setTimeout(r, 500));
               if (document.getElementById('GLUXZipUpdateInput')) break;
             }
