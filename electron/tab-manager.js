@@ -122,6 +122,22 @@ async function initDeliveryZip(site, zip) {
     await win.loadURL(siteUrl + `?language=${getSiteLang(site)}`);
     await waitForLoad(win);
 
+    // 处理 Cookie 同意弹窗（部分站点首次访问会显示）
+    const cookieClicked = await win.webContents.executeJavaScript(`
+      (function() {
+        const btn = document.querySelector(
+          'input[name="accept"], #sp-cc-accept, [data-cell-id="accept"] input, ' +
+          'button[id*="accept"], .a-button-input[name="accept"]'
+        );
+        if (btn) { btn.click(); return true; }
+        return false;
+      })()
+    `).catch(() => false);
+    if (cookieClicked) {
+      await waitForLoad(win);
+      tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
+    }
+
     const ok = await win.webContents.executeJavaScript(`
       (async function() {
         try {
