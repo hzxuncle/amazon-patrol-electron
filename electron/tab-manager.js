@@ -111,8 +111,10 @@ async function initDeliveryZip(site, zip) {
   if (!zip || initializedSites.has(site)) return;
   const siteUrl = getSiteUrl(site);
 
+  // UK/DE 需要显示窗口才能正常触发 UI 弹窗交互
+  const needShow = ['UK', 'DE'].includes(site);
   const win = new BrowserWindow({
-    show: false, width: 800, height: 600,
+    show: needShow, width: 800, height: 600,
     webPreferences: { nodeIntegration: false, contextIsolation: false, javascript: true }
   });
   win.webContents.setUserAgent(CHROME_UA);
