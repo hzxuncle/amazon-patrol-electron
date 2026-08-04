@@ -40,6 +40,26 @@ const SITE_LANG_MAP = {
   'amazon.com.tr': 'tr_TR',
 };
 
+// 需要强制指定币种的站点（不指定时 Amazon 可能按 IP 显示其他币种）
+const SITE_CURRENCY_MAP = {
+  'amazon.co.uk':  'GBP',
+  'amazon.de':     'EUR',
+  'amazon.fr':     'EUR',
+  'amazon.it':     'EUR',
+  'amazon.es':     'EUR',
+  'amazon.nl':     'EUR',
+  'amazon.se':     'SEK',
+  'amazon.pl':     'PLN',
+  'amazon.com.be': 'EUR',
+  'amazon.co.jp':  'JPY',
+  'amazon.in':     'INR',
+  'amazon.sg':     'SGD',
+  'amazon.com.br': 'BRL',
+  'amazon.ae':     'AED',
+  'amazon.sa':     'SAR',
+  'amazon.com.tr': 'TRY',
+};
+
 const { BUILTIN_SITES } = require('./sites-data');
 
 // code → { domain, lang } 映射，优先用内置数据
@@ -84,10 +104,18 @@ function getSiteLang(code) {
   return SITE_LANG_MAP[key] || 'en_US';
 }
 
+function getCurrencyByCode(code) {
+  const domain = CODE_TO_DOMAIN[code] || code;
+  const key = domain.replace(/^www\./, '');
+  return SITE_CURRENCY_MAP['amazon.' + key.replace(/^amazon\./, '')] || null;
+}
+
 function buildProductUrl(site, asin) {
   const base = getSiteUrl(site);
   const lang = getSiteLang(site);
-  return `${base}/dp/${asin}?language=${lang}`;
+  const currency = getCurrencyByCode(site);
+  const params = currency ? `language=${lang}&currency=${currency}` : `language=${lang}`;
+  return `${base}/dp/${asin}?${params}`;
 }
 
 function sleep(ms) {
