@@ -851,52 +851,22 @@ async function startPatrol() {
     userIds:   dom.dingtalkUserIds   ? dom.dingtalkUserIds.value.trim()   : '',
   };
 
-  // 检查是否有未完成的任务 (已停止但还有结果)
-  const hasExisting = allResults.length > 0;
-  const existingKeys = new Set(allResults.map(r => `${r.asin}_${r.site}`));
+  // 每次开始巡店都是全新任务，清除上次结果
+  allResults = [];
 
-  // 构建新任务的key集合
-  const newKeys = new Set(td.tasks.map(t => `${t.asin}_${t.site}`));
-
-  // 检测任务是否变化
-  let taskChanged = false;
-  if (hasExisting) {
-    const onlyInOld = [...existingKeys].filter(k => !newKeys.has(k));
-    const onlyInNew = [...newKeys].filter(k => !existingKeys.has(k));
-    taskChanged = onlyInOld.length > 0 || onlyInNew.length > 0;
-  }
-
-  // 过滤出未完成的任务
-  const completedKeys = new Set(allResults.map(r => `${r.asin}_${r.site}`));
-  const remainingTasks = td.tasks.filter(t => !completedKeys.has(`${t.asin}_${t.site}`));
-
-  if (remainingTasks.length === 0 && allResults.length >= td.tasks.length) {
-    await showAlert('提示', '所有任务均已完成');
-    return;
-  }
-
-  const isContinue = hasExisting && !taskChanged && remainingTasks.length < td.tasks.length;
-
-  // 构建确认对话框信息
-  const confirmLines = [];
-  if (taskChanged) confirmLines.push('任务列表已变更，已有结果将被清除');
-  if (isContinue) {
-    confirmLines.push(`继续上次巡店，剩余 ${remainingTasks.length} / ${td.totalCount} 个任务`);
-  } else {
-    confirmLines.push(`共 ${td.totalCount} 个任务`);
-    confirmLines.push(`并发 ${config.concurrency} · 间隔 ${config.pageInterval/1000}s`);
-  }
+  const confirmLines = [
+    `共 ${td.totalCount} 个任务`,
+    `并发 ${config.concurrency} · 间隔 ${config.pageInterval/1000}s`
+  ];
 
   const confirmed = await showConfirmDialog('开始巡店', confirmLines, '开始', '取消');
   if (!confirmed) return;
 
-  if (taskChanged) allResults = [];
-
   const res = await window.electronAPI.sendMessage('START_PATROL', {
-    tasks: remainingTasks,
+    tasks: td.tasks,
     config,
     totalCount: td.tasks.length,
-    keepExisting: isContinue
+    keepExisting: false
   });
   if (res && res.success) {
     patrolRunning = true;
