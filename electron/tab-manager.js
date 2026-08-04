@@ -17,6 +17,15 @@ function unpackedPath(p) {
 
 const sitesIndex = require(path.join(__dirname, '../renderer/sites/index.js'));
 
+// i18n-prefs Cookie 控制页面显示币种，已验证 UK/DE/FR/IT/ES 需要显式设置
+const SITE_CURRENCY_COOKIE = {
+  'UK': 'GBP',
+  'DE': 'EUR',
+  'FR': 'EUR',
+  'IT': 'EUR',
+  'ES': 'EUR',
+};
+
 const SITE_LANG_MAP = {
   'amazon.com':    'en_US',
   'amazon.ca':     'en_CA',
@@ -214,6 +223,24 @@ async function initDeliveryZip(site, zip) {
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
       tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: ` + deliveryText + `）`);
+
+      // 直接写入 i18n-prefs Cookie 设置显示币种（该 Cookie 由 Amazon 读取，无需接口）
+      const currency = SITE_CURRENCY_COOKIE[site];
+      if (currency) {
+        const domain = getDomainByCode(site) || '';
+        await win.webContents.session.cookies.set({
+          url: siteUrl,
+          name: 'i18n-prefs',
+          value: currency,
+          domain: '.' + domain,
+          path: '/',
+          secure: true,
+          httpOnly: false,
+          expirationDate: Math.floor(Date.now() / 1000) + 365 * 24 * 3600
+        });
+        tabLog(`[TabManager] 币种 Cookie 已设置: ${site} → ${currency}`);
+      }
+
       initializedSites.add(site);
     } else {
       // 设置失败时标记为已初始化（跳过），避免异常 session 影响后续抓取
