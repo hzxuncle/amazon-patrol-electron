@@ -152,18 +152,25 @@ async function initDeliveryZip(site, zip) {
 
     // 处理 Cookie 同意弹窗（部分站点首次访问会显示）
     const cookieClicked = await win.webContents.executeJavaScript(`
-      (function() {
+      (async function() {
         const btn = document.querySelector(
           'input[name="accept"], #sp-cc-accept, [data-cell-id="accept"] input, ' +
           'button[id*="accept"], .a-button-input[name="accept"]'
         );
-        if (btn) { btn.click(); return true; }
-        return false;
+        if (!btn) return false;
+        btn.click();
+        // 等待弹窗消失（最多 5 秒），而不是等页面加载
+        for (let i = 0; i < 10; i++) {
+          await new Promise(r => setTimeout(r, 500));
+          const stillThere = document.querySelector('#sp-cc-accept, [data-cell-id="accept"] input');
+          if (!stillThere) return true;
+        }
+        return true;
       })()
     `).catch(() => false);
     if (cookieClicked) {
       await waitForLoad(win);
-      await sleep(1000); // Cookie 弹窗跳转后额外等待页面稳定
+      await sleep(1000);
       tabLog(`[TabManager] Cookie 弹窗已处理: ${site}`);
     }
 
