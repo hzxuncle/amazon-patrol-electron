@@ -10,11 +10,6 @@ const FR_SELECTORS = {
     '.a-price[data-a-size="m"] .a-offscreen',
     '#corePrice_feature_div .a-offscreen',
   ],
-  seller: [
-    'a#sellerProfileTriggerId',
-    '#merchant-info a',
-    '#merchantInfoFeature_feature_div .offer-display-feature-text',
-  ],
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = FR_SELECTORS;
