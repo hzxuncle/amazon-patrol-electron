@@ -167,10 +167,10 @@ async function _tryInitDeliveryZip(site, zip, siteUrl, asin) {
       return true;
     }
 
-    // UK/DE 加载商品页（Cookie 弹窗和地址弹窗都在商品页正常渲染）
-    // 其他站点加载首页获取 CSRF token
+    // 所有站点都加载商品页，确保 Cookie 弹窗能正常出现并被处理
+    // Cookie 弹窗只在商品页渲染，首页不会出现
     const useUiClick = ['UK', 'DE'].includes(site);
-    const initUrl = (useUiClick && asin)
+    const initUrl = asin
       ? buildProductUrl(site, asin)
       : siteUrl + `?language=${getSiteLang(site)}`;
     await win.loadURL(initUrl);
