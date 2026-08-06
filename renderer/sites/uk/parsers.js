@@ -65,5 +65,17 @@ function extractBsr(productInfo) {
   };
 }
 
-const UK_PARSERS = { extractProductDetails, extractBsr };
+function parseCoupon(rawText) {
+  if (!rawText) return '';
+  const text = rawText.replace(/\s+/g, ' ').trim();
+  if (text.length > 300) return '';
+  // Strip trailing noise: "Terms"
+  const clean = text.replace(/\s+Terms\b.*/i, '').trim();
+  if (!clean) return '';
+  // "Apply £10.20 voucher" / "Save 5%"
+  if (clean.match(/voucher/i) || clean.match(/coupon/i) || clean.match(/save\s+\d+%/i)) return clean;
+  return '';
+}
+
+const UK_PARSERS = { extractProductDetails, extractBsr, parseCoupon };
 if (typeof module !== 'undefined' && module.exports) module.exports = UK_PARSERS;

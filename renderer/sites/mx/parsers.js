@@ -67,5 +67,21 @@ function extractBsr(productInfo) {
   };
 }
 
-const MX_PARSERS = { extractRating, extractProductDetails, extractBsr };
+function parseCoupon(rawText) {
+  if (!rawText) return '';
+  const text = rawText.replace(/\s+/g, ' ').trim();
+  if (text.length > 300) return '';
+  // Strip trailing noise: "Comprar artículos | Términos" / "Términos"
+  const clean = text
+    .replace(/\s*\|\s*T[eé]rminos\b.*/i, '')
+    .replace(/\s+Comprar art[ií]culos\b.*/i, '')
+    .replace(/\s+T[eé]rminos\b.*/i, '')
+    .trim();
+  if (!clean) return '';
+  // "Aplica el cupón de 5 %" / "Se aplicó el cupón de descuento de 5 %"
+  if (clean.match(/cup[oó]n/i)) return clean;
+  return '';
+}
+
+const MX_PARSERS = { extractRating, extractProductDetails, extractBsr, parseCoupon };
 if (typeof module !== 'undefined' && module.exports) module.exports = MX_PARSERS;

@@ -157,6 +157,7 @@ const BASE_SELECTORS = {
     '#couponTextdollar',
     '#coupon_feature_div .a-size-small',
     '#promo_price_details_row .a-size-small',
+    'P#pqv-price-coupon-message',
     '.promoPriceBlockMessage',
     '#promoMessage',
     '.vpcoupon-text',

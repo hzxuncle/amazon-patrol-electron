@@ -73,5 +73,17 @@ function extractBsr(productInfo) {
   };
 }
 
-const FR_PARSERS = { extractPrice, extractRating, extractProductDetails, extractBsr };
+function parseCoupon(rawText) {
+  if (!rawText) return '';
+  const text = rawText.replace(/\s+/g, ' ').trim();
+  if (text.length > 300) return '';
+  // Strip trailing noise: "Termes"
+  const clean = text.replace(/\s+Termes\b.*/i, '').trim();
+  if (!clean) return '';
+  // "Cliquer pour payer 70,39 €" / "Coupon de X % appliqué"
+  if (clean.match(/coupon/i) || clean.match(/cliquer pour payer/i) || clean.match(/r[ée]duction/i)) return clean;
+  return '';
+}
+
+const FR_PARSERS = { extractPrice, extractRating, extractProductDetails, extractBsr, parseCoupon };
 if (typeof module !== 'undefined' && module.exports) module.exports = FR_PARSERS;

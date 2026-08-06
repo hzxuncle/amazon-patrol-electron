@@ -72,5 +72,17 @@ function extractBsr(productInfo) {
   };
 }
 
-const DE_PARSERS = { extractPrice, extractRating, extractProductDetails, extractBsr };
+function parseCoupon(rawText) {
+  if (!rawText) return '';
+  const text = rawText.replace(/\s+/g, ' ').trim();
+  if (text.length > 300) return '';
+  // Strip trailing noise: "Bedingungen"
+  const clean = text.replace(/\s+Bedingungen\b.*/i, '').trim();
+  if (!clean) return '';
+  // "20 %-Coupon anwenden" / "Coupon mit X % Rabatt angewendet"
+  if (clean.match(/coupon/i) || clean.match(/rabatt/i)) return clean;
+  return '';
+}
+
+const DE_PARSERS = { extractPrice, extractRating, extractProductDetails, extractBsr, parseCoupon };
 if (typeof module !== 'undefined' && module.exports) module.exports = DE_PARSERS;

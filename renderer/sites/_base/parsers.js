@@ -92,13 +92,20 @@ function parseAcBadge(rawText) {
 function parseCoupon(rawText) {
   if (!rawText) return '';
   const text = cleanText(rawText);
+  if (text.length > 300) return '';
 
-  // 排除误匹配（如非coupon的Save文本）
-  if (text.includes('Subscribe') && text.includes('Save')) return text;
-  if (text.includes('coupon') || text.includes('Coupon')) return text;
-  if (text.match(/save\s+\d+%/i)) return text;
-  if (text.match(/save\s+\$[\d.]+/i)) return text;
-  if (text.match(/save\s+with\s+clip/i)) return text;
+  // Strip trailing noise suffixes common across English sites
+  const clean = text
+    .replace(/\s*\|\s*Terms\b.*/i, '')
+    .replace(/\s+Terms\b.*/i, '')
+    .replace(/\s+Shop items\b.*/i, '')
+    .trim();
+
+  if (clean.includes('Subscribe') && clean.includes('Save')) return clean;
+  if (clean.includes('coupon') || clean.includes('Coupon')) return clean;
+  if (clean.match(/save\s+\d+%/i)) return clean;
+  if (clean.match(/save\s+\$[\d.]+/i)) return clean;
+  if (clean.match(/save\s+with\s+clip/i)) return clean;
 
   return '';
 }

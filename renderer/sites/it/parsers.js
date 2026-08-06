@@ -73,5 +73,21 @@ function extractBsr(productInfo) {
   };
 }
 
-const IT_PARSERS = { extractPrice, extractRating, extractProductDetails, extractBsr };
+function parseCoupon(rawText) {
+  if (!rawText) return '';
+  const text = rawText.replace(/\s+/g, ' ').trim();
+  if (text.length > 300) return '';
+  // Strip trailing noise: "Acquista articoli | Termini" / "Termini"
+  const clean = text
+    .replace(/\s*\|\s*Termini\b.*/i, '')
+    .replace(/\s+Acquista articoli\b.*/i, '')
+    .replace(/\s+Termini\b.*/i, '')
+    .trim();
+  if (!clean) return '';
+  // "Applica coupon 30€" / "Coupon di 30€ di sconto applicato"
+  if (clean.match(/coupon/i)) return clean;
+  return '';
+}
+
+const IT_PARSERS = { extractPrice, extractRating, extractProductDetails, extractBsr, parseCoupon };
 if (typeof module !== 'undefined' && module.exports) module.exports = IT_PARSERS;
