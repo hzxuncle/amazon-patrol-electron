@@ -19,10 +19,9 @@ function extractRating(text) {
 function extractProductDetails() {
   const result = {};
 
-  // IT 使用 productDetails_expanderSectionTables 结构
-  const sections = document.querySelectorAll(
-    '#productDetails_expanderSectionTables .a-expander-section-container'
-  );
+  // 优先尝试结构1，无数据时回落到结构3
+  const s1 = document.querySelectorAll('#productDetails_feature_div .a-expander-section-container');
+  const sections = s1.length > 0 ? s1 : document.querySelectorAll('#productDetails_expanderSectionTables .a-expander-section-container');
   sections.forEach(section => {
     const titleEl = section.querySelector('.a-expander-prompt');
     if (!titleEl) return;

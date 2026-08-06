@@ -7,9 +7,13 @@
 function extractProductDetails() {
   const result = {};
 
-  const sections = document.querySelectorAll(
-    '#productDetails_feature_div .a-expander-section-container'
-  );
+  // UK 部分商品用结构1（#productDetails_feature_div），部分用结构3（#productDetails_expanderSectionTables）
+  // 优先尝试结构1，无数据时回落到结构3
+  const selector1 = '#productDetails_feature_div .a-expander-section-container';
+  const selector3 = '#productDetails_expanderSectionTables .a-expander-section-container';
+  const s1 = document.querySelectorAll(selector1);
+  const sections = s1.length > 0 ? s1 : document.querySelectorAll(selector3);
+
   sections.forEach(section => {
     const titleEl = section.querySelector('.a-expander-prompt');
     if (!titleEl) return;
