@@ -1,13 +1,13 @@
-# 亚马逊监控助手 v1.1.9
+# 亚马逊监控助手 v1.2.0
 2026年8月6日
 
 将 Chrome 扩展版（`amazon-patrol`）改造为 Windows + Mac 双平台桌面应用，保留全部巡检功能，新增系统托盘、开机自启动、钉钉通知、产品信息抓取、站点管理等功能。
 
 ## 功能
 
-- **多站点巡检**：支持 20 个 Amazon 站点，每个站点独立配置 ASIN 列表，内部统一用二字码（CA/US/AU/MX/UK/DE/FR/IT/ES 等）标识；欧洲站（UK/DE/FR/IT/ES）已完成选择器适配、多语言解析和配送地初始化
-- **抓取字段**：售价、划线价、星级、评论数、卖家、库存、父体 ASIN、活动标、AC 标、Coupon、产品信息、BSR 大类/小类排名及名称；字段可单独勾选，列顺序可拖拽自定义
-- **产品信息**：原样抓取各站点 Product information 所有折叠区块，点击「查看」展开浮层查看完整键值对，支持 20 个站点多语言
+- **多站点巡检**：支持 20 个 Amazon 站点，每个站点独立配置 ASIN 列表，内部统一用二字码（CA/US/AU/MX/UK/DE/FR/IT/ES 等）标识；欧洲站（UK/DE/FR/IT/ES）已完成选择器适配、多语言解析、配送地初始化、产品信息及 BSR 抓取
+- **抓取字段**：售价、划线价、星级、评论数、卖家、库存、父体 ASIN、活动标、AC 标、Coupon、产品信息、BSR 大类/小类排名及名称；字段可单独勾选，列顺序可拖拽自定义；Coupon 支持全站点多语言格式（英文 coupon/voucher/Save X%、DE/FR/IT/ES/MX 本地语言）
+- **产品信息**：原样抓取各站点 Product information 所有折叠区块，点击「查看」展开浮层查看完整键值对，支持 20 个站点多语言；欧洲站点自动适配两种页面结构（`productDetails_feature_div` / `productDetails_expanderSectionTables`）
 - **BSR 排名**：从产品信息中解析大类和小类排名，支持与参考数据对比（排名上升则标红）
 - **参考对比**：导入 Excel 预设期望值（必须含 ASIN 和站点列），自动标红偏差项，导入时自动按站点填入巡检面板；巡检面板「启用对比」开关控制是否进行对比
 - **缺货保护**：缺货商品（Out of Stock）价格自动清空，避免误抓页面推荐区价格
@@ -139,6 +139,11 @@ amazon-patrol-electron/
 │   │   ├── ca/           amazon.ca 专用配置
 │   │   ├── au/           amazon.com.au 专用配置
 │   │   ├── mx/           amazon.com.mx 专用配置（含多语言解析覆盖）
+│   │   ├── uk/           amazon.co.uk 专用配置（含 BSR/Coupon/产品信息）
+│   │   ├── de/           amazon.de 专用配置（含多语言解析/BSR/Coupon）
+│   │   ├── fr/           amazon.fr 专用配置（含多语言解析/BSR/Coupon）
+│   │   ├── it/           amazon.it 专用配置（含多语言解析/BSR/Coupon）
+│   │   ├── es/           amazon.es 专用配置（含多语言解析/BSR/Coupon）
 │   │   └── index.js      Node端入口：按站点构建注入脚本
 │   └── lib/
 │       ├── cron.js       Cron 表达式解析器
