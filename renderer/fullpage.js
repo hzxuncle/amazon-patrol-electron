@@ -623,6 +623,30 @@ function cancelRefEdit() {
   renderRefPreview();
 }
 
+async function exportRefData() {
+  if (typeof XLSX === 'undefined') { await showAlert('提示', 'Excel库加载中'); return; }
+  if (!referenceData || !referenceData.rows || !referenceData.rows.length) {
+    await showAlert('提示', '暂无参考数据可导出');
+    return;
+  }
+  const headers = ['ASIN','站点','常用名','期望售价','期望划线价','期望活动标','期望AC标','期望Coupon','期望星级','期望评论数','期望卖家','期望库存','期望BSR大类排名','期望BSR大类名','期望BSR小类排名','期望BSR小类名'];
+  const dataRows = referenceData.rows.map(r => [
+    r.asin, r.site, r.aliasName||'',
+    r.expectedPrice||'', r.expectedListPrice||'', r.expectedDealBadge||'',
+    r.expectedAcBadge||'', r.expectedCoupon||'', r.expectedRating||'',
+    r.expectedReviews||'', r.expectedSeller||'', r.expectedStock||'',
+    r.expectedBsrMainRank||'', r.expectedBsrMainCategory||'',
+    r.expectedBsrSubRank||'', r.expectedBsrSubCategory||''
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+  ws['!cols'] = [{wch:14},{wch:6},{wch:16},{wch:10},{wch:10},{wch:16},{wch:12},{wch:16},{wch:8},{wch:10},{wch:20},{wch:12},{wch:14},{wch:20},{wch:14},{wch:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '参考数据');
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const saveResult = await window.electronAPI.saveExcel(wbout);
+  if (saveResult && saveResult.cancelled) return;
+}
+
 async function clearRef() {
   const ok = await showConfirmDialog('清除参考数据', ['所有参考数据将被清除，此操作不可恢复。'], '清除', '取消');
   if (!ok) return;
