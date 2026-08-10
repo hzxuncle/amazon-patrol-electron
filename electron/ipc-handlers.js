@@ -164,8 +164,8 @@ function processQueue(config) {
         const errorResult = {
           asin: task.asin, site: task.site, index: task.index,
           title: '', price: '', listPrice: '', rating: '', reviews: '',
-          seller: '', stock: '', parentAsin: 'N/A',
-          dealBadge: 'N/A', acBadge: 'N/A', coupon: 'N/A',
+          seller: '', stock: '', parentAsin: '',
+          dealBadge: '', acBadge: '', coupon: '',
           url: `https://${task.site}/dp/${task.asin}`,
           timestamp: new Date().toISOString(),
           status: 'failed', error: friendlyError,
