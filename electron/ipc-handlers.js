@@ -164,8 +164,8 @@ function processQueue(config) {
         const errorResult = {
           asin: task.asin, site: task.site, index: task.index,
           title: '', price: '', listPrice: '', rating: '', reviews: '',
-          seller: '', stock: '', parentAsin: '',
-          dealBadge: '', acBadge: '', coupon: '',
+          seller: '', stock: '', parentAsin: 'N/A',
+          dealBadge: 'N/A', acBadge: 'N/A', coupon: 'N/A',
           url: `https://${task.site}/dp/${task.asin}`,
           timestamp: new Date().toISOString(),
           status: 'failed', error: friendlyError,
@@ -475,7 +475,7 @@ async function buildDingTalkText(summary) {
       } else {
         item.diffs.forEach(d => {
           const actual = (d.actual !== '' && d.actual !== null && d.actual !== undefined)
-            ? `\`${d.actual}\`` : '`空`';
+            ? `\`${d.actual}\`` : '`N/A`';
           text += `- **${d.field}**: <font color=#07b807>期望 \`${d.expected}\`</font> → <font color=#ff4d4f>实际 ${actual}</font>\n`;
         });
       }
