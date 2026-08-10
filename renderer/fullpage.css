@@ -815,3 +815,7 @@ body::before { display: none; }
   font-size: 11px; color: var(--text-muted); line-height: 1.6;
   margin: 0;
 }
+
+.ref-action-btns { display: flex; gap: 6px; margin-left: auto; }
+.ref-edit-input { width: 100%; box-sizing: border-box; font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); color: var(--text); }
+.ref-edit-input:focus { outline: none; border-color: var(--accent); }

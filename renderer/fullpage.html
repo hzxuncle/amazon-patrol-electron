@@ -262,6 +262,12 @@
             <div class="card-header">
               <span class="card-title">已导入参考数据</span>
               <span id="refCount" class="badge">0条</span>
+              <div class="ref-action-btns">
+                <button class="btn-site-op" id="btnRefEdit" onclick="enterRefEditMode()">编辑</button>
+                <button class="btn-site-op confirm" id="btnRefSave" style="display:none" onclick="saveRefEdit()">保存</button>
+                <button class="btn-site-op" id="btnRefCancel" style="display:none" onclick="cancelRefEdit()">取消</button>
+                <button class="btn-site-op" id="btnRefExport" onclick="exportRefData()">导出</button>
+              </div>
             </div>
             <div id="refLastImportBar" class="ref-last-import-bar">
               <span class="ref-last-import-label">最近一次导入：</span>
