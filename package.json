@@ -1,6 +1,6 @@
 {
   "name": "amazon-patrol",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "亚马逊监控助手桌面版",
   "main": "electron/main.js",
   "engines": {
