@@ -1606,6 +1606,7 @@ function renderSitesTable() {
       <td>${esc(s.region || '')}</td>
       <td>${esc(s.country || '')}</td>
       <td><code style="font-size:12px">${esc(s.domain || '')}</code></td>
+      <td><code style="font-size:12px">${esc(s.currency || 'USD')}</code></td>
       <td><input type="text" class="zip-input" data-index="${s._origIdx}" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample || '')}"></td>
       <td><span class="zip-format-hint">${esc(s.zipFormat || '')}</span></td>
       <td>
@@ -1650,6 +1651,7 @@ function editSiteRow(idx) {
     <td><input class="site-edit-input site-edit-region" value="${esc(s.region || '')}" placeholder="北美"></td>
     <td><input class="site-edit-input site-edit-country" value="${esc(s.country || '')}" placeholder="美国"></td>
     <td><input class="site-edit-input site-edit-domain" value="${esc(s.domain || '')}" placeholder="amazon.com"></td>
+    <td><code style="font-size:12px">${esc(s.currency || 'USD')}</code></td>
     <td><input class="site-edit-input site-edit-zip" value="${esc(s.zip || '')}" placeholder="${esc(s.zipExample || '')}"></td>
     <td><input class="site-edit-input site-edit-zipformat" value="${esc(s.zipFormat || '')}" placeholder="5位数字"></td>
     <td>
@@ -1714,6 +1716,7 @@ function addSiteRow() {
     <td><input class="site-edit-input site-edit-region" value="" placeholder="亚太"></td>
     <td><input class="site-edit-input site-edit-country" value="" placeholder="新西兰"></td>
     <td><input class="site-edit-input site-edit-domain" value="" placeholder="amazon.co.nz"></td>
+    <td><code style="font-size:12px">USD</code></td>
     <td><input class="site-edit-input site-edit-zip" value="" placeholder="1010"></td>
     <td><input class="site-edit-input site-edit-zipformat" value="" placeholder="4位数字"></td>
     <td>

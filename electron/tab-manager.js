@@ -17,15 +17,6 @@ function unpackedPath(p) {
 
 const sitesIndex = require(path.join(__dirname, '../renderer/sites/index.js'));
 
-// i18n-prefs Cookie 控制页面显示币种，已验证 UK/DE/FR/IT/ES 需要显式设置
-const SITE_CURRENCY_COOKIE = {
-  'UK': 'GBP',
-  'DE': 'EUR',
-  'FR': 'EUR',
-  'IT': 'EUR',
-  'ES': 'EUR',
-};
-
 const SITE_LANG_MAP = {
   'amazon.com':    'en_US',
   'amazon.ca':     'en_CA',
@@ -52,14 +43,17 @@ const SITE_LANG_MAP = {
 
 const { BUILTIN_SITES } = require('./sites-data');
 
-// code → { domain, lang } 映射，优先用内置数据
+// code → { domain, lang, currency } 映射，优先用内置数据
 const CODE_TO_DOMAIN = {};
 const CODE_TO_LANG = {};
+// i18n-prefs Cookie 只对这五个欧洲站点设置，确保抓到的价格是本地货币
+const NEEDS_CURRENCY_COOKIE = new Set(['UK', 'DE', 'FR', 'IT', 'ES']);
+const SITE_CURRENCY_COOKIE = {};
 BUILTIN_SITES.forEach(s => {
   if (s.code) {
     CODE_TO_DOMAIN[s.code] = s.domain;
-    // SITE_LANG_MAP 的 key 是 amazon.xxx，直接查
     CODE_TO_LANG[s.code] = SITE_LANG_MAP[s.domain] || 'en_US';
+    if (NEEDS_CURRENCY_COOKIE.has(s.code)) SITE_CURRENCY_COOKIE[s.code] = s.currency;
   }
 });
 

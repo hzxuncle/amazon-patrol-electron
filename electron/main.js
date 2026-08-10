@@ -226,6 +226,7 @@ app.whenReady().then(() => {
   initSites();
   initDingTalkPersonal();
   store.migrateSiteCodes();
+  store.migrateSiteCurrency();
   ipcHandlers.register();
   createWindow();
   createTray();

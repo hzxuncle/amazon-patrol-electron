@@ -183,4 +183,23 @@ function migrateSiteCodes() {
   if (changed) console.log('[Store] 站点 code 迁移完成');
 }
 
-module.exports = { get, set, remove, getAll, migrate, migrateSiteCodes };
+function migrateSiteCurrency() {
+  const { BUILTIN_SITES } = require('./sites-data');
+  const sites = get('sites') || [];
+  if (!sites.length) return;
+
+  const builtinMap = {};
+  BUILTIN_SITES.forEach(s => { builtinMap[s.code] = s.currency; });
+
+  const needsUpdate = sites.some(s => !s.currency);
+  if (!needsUpdate) return;
+
+  const updated = sites.map(s => ({
+    ...s,
+    currency: s.currency || builtinMap[s.code] || 'USD',
+  }));
+  set('sites', updated);
+  console.log('[Store] 站点币种迁移完成');
+}
+
+module.exports = { get, set, remove, getAll, migrate, migrateSiteCodes, migrateSiteCurrency };
