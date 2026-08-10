@@ -553,6 +553,7 @@ function processFile(file) {
 }
 
 function renderRefPreview() {
+  if (refEditMode) cancelRefEdit();
   if (!referenceData || !referenceData.rows || !referenceData.rows.length) {
     dom.refCard.style.display = 'none';
     return;
@@ -591,9 +592,17 @@ function enterRefEditMode() {
     `<tr data-idx="${i}">
       <td>${esc(r.asin)}</td>
       <td>${esc(r.site)}</td>
-      ${fields.map(f => `<td><input class="ref-edit-input" data-field="${f}" value="${esc(r[f]||'')}" /></td>`).join('')}
+      ${fields.map(f => `<td><input class="ref-edit-input" data-field="${f}" /></td>`).join('')}
     </tr>`
   ).join('');
+
+  dom.refBody.querySelectorAll('tr[data-idx]').forEach(row => {
+    const idx = parseInt(row.dataset.idx);
+    const r = referenceData.rows[idx];
+    row.querySelectorAll('input[data-field]').forEach(input => {
+      input.value = r[input.dataset.field] || '';
+    });
+  });
 }
 
 async function saveRefEdit() {
@@ -604,8 +613,13 @@ async function saveRefEdit() {
       referenceData.rows[idx][input.dataset.field] = input.value.trim();
     });
   });
-  await window.electronAPI.storage.set('referenceData', referenceData)
-    .catch(e => console.error('[Store] referenceData 保存失败:', e));
+  try {
+    await window.electronAPI.storage.set('referenceData', referenceData);
+  } catch (e) {
+    console.error('[Store] referenceData 保存失败:', e);
+    await showAlert('保存失败', '数据未能写入本地存储，请重试。');
+    return;
+  }
   refEditMode = false;
   document.getElementById('btnRefEdit').style.display = '';
   document.getElementById('btnRefExport').style.display = '';
@@ -648,6 +662,7 @@ async function exportRefData() {
 }
 
 async function clearRef() {
+  if (refEditMode) cancelRefEdit();
   const ok = await showConfirmDialog('清除参考数据', ['所有参考数据将被清除，此操作不可恢复。'], '清除', '取消');
   if (!ok) return;
   referenceData = { importedAt: null, fileName: '', rows: [] };
