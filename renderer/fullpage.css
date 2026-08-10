@@ -387,7 +387,7 @@ body::before { display: none; }
 
 /* ===== Table ===== */
 .table-scroll { overflow: auto; }
-.table-scroll.short { max-height: 300px; }
+.table-scroll.short { max-height: 600px; }
 
 .results-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; table-layout: fixed; }
 .ref-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
@@ -453,6 +453,7 @@ body::before { display: none; }
   background: rgba(255,61,71,0.1); padding: 1px 3px; border-radius: 2px;
 }
 .match-ok { color: var(--success); }
+.match-expected { color: var(--text-muted); font-size: 11px; }
 
 /* 历史变化趋势 */
 .history-up { color: var(--danger); }

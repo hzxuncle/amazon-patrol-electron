@@ -571,8 +571,8 @@ function renderRefPreview() {
     : '';
   document.getElementById('refLastCount').textContent = `共 ${referenceData.rows.length} 条`;
 
-  dom.refBody.innerHTML = referenceData.rows.slice(0, 50).map(r =>
-    `<tr><td>${esc(r.asin)}</td><td>${esc(r.site)}</td><td>${esc(r.aliasName||'')}</td><td>${esc(r.expectedPrice)}</td><td>${esc(r.expectedListPrice)}</td><td>${esc(r.expectedDealBadge||'')}</td><td>${esc(r.expectedAcBadge||'')}</td><td>${esc(r.expectedCoupon||'')}</td><td>${esc(r.expectedRating)}</td><td>${esc(r.expectedReviews)}</td><td>${esc(r.expectedSeller)}</td><td>${esc(r.expectedStock)}</td></tr>`
+  dom.refBody.innerHTML = referenceData.rows.map(r =>
+    `<tr><td>${esc(r.asin)}</td><td>${esc(r.site)}</td><td>${esc(r.aliasName||'')}</td><td>${esc(r.expectedPrice||'')}</td><td>${esc(r.expectedListPrice||'')}</td><td>${esc(r.expectedDealBadge||'')}</td><td>${esc(r.expectedAcBadge||'')}</td><td>${esc(r.expectedCoupon||'')}</td><td>${esc(r.expectedRating||'')}</td><td>${esc(r.expectedReviews||'')}</td><td>${esc(r.expectedSeller||'')}</td><td>${esc(r.expectedStock||'')}</td><td>${esc(r.expectedBsrMainRank||'')}</td><td>${esc(r.expectedBsrMainCategory||'')}</td><td>${esc(r.expectedBsrSubRank||'')}</td><td>${esc(r.expectedBsrSubCategory||'')}</td></tr>`
   ).join('');
 }
 
@@ -1087,6 +1087,7 @@ function renderField(actual, expected, field) {
   const cmp = cmpField(actual, expected, field);
   if (!expected) return `<span>${esc(cmp.display)}</span>`;
   if (cmp.match) return `<span>${esc(cmp.display)}</span> <span class="match-ok">✓</span>`;
+  if (field === 'bsrRank') return `<span class="diff-highlight">${esc(cmp.display)}</span> <span class="match-expected">(目标: ${esc(expected)})</span>`;
   return `<span class="diff-highlight">${esc(cmp.display)}</span>`;
 }
 
@@ -1154,7 +1155,9 @@ function getRowClass(result) {
     cmpField(result.rating, ref.expectedRating, 'rating'),
     cmpField(result.reviews, ref.expectedReviews, 'reviews'),
     cmpField(result.seller, ref.expectedSeller, 'seller'),
-    cmpField(result.stock, ref.expectedStock, 'stock')
+    cmpField(result.stock, ref.expectedStock, 'stock'),
+    cmpField(result.bsrMainRank, ref.expectedBsrMainRank, 'bsrRank'),
+    cmpField(result.bsrSubRank, ref.expectedBsrSubRank, 'bsrRank'),
   ];
   return checks.every(c => c.match) ? 'match-success' : 'match-error';
 }
