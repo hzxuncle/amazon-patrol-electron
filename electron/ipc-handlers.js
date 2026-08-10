@@ -394,6 +394,12 @@ function mismatchText(a,e) {
   const at=String(a||'').trim().toLowerCase(), et=String(e).trim().toLowerCase();
   return at!==et&&!at.includes(et)&&!et.includes(at);
 }
+function mismatchBsrRank(a,e) {
+  if(!e)return false;
+  const an=parseInt(String(a||'').replace(/[^0-9]/g,'')), en=parseInt(String(e).replace(/[^0-9]/g,''));
+  if(isNaN(an)||isNaN(en))return false;
+  return an>en;
+}
 
 async function buildDingTalkText(summary) {
   const references = (store.get('referenceData') || {}).rows || [];
@@ -435,6 +441,10 @@ async function buildDingTalkText(summary) {
       diffs.push({ field: '卖家', expected: ref.expectedSeller, actual: r.seller });
     if (mismatchText(r.stock, ref.expectedStock))
       diffs.push({ field: '库存', expected: ref.expectedStock, actual: r.stock });
+    if (mismatchBsrRank(r.bsrMainRank, ref.expectedBsrMainRank))
+      diffs.push({ field: 'BSR大类排名', expected: ref.expectedBsrMainRank, actual: r.bsrMainRank });
+    if (mismatchBsrRank(r.bsrSubRank, ref.expectedBsrSubRank))
+      diffs.push({ field: 'BSR小类排名', expected: ref.expectedBsrSubRank, actual: r.bsrSubRank });
 
     if (diffs.length) {
       if (!siteMap.has(r.site)) siteMap.set(r.site, []);
@@ -465,7 +475,7 @@ async function buildDingTalkText(summary) {
       } else {
         item.diffs.forEach(d => {
           const actual = (d.actual !== '' && d.actual !== null && d.actual !== undefined)
-            ? `\`${d.actual}\`` : '`N/A`';
+            ? `\`${d.actual}\`` : '`空`';
           text += `- **${d.field}**: <font color=#07b807>期望 \`${d.expected}\`</font> → <font color=#ff4d4f>实际 ${actual}</font>\n`;
         });
       }
