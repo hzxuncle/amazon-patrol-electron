@@ -82,6 +82,7 @@ const dom = {
 let patrolRunning = false;
 let patrolTimer = null;
 let referenceData = null;
+let refEditMode = false;
 let allResults = [];
 let historySnapshots = {};
 
@@ -574,6 +575,52 @@ function renderRefPreview() {
   dom.refBody.innerHTML = referenceData.rows.map(r =>
     `<tr><td>${esc(r.asin)}</td><td>${esc(r.site)}</td><td>${esc(r.aliasName||'')}</td><td>${esc(r.expectedPrice||'')}</td><td>${esc(r.expectedListPrice||'')}</td><td>${esc(r.expectedDealBadge||'')}</td><td>${esc(r.expectedAcBadge||'')}</td><td>${esc(r.expectedCoupon||'')}</td><td>${esc(r.expectedRating||'')}</td><td>${esc(r.expectedReviews||'')}</td><td>${esc(r.expectedSeller||'')}</td><td>${esc(r.expectedStock||'')}</td><td>${esc(r.expectedBsrMainRank||'')}</td><td>${esc(r.expectedBsrMainCategory||'')}</td><td>${esc(r.expectedBsrSubRank||'')}</td><td>${esc(r.expectedBsrSubCategory||'')}</td></tr>`
   ).join('');
+}
+
+function enterRefEditMode() {
+  if (!referenceData || !referenceData.rows || !referenceData.rows.length) return;
+  refEditMode = true;
+  document.getElementById('btnRefEdit').style.display = 'none';
+  document.getElementById('btnRefExport').style.display = 'none';
+  document.getElementById('btnRefSave').style.display = '';
+  document.getElementById('btnRefCancel').style.display = '';
+
+  const fields = ['aliasName','expectedPrice','expectedListPrice','expectedDealBadge','expectedAcBadge','expectedCoupon','expectedRating','expectedReviews','expectedSeller','expectedStock','expectedBsrMainRank','expectedBsrMainCategory','expectedBsrSubRank','expectedBsrSubCategory'];
+
+  dom.refBody.innerHTML = referenceData.rows.map((r, i) =>
+    `<tr data-idx="${i}">
+      <td>${esc(r.asin)}</td>
+      <td>${esc(r.site)}</td>
+      ${fields.map(f => `<td><input class="ref-edit-input" data-field="${f}" value="${esc(r[f]||'')}" /></td>`).join('')}
+    </tr>`
+  ).join('');
+}
+
+async function saveRefEdit() {
+  const rows = dom.refBody.querySelectorAll('tr[data-idx]');
+  rows.forEach(row => {
+    const idx = parseInt(row.dataset.idx);
+    row.querySelectorAll('input[data-field]').forEach(input => {
+      referenceData.rows[idx][input.dataset.field] = input.value.trim();
+    });
+  });
+  await window.electronAPI.storage.set('referenceData', referenceData)
+    .catch(e => console.error('[Store] referenceData 保存失败:', e));
+  refEditMode = false;
+  document.getElementById('btnRefEdit').style.display = '';
+  document.getElementById('btnRefExport').style.display = '';
+  document.getElementById('btnRefSave').style.display = 'none';
+  document.getElementById('btnRefCancel').style.display = 'none';
+  renderRefPreview();
+}
+
+function cancelRefEdit() {
+  refEditMode = false;
+  document.getElementById('btnRefEdit').style.display = '';
+  document.getElementById('btnRefExport').style.display = '';
+  document.getElementById('btnRefSave').style.display = 'none';
+  document.getElementById('btnRefCancel').style.display = 'none';
+  renderRefPreview();
 }
 
 async function clearRef() {
