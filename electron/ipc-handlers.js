@@ -146,7 +146,8 @@ async function sendErpReport(results, settings) {
     extraHeaders['Authorization'] = `Bearer ${settings.erpBearerToken}`;
   }
 
-  broadcastLog(`[ERP] 发送 ${payload.length} 条，示例: ${JSON.stringify(payload[0])}`);
+  console.log('[ERP] 发送 payload:', JSON.stringify(payload, null, 2));
+  broadcastLog(`[ERP] 发送 ${payload.length} 条`);
   const res = await postJSON(settings.erpReportUrl, payload, extraHeaders);
   const text = res.text();
   let json;
