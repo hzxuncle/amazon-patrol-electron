@@ -84,7 +84,7 @@ function getSiteLabel(siteCode) {
 }
 
 // ========== Node 16 fetch 替代 ==========
-function postJSON(url, body) {
+function postJSON(url, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const urlObj = new URL(url);
@@ -92,7 +92,7 @@ function postJSON(url, body) {
       hostname: urlObj.hostname,
       path: urlObj.pathname + urlObj.search,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...headers }
     }, res => {
       let raw = '';
       res.on('data', c => raw += c);
@@ -102,6 +102,53 @@ function postJSON(url, body) {
     req.write(data);
     req.end();
   });
+}
+
+async function sendErpReport(results, settings) {
+  if (!settings || !settings.enableErpReport || !settings.erpReportUrl) return;
+
+  function toFloat(s) { const n = parseFloat(String(s || '').replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
+  function toInt(s)   { const n = parseInt(String(s || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; }
+
+  const payload = results.map(r => ({
+    reportingTime:   r.timestamp || new Date().toISOString(),
+    asin:            r.asin || '',
+    site:            r.site || '',
+    title:           r.status === 'success' ? (r.title        || '') : '',
+    price:           r.status === 'success' ? toFloat(r.price)       : 0,
+    listPrice:       r.status === 'success' ? toFloat(r.listPrice)   : 0,
+    rating:          r.status === 'success' ? toFloat(r.rating)      : 0,
+    reviews:         r.status === 'success' ? toInt(r.reviews)       : 0,
+    seller:          r.status === 'success' ? (r.seller        || '') : '',
+    stock:           r.status === 'success' ? (r.stock         || '') : '',
+    dealBadge:       r.status === 'success' ? (r.dealBadge     || '') : '',
+    acBadge:         r.status === 'success' ? (r.acBadge       || '') : '',
+    coupon:          r.status === 'success' ? (r.coupon        || '') : '',
+    parentAsin:      r.status === 'success' ? (r.parentAsin    || '') : '',
+    bsrMainRank:     r.status === 'success' ? (r.bsrMainRank      || '') : '',
+    bsrMainCategory: r.status === 'success' ? (r.bsrMainCategory  || '') : '',
+    bsrSubRank:      r.status === 'success' ? (r.bsrSubRank       || '') : '',
+    bsrSubCategory:  r.status === 'success' ? (r.bsrSubCategory   || '') : '',
+    productInfo:     r.status === 'success' ? (r.productInfo && typeof r.productInfo === 'object' ? JSON.stringify(r.productInfo) : (r.productInfo || '')) : '',
+    url:             r.url || '',
+  }));
+
+  const extraHeaders = {};
+  if (settings.erpAuthType === 'bearer' && settings.erpBearerToken) {
+    extraHeaders['Authorization'] = `Bearer ${settings.erpBearerToken}`;
+  }
+
+  const res = await postJSON(settings.erpReportUrl, payload, extraHeaders);
+  const text = res.text();
+  let json;
+  try { json = JSON.parse(text); } catch (e) { json = null; }
+
+  if (json && json.success) {
+    broadcastLog(`[ERP] 上报成功，共 ${payload.length} 条`);
+  } else {
+    const msg = json ? (json.message || json.code || text) : text;
+    broadcastLog(`[ERP] 上报失败: ${msg}`);
+  }
 }
 
 // ========== Worker Pool ==========
@@ -252,6 +299,14 @@ async function onPatrolComplete() {
           console.error('[Patrol] 个人通知失败:', e.message));
       }
     }
+  }
+
+  // ERP 数据上报
+  const erpSettings = store.get('patrolSettings');
+  if (erpSettings && erpSettings.enableErpReport) {
+    sendErpReport(completedResults, erpSettings).catch(e =>
+      broadcastLog(`[ERP] 上报失败: ${e.message}`)
+    );
   }
 }
 
