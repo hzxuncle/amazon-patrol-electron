@@ -38,6 +38,28 @@ function extractProductDetails() {
     if (Object.keys(sectionData).length > 0) result[title] = sectionData;
   });
 
+  // 结构3：detailBullets（部分商品只有此结构）
+  if (Object.keys(result).length === 0) {
+    const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
+    if (bulletRows.length) {
+      const sectionData = {};
+      bulletRows.forEach(row => {
+        const keyEl = row.querySelector('.a-text-bold');
+        if (!keyEl) return;
+        const fullText = row.textContent.replace(/[‏‎]/g, '').replace(/\s+/g, ' ').trim();
+        const colonIdx = fullText.indexOf(':');
+        if (colonIdx < 0) return;
+        const key = fullText.slice(0, colonIdx).trim();
+        const val = fullText.slice(colonIdx + 1).trim();
+        if (!key || !val) return;
+        if (val.includes('de 5 estrellas') || val.includes('P.when') ||
+            key.includes('Opiniones de los clientes')) return;
+        sectionData[key] = val;
+      });
+      if (Object.keys(sectionData).length > 0) result['Detalles del producto'] = sectionData;
+    }
+  }
+
   return result;
 }
 
