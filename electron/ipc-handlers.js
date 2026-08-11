@@ -137,6 +137,8 @@ async function sendErpReport(results, settings) {
     productInfo:     r.status === 'success' ? (r.productInfo && typeof r.productInfo === 'object' ? JSON.stringify(r.productInfo) : toStr(r.productInfo)) : null,
     url:             r.url || null,
     currency:        r.currency || null,
+    status:          r.status || null,
+    error:           r.error  || null,
   }));
 
   const extraHeaders = {};
