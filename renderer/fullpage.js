@@ -61,6 +61,11 @@ const dom = {
   enableGroupNotify:   $('#enableGroupNotify'),
   enablePersonalNotify:$('#enablePersonalNotify'),
   showScrapeWindow: $('#showScrapeWindow'),
+  enableErpReport: $('#enableErpReport'),
+  erpReportUrl:    $('#erpReportUrl'),
+  erpAuthType:     $('#erpAuthType'),
+  erpBearerToken:  $('#erpBearerToken'),
+  erpTokenRow:     $('#erpTokenRow'),
 
   // Status
   statusBadge: $('#statusBadge'),
@@ -157,6 +162,13 @@ function initSettingsSliders() {
     saveSettings();
   });
   if (dom.showScrapeWindow) dom.showScrapeWindow.addEventListener('change', saveSettings);
+  if (dom.enableErpReport) dom.enableErpReport.addEventListener('change', saveSettings);
+  if (dom.erpReportUrl)    dom.erpReportUrl.addEventListener('input', saveSettings);
+  if (dom.erpBearerToken)  dom.erpBearerToken.addEventListener('input', saveSettings);
+  if (dom.erpAuthType) dom.erpAuthType.addEventListener('change', () => {
+    if (dom.erpTokenRow) dom.erpTokenRow.style.display = dom.erpAuthType.value === 'bearer' ? '' : 'none';
+    saveSettings();
+  });
   dom.showHistoryDiff.addEventListener('change', () => {
     renderAllResults();
     saveSettings();
@@ -198,7 +210,11 @@ function getSettings() {
     enableRefCompare: dom.enableRefCompare ? dom.enableRefCompare.checked : false,
     enabledFields: getEnabledFields(),
     fieldOrder: fieldOrder,
-    showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false
+    showScrapeWindow: dom.showScrapeWindow ? dom.showScrapeWindow.checked : false,
+    enableErpReport: dom.enableErpReport ? dom.enableErpReport.checked : false,
+    erpReportUrl:    dom.erpReportUrl    ? dom.erpReportUrl.value.trim()  : '',
+    erpAuthType:     dom.erpAuthType     ? dom.erpAuthType.value           : 'none',
+    erpBearerToken:  dom.erpBearerToken  ? dom.erpBearerToken.value.trim() : ''
   };
 }
 
@@ -401,6 +417,11 @@ async function loadSettings() {
     if (dom.dingtalkUserIds) dom.dingtalkUserIds.value = s.dingtalkPersonalPhones || '';
     dom.showHistoryDiff.checked = s.showHistoryDiff || false;
     if (dom.enableRefCompare) dom.enableRefCompare.checked = s.enableRefCompare || false;
+    if (dom.enableErpReport) dom.enableErpReport.checked = s.enableErpReport || false;
+    if (dom.erpReportUrl)    dom.erpReportUrl.value    = s.erpReportUrl    || '';
+    if (dom.erpAuthType)     dom.erpAuthType.value     = s.erpAuthType     || 'none';
+    if (dom.erpBearerToken)  dom.erpBearerToken.value  = s.erpBearerToken  || '';
+    if (dom.erpTokenRow)     dom.erpTokenRow.style.display = (s.erpAuthType === 'bearer') ? '' : 'none';
     // 恢复字段勾选
     if (s.enabledFields && s.enabledFields.length > 0) {
       dom.fieldToggles.forEach(cb => { cb.checked = s.enabledFields.includes(cb.dataset.field); });
