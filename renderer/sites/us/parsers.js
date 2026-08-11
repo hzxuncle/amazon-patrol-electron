@@ -34,6 +34,33 @@ function extractProductDetails() {
     ).forEach(parseSection);
   }
 
+  // 结构3：detailBullets（部分商品只有此结构）
+  if (Object.keys(result).length === 0) {
+    const bulletRows = document.querySelectorAll('#detailBullets_feature_div li');
+    if (bulletRows.length) {
+      const sectionData = {};
+      bulletRows.forEach(row => {
+        const keyEl = row.querySelector('.a-text-bold');
+        const valEl = row.querySelector('span:not(.a-text-bold)');
+        if (!keyEl || !valEl) return;
+        const key = keyEl.textContent.replace(/[‏‎‏‎:：]/g, '').replace(/\s+/g, ' ').trim();
+        let val = valEl.textContent.replace(/\s+/g, ' ').trim();
+        if (!key || !val) return;
+        if (val.includes('out of 5 stars') || val.includes('P.when') ||
+            key.includes('Customer Reviews')) return;
+        const keyClean = key.replace(/[‏‎\s]/g, '').toLowerCase();
+        const valPrefix = val.replace(/[‏‎]/g, '').replace(/\s+/g, ' ');
+        const colonIdx = valPrefix.indexOf(':');
+        if (colonIdx > 0 && colonIdx < 40) {
+          const prefix = valPrefix.slice(0, colonIdx).trim().toLowerCase().replace(/\s/g, '');
+          if (prefix === keyClean) val = valPrefix.slice(colonIdx + 1).trim();
+        }
+        sectionData[key] = val;
+      });
+      if (Object.keys(sectionData).length > 0) result['Product Details'] = sectionData;
+    }
+  }
+
   return result;
 }
 
