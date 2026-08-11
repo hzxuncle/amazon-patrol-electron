@@ -548,6 +548,34 @@
             </div>
           </section>
           <section class="card">
+            <div class="card-header"><span class="card-title">数据上报</span></div>
+            <div class="setting-item">
+              <div class="config-switch-row">
+                <span class="config-switch-label">启用数据上报</span>
+                <label class="cron-toggle-wrap">
+                  <input type="checkbox" id="enableErpReport">
+                  <span class="cron-toggle-slider"></span>
+                </label>
+              </div>
+              <span class="setting-hint">巡店完成后将全部结果推送到 ERP 接口</span>
+            </div>
+            <div class="setting-item" style="margin-top:12px">
+              <label>接口地址</label>
+              <input type="text" id="erpReportUrl" class="text-input" placeholder="http://your-erp/api/crawling/amz/saveCrawlingInfo">
+            </div>
+            <div class="setting-item" style="margin-top:12px">
+              <label>认证方式</label>
+              <select id="erpAuthType" class="text-input" style="height:32px">
+                <option value="none">无需认证</option>
+                <option value="bearer">Bearer Token</option>
+              </select>
+            </div>
+            <div class="setting-item" style="margin-top:12px" id="erpTokenRow">
+              <label>Bearer Token</label>
+              <input type="password" id="erpBearerToken" class="text-input" placeholder="your-token">
+            </div>
+          </section>
+          <section class="card">
             <div class="card-header"><span class="card-title">系统设置</span></div>
             <div class="setting-item">
               <div class="config-switch-row">
