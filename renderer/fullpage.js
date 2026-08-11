@@ -932,10 +932,6 @@ async function buildTasks() {
       await showAlert('校验失败', `[${label}] 包含无效 ASIN：${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '...' : ''}`);
       return null;
     }
-    if (asinList.length > 100) {
-      await showAlert('校验失败', `单站点最多100个ASIN，当前${asinList.length}个`);
-      return null;
-    }
     for (const asin of asinList) {
       tasks.push({ asin, site, index: idx++ });
     }
