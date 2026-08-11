@@ -88,8 +88,12 @@ function postJSON(url, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const urlObj = new URL(url);
-    const req = https.request({
+    const isHttps = urlObj.protocol === 'https:';
+    const transport = isHttps ? require('https') : require('http');
+    const port = urlObj.port ? parseInt(urlObj.port, 10) : (isHttps ? 443 : 80);
+    const req = transport.request({
       hostname: urlObj.hostname,
+      port,
       path: urlObj.pathname + urlObj.search,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...headers }
@@ -302,9 +306,8 @@ async function onPatrolComplete() {
   }
 
   // ERP 数据上报
-  const erpSettings = store.get('patrolSettings');
-  if (erpSettings && erpSettings.enableErpReport) {
-    sendErpReport(completedResults, erpSettings).catch(e =>
+  if (patrolSettings && patrolSettings.enableErpReport) {
+    sendErpReport(completedResults, patrolSettings).catch(e =>
       broadcastLog(`[ERP] 上报失败: ${e.message}`)
     );
   }
