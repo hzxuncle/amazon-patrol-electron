@@ -114,6 +114,10 @@ async function sendErpReport(results, settings) {
   function toFloat(s) { const n = parseFloat(String(s || '').replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
   function toInt(s)   { const n = parseInt(String(s || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; }
 
+  const sitesList = store.get('sites') || [];
+  const currencyMap = {};
+  sitesList.forEach(s => { if (s.code) currencyMap[s.code] = s.currency || 'USD'; });
+
   const payload = results.map(r => ({
     reportingTime:   r.timestamp || new Date().toISOString(),
     asin:            r.asin || '',
@@ -135,6 +139,7 @@ async function sendErpReport(results, settings) {
     bsrSubCategory:  r.status === 'success' ? (r.bsrSubCategory   || '') : '',
     productInfo:     r.status === 'success' ? (r.productInfo && typeof r.productInfo === 'object' ? JSON.stringify(r.productInfo) : (r.productInfo || '')) : '',
     url:             r.url || '',
+    currency:        currencyMap[r.site] || 'USD',
   }));
 
   const extraHeaders = {};
