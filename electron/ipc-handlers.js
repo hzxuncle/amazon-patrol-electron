@@ -111,31 +111,32 @@ function postJSON(url, body, headers = {}) {
 async function sendErpReport(results, settings) {
   if (!settings || !settings.enableErpReport || !settings.erpReportUrl) return;
 
-  function toFloat(s) { const n = parseFloat(String(s || '').replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
-  function toInt(s)   { const n = parseInt(String(s || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  function toFloat(s) { const n = parseFloat(String(s || '').replace(/[^0-9.]/g, '')); return isNaN(n) ? null : n; }
+  function toInt(s)   { const n = parseInt(String(s || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? null : n; }
+  function toStr(s)   { const v = String(s || '').trim(); return v === '' || v === 'N/A' ? null : v; }
 
   const payload = results.map(r => ({
     reportingTime:   r.timestamp || new Date().toISOString(),
-    asin:            r.asin || '',
-    site:            r.site || '',
-    title:           r.status === 'success' ? (r.title        || '') : '',
-    price:           r.status === 'success' ? toFloat(r.price)       : 0,
-    listPrice:       r.status === 'success' ? toFloat(r.listPrice)   : 0,
-    rating:          r.status === 'success' ? toFloat(r.rating)      : 0,
-    reviews:         r.status === 'success' ? toInt(r.reviews)       : 0,
-    seller:          r.status === 'success' ? (r.seller        || '') : '',
-    stock:           r.status === 'success' ? (r.stock         || '') : '',
-    dealBadge:       r.status === 'success' ? (r.dealBadge     || '') : '',
-    acBadge:         r.status === 'success' ? (r.acBadge       || '') : '',
-    coupon:          r.status === 'success' ? (r.coupon        || '') : '',
-    parentAsin:      r.status === 'success' ? (r.parentAsin    || '') : '',
-    bsrMainRank:     r.status === 'success' ? (r.bsrMainRank      || '') : '',
-    bsrMainCategory: r.status === 'success' ? (r.bsrMainCategory  || '') : '',
-    bsrSubRank:      r.status === 'success' ? (r.bsrSubRank       || '') : '',
-    bsrSubCategory:  r.status === 'success' ? (r.bsrSubCategory   || '') : '',
-    productInfo:     r.status === 'success' ? (r.productInfo && typeof r.productInfo === 'object' ? JSON.stringify(r.productInfo) : (r.productInfo || '')) : '',
-    url:             r.url || '',
-    currency:        r.currency || 'USD',
+    asin:            r.asin || null,
+    site:            r.site || null,
+    title:           r.status === 'success' ? toStr(r.title)           : null,
+    price:           r.status === 'success' ? toFloat(r.price)         : null,
+    listPrice:       r.status === 'success' ? toFloat(r.listPrice)     : null,
+    rating:          r.status === 'success' ? toFloat(r.rating)        : null,
+    reviews:         r.status === 'success' ? toInt(r.reviews)         : null,
+    seller:          r.status === 'success' ? toStr(r.seller)          : null,
+    stock:           r.status === 'success' ? toStr(r.stock)           : null,
+    dealBadge:       r.status === 'success' ? toStr(r.dealBadge)       : null,
+    acBadge:         r.status === 'success' ? toStr(r.acBadge)         : null,
+    coupon:          r.status === 'success' ? toStr(r.coupon)          : null,
+    parentAsin:      r.status === 'success' ? toStr(r.parentAsin)      : null,
+    bsrMainRank:     r.status === 'success' ? toStr(r.bsrMainRank)     : null,
+    bsrMainCategory: r.status === 'success' ? toStr(r.bsrMainCategory) : null,
+    bsrSubRank:      r.status === 'success' ? toStr(r.bsrSubRank)      : null,
+    bsrSubCategory:  r.status === 'success' ? toStr(r.bsrSubCategory)  : null,
+    productInfo:     r.status === 'success' ? (r.productInfo && typeof r.productInfo === 'object' ? JSON.stringify(r.productInfo) : toStr(r.productInfo)) : null,
+    url:             r.url || null,
+    currency:        r.currency || null,
   }));
 
   const extraHeaders = {};
