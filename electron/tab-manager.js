@@ -47,7 +47,7 @@ const { BUILTIN_SITES } = require('./sites-data');
 const CODE_TO_DOMAIN = {};
 const CODE_TO_LANG = {};
 // i18n-prefs Cookie 只对这五个欧洲站点设置，确保抓到的价格是本地货币
-const NEEDS_CURRENCY_COOKIE = new Set(['UK', 'DE', 'FR', 'IT', 'ES']);
+const NEEDS_CURRENCY_COOKIE = new Set(['UK', 'DE', 'FR', 'IT', 'ES', 'CA', 'AU', 'MX']);
 const SITE_CURRENCY_COOKIE = {};
 BUILTIN_SITES.forEach(s => {
   if (s.code) {

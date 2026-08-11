@@ -191,13 +191,14 @@ function migrateSiteCurrency() {
   const builtinMap = {};
   BUILTIN_SITES.forEach(s => { builtinMap[s.code] = s.currency; });
 
-  const needsUpdate = sites.some(s => !s.currency);
-  if (!needsUpdate) return;
-
+  // 以 BUILTIN_SITES 为准强制覆盖内置站点的币种（修正历史错误值）
   const updated = sites.map(s => ({
     ...s,
-    currency: s.currency || builtinMap[s.code] || 'USD',
+    currency: builtinMap[s.code] || s.currency || 'USD',
   }));
+  const needsUpdate = updated.some((s, i) => s.currency !== sites[i].currency);
+  if (!needsUpdate) return;
+
   set('sites', updated);
   console.log('[Store] 站点币种迁移完成');
 }
