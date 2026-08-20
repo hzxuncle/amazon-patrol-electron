@@ -1176,7 +1176,7 @@ function cmpField(actual, expected, field) {
   if (field === 'rating') {
     const an = parseFloat(a), en = parseFloat(e);
     if (isNaN(an) || isNaN(en)) return { match: a === e, display: a || 'N/A' };
-    return { match: Math.abs(an - en) < 0.2, display: a || 'N/A' };
+    return { match: Math.abs(an - en) < 0.05, display: a || 'N/A' };
   }
   if (field === 'reviews') {
     const an = parseInt(a.replace(/[^0-9]/g, '')), en = parseInt(e.replace(/[^0-9]/g, ''));
