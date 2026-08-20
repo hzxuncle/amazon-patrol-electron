@@ -74,6 +74,8 @@ const initializedSites = new Set();
 const pendingSiteInit = new Map(); // site → Promise
 // 全局初始化互斥锁，保证同一时间只有一个站点在执行初始化，避免并发请求被 Amazon 断开
 let initLock = Promise.resolve();
+// 记录上次成功设置的邮编，用于判断邮编是否变更（邮编变更时不走 session 快捷路径）
+const lastUsedZips = new Map(); // site → zip
 
 function getSiteUrl(code) {
   const domain = getDomainByCode(code);
@@ -154,8 +156,8 @@ async function _tryInitDeliveryZip(site, zip, siteUrl, asin) {
     const i18nCookies = await win.webContents.session.cookies.get({ domain: '.' + domain, name: 'i18n-prefs' });
     const currency = SITE_CURRENCY_COOKIE[site];
     const i18nOk = !currency || (i18nCookies.length > 0 && i18nCookies[0].value === currency);
-    if (existingCookies.length > 0 && i18nOk) {
-      tabLog(`[TabManager] 配送地 session 已存在，跳过初始化: ${site}`);
+    if (existingCookies.length > 0 && i18nOk && lastUsedZips.get(site) === zip) {
+      tabLog(`[TabManager] 配送地 session 已存在且邮编未变，跳过初始化: ${site}`);
       initializedSites.add(site);
       if (!win.isDestroyed()) win.close();
       return true;
@@ -323,6 +325,7 @@ async function _tryInitDeliveryZip(site, zip, siteUrl, asin) {
         (document.querySelector('#glow-ingress-line2') || document.querySelector('#nav-global-location-slot') || {innerText:''}).innerText.replace(/\\s+/g,' ').trim()
       `).catch(() => '');
       tabLog(`[TabManager] 配送地已设置: ${site} → ${zip}（页面显示: ` + deliveryText + `）`);
+      lastUsedZips.set(site, zip);
       initializedSites.add(site);
       return true;
     } else {
