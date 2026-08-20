@@ -451,7 +451,12 @@ function mismatchPrice(a, e) {
   if (isNaN(an)||isNaN(en)) return String(a||'').trim()!==String(e).trim();
   return Math.abs(an-en)>=0.01;
 }
-function mismatchRating(a,e) { if(!e)return false; return Math.abs(parseFloat(a||'0')-parseFloat(e))>=0.2; }
+function mismatchRating(a,e) {
+  if (!e) return false;
+  const an = parseFloat(String(a || '')), en = parseFloat(String(e));
+  if (isNaN(an) || isNaN(en)) return String(a || '').trim() !== String(e).trim();
+  return an !== en;
+}
 function mismatchReviews(a,e) {
   if(!e)return false;
   const an=parseInt(String(a||'').replace(/[^0-9]/g,''))||0, en=parseInt(String(e).replace(/[^0-9]/g,''))||0;
@@ -501,6 +506,7 @@ async function buildDingTalkText(summary) {
       diffs.push({ field: 'AC标', expected: ref.expectedAcBadge, actual: r.acBadge });
     if (mismatchText(r.coupon, ref.expectedCoupon))
       diffs.push({ field: 'Coupon', expected: ref.expectedCoupon, actual: r.coupon });
+    console.log(`[DingTalk] rating check ${r.asin}@${r.site}: actual=${JSON.stringify(r.rating)} expected=${JSON.stringify(ref.expectedRating)} mismatch=${mismatchRating(r.rating, ref.expectedRating)}`);
     if (mismatchRating(r.rating, ref.expectedRating))
       diffs.push({ field: '星级', expected: ref.expectedRating, actual: r.rating });
     if (mismatchReviews(r.reviews, ref.expectedReviews))
