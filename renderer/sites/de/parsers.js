@@ -57,7 +57,7 @@ function extractBsr(productInfo) {
   if (!raw) return null;
 
   // 格式: "Nr. 73.529 in Category"，千位点分隔
-  const matches = [...raw.matchAll(/Nr\.\s*([\d.]+)\s+in\s+([^(\nN]+)/gi)];
+  const matches = [...raw.matchAll(/Nr\.\s*([\d.]+)\s+in\s+([^(\nN]+)/g)];
   if (!matches.length) return null;
 
   function parseMatch(m) {
