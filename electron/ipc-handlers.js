@@ -506,7 +506,6 @@ async function buildDingTalkText(summary) {
       diffs.push({ field: 'AC标', expected: ref.expectedAcBadge, actual: r.acBadge });
     if (mismatchText(r.coupon, ref.expectedCoupon))
       diffs.push({ field: 'Coupon', expected: ref.expectedCoupon, actual: r.coupon });
-    console.log(`[DingTalk] rating check ${r.asin}@${r.site}: actual=${JSON.stringify(r.rating)} expected=${JSON.stringify(ref.expectedRating)} mismatch=${mismatchRating(r.rating, ref.expectedRating)}`);
     if (mismatchRating(r.rating, ref.expectedRating))
       diffs.push({ field: '星级', expected: ref.expectedRating, actual: r.rating });
     if (mismatchReviews(r.reviews, ref.expectedReviews))
