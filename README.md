@@ -90,6 +90,8 @@ git push origin v1.0.0
 ```
 
 用户确认更新说明后，在 GitHub 仓库 Actions 的 Build 工作流中选择对应版本标签，勾选 `release_notes_confirmed` 并手动运行。两个平台构建及产物校验均通过后才正式发布；不能选择普通分支发布。构建产物包含：
+
+若发布准备期间修订了工作流或更新说明，可选择 master 运行并在 `release_tag` 填写已有版本标签；应用源码仍从标签检出，已确认的说明从 master 读取，不移动版本标签。此方式同样必须勾选确认项。
 - Windows：`.exe` 安装包 + `.zip` 绿色版
 - Mac：`.dmg` + `.zip`（x64 + arm64）
 

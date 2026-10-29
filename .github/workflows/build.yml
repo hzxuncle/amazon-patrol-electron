@@ -6,6 +6,11 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: '可选：从 master 手动重建/发布已有标签，例如 v1.2.5；留空则选择对应标签运行'
+        type: string
+        required: false
+        default: ''
       release_notes_confirmed:
         description: '仅在用户已查看并明确确认本版本更新说明后勾选，且必须选择对应版本标签运行'
         type: boolean
@@ -17,10 +22,12 @@ permissions:
 
 jobs:
   build-windows:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.release_tag, 'v'))
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -33,6 +40,7 @@ jobs:
         run: node --test tests/asin-identity.test.js
 
       - name: Build and Publish Windows
+        shell: bash
         run: npx electron-builder --win --publish always -c.publish.releaseType=draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +57,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const tag = context.ref.replace('refs/tags/', '');
+            const tag = context.payload.inputs?.release_tag || context.ref.replace('refs/tags/', '');
             const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             if (tag !== `v${version}`) throw new Error('Tag and package version differ');
             const releases = await github.paginate(github.rest.repos.listReleases, {
@@ -76,10 +84,12 @@ jobs:
             });
 
   build-mac:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.release_tag, 'v'))
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
