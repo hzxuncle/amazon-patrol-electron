@@ -213,6 +213,15 @@ sites.json
 
 详见 [scraper-architecture.md](scraper-architecture.md)。
 
+### 全站点 URL 不变的 ASIN 替换检测
+
+- `_base/parsers.js extractProductAsin(productInfo)`：所有站点共用，只识别详情中明确标为 ASIN 的完整十位值，不使用父体或推荐商品。
+- `sites/index.js`：所有站点注入同一身份解析函数，产品详情仍使用各站点解析，未适配站点使用 `_base` 详情提取。
+- `_base/scraper.js`：字段抓取前校验身份，独立于 productInfo/BSR 开关；详情 ASIN 与目标不同则保留原 ASIN、标为 failed。文案为「商品已下架：目标 ASIN A 的产品详情显示为 ASIN B」。无有效值不判下架。
+- 失败结果保留 `asinEvidence`（目标/详情 ASIN、URL、观测时间、来源）及原始 `productInfo`；`ipc-handlers.js savePatrolHistory()` 同时保留这些证据。
+- 沿用失败链路：实时日志 → 历史失败原因 → Excel 异常汇总 → 巡检完成后的钉钉报告（需已启用并配置通知，无需匹配参考数据）。
+- 回归检查：`node --test tests/asin-identity.test.js`。
+
 ### 站点文件改动影响范围
 
 | 改动 | 影响范围 |

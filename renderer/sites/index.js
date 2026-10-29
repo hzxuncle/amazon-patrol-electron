@@ -115,6 +115,7 @@ function buildScraperScript(siteCode) {
       parseAcBadge,
       parseCoupon,
       extractProductDetails,
+      extractProductAsin,
       extractBsr: (typeof extractBsr === 'function') ? extractBsr : null
     },
     normalizers: {

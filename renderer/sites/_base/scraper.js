@@ -213,6 +213,29 @@ async function scrapePageData(options = {}) {
   }
 
   try {
+    // 共用身份校验，详情仍由各站点解析；独立于字段开关。
+    let identityProductInfo = null;
+    if (targetAsin) {
+      identityProductInfo = parsers.extractProductDetails();
+      const detailAsin = parsers.extractProductAsin(identityProductInfo);
+      if (detailAsin && detailAsin !== targetAsin) {
+        result.asin = targetAsin;
+        result.status = 'failed';
+        result.error = `商品已下架：目标 ASIN ${targetAsin} 的产品详情显示为 ASIN ${detailAsin}`;
+        // 失败时保留详情和识别证据，供历史记录、排查及申诉参考。
+        result.productInfo = identityProductInfo;
+        result.asinEvidence = {
+          type: 'product-details-asin-mismatch',
+          targetAsin,
+          detailAsin,
+          url: result.url,
+          observedAt: result.timestamp,
+          source: 'productInfo.ASIN'
+        };
+        return result;
+      }
+    }
+
     // 标题
     if (isEnabled('title')) {
       result.title = queryWithFallback(selectors.title);
@@ -273,7 +296,7 @@ async function scrapePageData(options = {}) {
       isEnabled('bsrSubRank')  || isEnabled('bsrSubCategory');
 
     if (needProductInfo) {
-      result.productInfo = parsers.extractProductDetails();
+      result.productInfo = identityProductInfo || parsers.extractProductDetails();
       // BSR 从产品信息里提取（各站点独立解析逻辑），展开为四个独立字段
       if (parsers.extractBsr && Object.keys(result.productInfo).length > 0) {
         const bsr = parsers.extractBsr(result.productInfo);

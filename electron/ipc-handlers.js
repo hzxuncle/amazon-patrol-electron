@@ -356,7 +356,11 @@ function savePatrolHistory(summary) {
     results: completedResults.map(r => ({
       asin: r.asin, site: r.site, status: r.status,
       price: r.price, stock: r.stock, seller: r.seller,
-      error: r.error || ''
+      error: r.error || '',
+      ...(r.asinEvidence ? {
+        url: r.url, timestamp: r.timestamp,
+        asinEvidence: r.asinEvidence, productInfo: r.productInfo
+      } : {})
     }))
   });
   store.set('patrolHistory', list.slice(0, 10));

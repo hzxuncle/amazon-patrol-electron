@@ -170,6 +170,20 @@ function extractProductDetails() {
   return result;
 }
 
+// 各站点详情解析统一输出「区块 -> 字段 -> 值」，身份比较不依赖页面语言或 DOM。
+// 只认明确标为 ASIN 的值，避免误用父体或推荐商品的 ASIN。
+function extractProductAsin(productInfo) {
+  for (const section of Object.values(productInfo || {})) {
+    for (const [key, value] of Object.entries(section || {})) {
+      const label = key.replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\s:：]/g, '').toUpperCase();
+      if (label !== 'ASIN') continue;
+      const asin = String(value || '').replace(/[\u200e\u200f]/g, '').trim().toUpperCase();
+      if (/^[A-Z0-9]{10}$/.test(asin)) return asin;
+    }
+  }
+  return '';
+}
+
 const BASE_PARSERS = {
   cleanText,
   extractNumber,
@@ -179,7 +193,8 @@ const BASE_PARSERS = {
   parseDealBadge,
   parseAcBadge,
   parseCoupon,
-  extractProductDetails
+  extractProductDetails,
+  extractProductAsin
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = BASE_PARSERS;
