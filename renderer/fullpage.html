@@ -22,6 +22,7 @@
         </span>
       </div>
       <div class="header-right">
+        <button id="btnUpdateAvailable" class="btn-header update-entry" style="display:none">↑ 新版本可用</button>
         <button id="btnTheme" class="btn-header" title="切换主题"><span id="themeIcon">🌙</span> 主题</button>
         <button id="btnAbout" class="btn-header" title="关于">ⓘ 关于</button>
       </div>
@@ -653,47 +654,52 @@
 
   <!-- 发现新版本弹框 -->
   <div class="product-info-overlay" id="updateAvailableOverlay" style="display:none">
-    <div class="about-dialog" style="max-width:600px">
-      <div class="product-info-modal-header">
-        <span>发现新版本</span>
+    <div class="update-dialog" role="dialog" aria-modal="true" aria-labelledby="updateHeading" tabindex="-1">
+      <div class="update-heading">
+        <button class="product-info-modal-close" id="btnUpdateClose" aria-label="关闭更新提示">✕</button>
       </div>
-      <div class="about-body">
-        <p style="margin:0 0 8px;font-size:15px;font-weight:600">亚马逊监控助手 <span id="updateVersion"></span> 已发布</p>
-        <div id="updateNotes" style="font-size:13px;max-height:400px;overflow-y:auto;margin:0 0 16px;line-height:1.7"></div>
-        <div style="display:flex;gap:8px;justify-content:flex-end">
+      <div class="update-body">
+        <div class="update-title-row">
+          <h2 id="updateHeading">新版本 <span id="updateVersion"></span></h2>
+          <span class="update-current" id="updateCurrentVersion"></span>
+        </div>
+        <div id="updateReading">
+          <p class="update-section-label">本次更新</p>
+          <div id="updateHighlights" class="update-highlights"></div>
+          <details class="update-details" id="updateDetails">
+            <summary>查看完整更新说明</summary>
+            <div id="updateNotes" class="release-notes"></div>
+          </details>
+        </div>
+        <div id="updateDownloadState" class="update-download" style="display:none" aria-live="polite">
+          <p id="updateDownloadLabel">正在下载更新…</p>
+          <div class="update-progress-track" role="progressbar" aria-label="更新下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="updateProgressBar">
+            <div id="updateProgressFill"></div>
+          </div>
+          <p id="updateProgressText">0%</p>
+        </div>
+        <p id="updateError" class="update-error" style="display:none" role="alert"></p>
+      </div>
+      <div class="update-footer">
+        <p class="update-install-hint" id="updateInstallHint">下载完成后将自动重启安装，请先完成当前工作。</p>
+        <div class="update-actions">
           <button class="btn btn-secondary" id="btnUpdateSkip">暂不更新</button>
-          <button class="btn btn-primary" id="btnUpdateNow">立即更新</button>
+          <button class="btn btn-primary" id="btnUpdateNow">下载更新</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 下载进度模态框（无法关闭） -->
-  <div class="product-info-overlay" id="updateProgressOverlay" style="display:none">
-    <div class="about-dialog" style="max-width:400px">
-      <div class="product-info-modal-header">
-        <span>正在下载更新</span>
-      </div>
-      <div class="about-body">
-        <p style="margin:0 0 12px;color:var(--text-secondary,#666)">请稍候，下载完成后将自动安装并重启...</p>
-        <div class="progress-track" style="height:10px;border-radius:5px;background:var(--bg-secondary,#eee);overflow:hidden;margin-bottom:8px">
-          <div id="updateProgressFill" style="height:100%;width:0%;background:var(--primary,#1677ff);transition:width 0.3s ease;border-radius:5px"></div>
-        </div>
-        <p id="updateProgressText" style="text-align:center;margin:0;font-size:13px;color:var(--text-secondary,#666)">0%</p>
       </div>
     </div>
   </div>
 
   <!-- 安装后更新说明弹框 -->
   <div class="product-info-overlay" id="updateChangelogOverlay" style="display:none">
-    <div class="about-dialog" style="max-width:600px">
+    <div class="update-dialog" role="dialog" aria-modal="true" aria-label="更新完成">
       <div class="product-info-modal-header">
         <span></span>
         <button class="product-info-modal-close" id="btnChangelogClose">✕</button>
       </div>
-      <div class="about-body" style="padding:8px 24px 28px">
-        <p style="margin:0 0 16px;font-size:18px;font-weight:600">亚马逊监控助手 <span id="changelogVersion"></span></p>
-        <div id="changelogNotes" style="font-size:13px;max-height:400px;overflow-y:auto;line-height:1.8;color:var(--text-primary,#333)"></div>
+      <div class="update-body">
+        <h2>已更新至 <span id="changelogVersion"></span></h2>
+        <div id="changelogNotes" class="release-notes"></div>
       </div>
     </div>
   </div>

@@ -816,6 +816,50 @@ body::before { display: none; }
   margin: 0;
 }
 
+/* 更新提示独立布局，避免继承关于弹窗的 400px 宽度。 */
+.update-dialog {
+  width: 520px; max-width: calc(100vw - 40px); max-height: calc(100vh - 64px);
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.2); overflow: hidden;
+  display: flex; flex-direction: column; color: var(--text-primary);
+}
+.update-dialog:focus { outline: none; }
+.update-heading { display: flex; justify-content: flex-end; padding: 20px 24px 0; }
+.update-body { padding: 20px 28px 24px; overflow-y: auto; min-height: 0; }
+.update-body h2 { margin: 0; font-size: 22px; line-height: 1.4; font-weight: 600; }
+.update-title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 24px; }
+.update-current { color: rgb(3, 224, 109); font-size: 12px; }
+.update-section-label { margin: 0 0 14px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.update-highlights { display: flex; flex-direction: column; gap: 16px; font-size: 14px; line-height: 1.75; }
+.update-highlight { position: relative; margin: 0; padding-left: 18px; overflow-wrap: anywhere; }
+.update-highlight::before { content: ''; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.update-highlight strong { font-weight: 600; }
+.update-details { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+.update-details summary { cursor: pointer; font-size: 12px; color: var(--accent); width: fit-content; }
+.release-notes { font-size: 14px; line-height: 1.75; color: var(--text-primary); overflow-wrap: anywhere; }
+.release-notes p { margin: 12px 0; }
+.release-notes h1, .release-notes h2, .release-notes h3, .release-notes h4 { margin: 20px 0 10px; font-size: 15px; }
+.release-notes ul, .release-notes ol { margin: 12px 0; padding-left: 20px; list-style: revert; }
+.release-notes li { margin: 10px 0; }
+.release-notes code { font-family: var(--font-mono); font-size: .9em; background: var(--bg-input); border-radius: 4px; padding: 1px 4px; }
+.update-footer { padding: 18px 28px 24px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--bg-card); }
+.update-install-hint { margin: 0 0 16px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.update-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.update-actions .btn { min-height: 38px; min-width: 100px; }
+.update-download { margin-top: 24px; font-size: 14px; }
+.update-progress-track { height: 7px; border-radius: 8px; background: var(--bg-input); overflow: hidden; }
+#updateProgressFill { height: 100%; width: 0%; background: var(--accent); transition: width .3s ease; }
+#updateProgressText { text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: 12px; }
+.update-error { color: var(--danger); font-size: 13px; line-height: 1.6; margin: 16px 0 0; }
+.update-entry { color: var(--accent); }
+.update-dialog :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-height: 600px) {
+  .update-heading { padding-top: 18px; }
+  .update-body { padding-top: 14px; padding-bottom: 16px; }
+  .update-title-row { margin-bottom: 16px; }
+  .update-highlights { gap: 10px; }
+}
+
 .ref-action-btns { display: flex; gap: 6px; margin-left: auto; }
 .ref-edit-input { width: 100%; box-sizing: border-box; font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); color: var(--text); }
 .ref-edit-input:focus { outline: none; border-color: var(--accent); }

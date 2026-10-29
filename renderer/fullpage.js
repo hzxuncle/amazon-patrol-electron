@@ -1113,6 +1113,7 @@ function handleUpdate(result, progress) {
 
 function handleComplete(summary, results) {
   patrolRunning = false;
+  window.dispatchEvent(new Event('patrol-complete'));
   stopTimer();
   if (results) { allResults = results.sort((a, b) => (a.index || 0) - (b.index || 0)); renderAllResults(); }
   updateUiStopped();
@@ -2208,65 +2209,158 @@ function applyTheme(theme) {
   if (!window.electronAPI) return;
 
   let pendingVersion = null;
+  let mandatory = false;
+  let downloading = false;
+  let deferredUpdate = false;
+  let returnFocus = null;
+  const overlay = document.getElementById('updateAvailableOverlay');
+  const entry = document.getElementById('btnUpdateAvailable');
+
+  function showUpdate() {
+    if (!pendingVersion || downloading) return;
+    deferredUpdate = false;
+    returnFocus = document.activeElement;
+    overlay.style.display = 'flex';
+    overlay.querySelector('.update-dialog').focus();
+  }
+
+  function closeUpdate() {
+    if (mandatory || downloading) return;
+    overlay.style.display = 'none';
+    if (returnFocus && returnFocus.isConnected) returnFocus.focus();
+  }
+
+  function setDownloading(active) {
+    downloading = active;
+    document.getElementById('updateReading').style.display = active ? 'none' : '';
+    document.getElementById('updateDownloadState').style.display = active ? '' : 'none';
+    document.getElementById('btnUpdateNow').disabled = active;
+    document.getElementById('btnUpdateNow').textContent = active ? '正在下载…' : '下载更新';
+    document.getElementById('btnUpdateSkip').style.display = mandatory || active ? 'none' : '';
+    document.getElementById('btnUpdateClose').style.display = mandatory || active ? 'none' : '';
+  }
+
+  function safeInline(text) {
+    return esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
 
   function renderNotes(text) {
-    if (!text) return '<p style="color:var(--text-secondary,#999)">暂无更新说明</p>';
-    // electron-updater 返回的 releaseNotes 已是 HTML，直接渲染
-    if (/<[a-z][\s\S]*>/i.test(text)) return text;
-    // 否则简单 Markdown 转换
-    return text.split('\n').map(line => {
-      if (/^#{1,3}\s/.test(line)) {
-        const t = line.replace(/^#+\s/, '');
-        return `<p style="font-weight:600;margin:10px 0 4px">${t}</p>`;
+    if (!text) return '<p>暂无更新说明</p>';
+    // HTML 与 Markdown 统一为语义段落/列表，让更新样式接管排版。
+    if (/<[a-z][\s\S]*>/i.test(text)) {
+      const template = document.createElement('template');
+      template.innerHTML = text;
+      const allowed = new Set(['P', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'CODE', 'BR', 'BLOCKQUOTE']);
+      for (const el of [...template.content.querySelectorAll('*')]) {
+        if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'IMG'].includes(el.tagName)) { el.remove(); continue; }
+        for (const attr of [...el.attributes]) el.removeAttribute(attr.name);
+        if (!allowed.has(el.tagName)) el.replaceWith(...el.childNodes);
       }
+      return template.innerHTML;
+    }
+    let html = '', inList = false;
+    for (const raw of text.split('\n')) {
+      const line = raw.trim();
       if (/^[-*]\s/.test(line)) {
-        const t = line.replace(/^[-*]\s/, '');
-        return `<p style="margin:3px 0;padding-left:12px">· ${t}</p>`;
+        if (!inList) { html += '<ul>'; inList = true; }
+        html += `<li>${safeInline(line.replace(/^[-*]\s/, ''))}</li>`;
+        continue;
       }
-      if (line.trim() === '') return '';
-      return `<p style="margin:3px 0">${line}</p>`;
-    }).join('');
+      if (inList) { html += '</ul>'; inList = false; }
+      if (/^#{1,6}\s/.test(line)) html += `<h3>${safeInline(line.replace(/^#+\s/, ''))}</h3>`;
+      else if (line) html += `<p>${safeInline(line)}</p>`;
+    }
+    return html + (inList ? '</ul>' : '');
   }
 
   // --- 发现新版本弹框 ---
   window.electronAPI.onUpdateAvailable(({ version, releaseNotes, isMandatory }) => {
     pendingVersion = version;
-    const overlay = document.getElementById('updateAvailableOverlay');
+    mandatory = !!isMandatory;
     document.getElementById('updateVersion').textContent = 'v' + version;
-    const displayNotes = releaseNotes.replace(/^\[强制更新\]\s*/i, '').trim();
-    document.getElementById('updateNotes').innerHTML = renderNotes(displayNotes);
-    const skipBtn = document.getElementById('btnUpdateSkip');
-    skipBtn.style.display = isMandatory ? 'none' : '';
-    overlay.style.display = 'flex';
+    const displayNotes = String(releaseNotes || '').replace(/^\[强制更新\]\s*/i, '').trim();
+    const notes = document.getElementById('updateNotes');
+    notes.innerHTML = renderNotes(displayNotes);
+    const items = [...notes.querySelectorAll('li')];
+    const highlights = items.length ? items : [...notes.querySelectorAll('p')];
+    document.getElementById('updateHighlights').innerHTML = highlights.slice(0, 3).map(item => {
+      const text = item.textContent.trim();
+      const split = text.search(/[：:]/);
+      return `<p class="update-highlight">${split > 0 && split < 24
+        ? `<strong>${esc(text.slice(0, split))}</strong><br>${esc(text.slice(split + 1).trim())}`
+        : safeInline(text)}</p>`;
+    }).join('') || '<p class="update-highlight">暂无更新说明，可下载最新版本。</p>';
+    document.getElementById('updateDetails').open = false;
+    document.getElementById('updateError').style.display = 'none';
+    setDownloading(false);
+    entry.style.display = '';
+    entry.textContent = `↑ 新版本 v${version}`;
+    window.electronAPI.getAppVersion().then(current => {
+      document.getElementById('updateCurrentVersion').textContent = `当前版本 v${current}${mandatory ? ' · 此版本需要更新' : ''}`;
+    }).catch(() => {});
+    deferredUpdate = patrolRunning;
+    if (!patrolRunning) showUpdate();
   });
 
-  document.getElementById('btnUpdateNow').addEventListener('click', () => {
-    document.getElementById('updateAvailableOverlay').style.display = 'none';
-    document.getElementById('updateProgressOverlay').style.display = 'flex';
-    window.electronAPI.startUpdateDownload();
+  // 巡检中仅显示入口；完成后再展示说明，避免遮挡执行过程。
+  entry.addEventListener('click', showUpdate);
+  window.addEventListener('patrol-complete', () => { if (deferredUpdate) showUpdate(); });
+  document.getElementById('btnUpdateClose').addEventListener('click', closeUpdate);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeUpdate(); });
+  overlay.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); closeUpdate(); }
+    if (e.key === 'Tab') {
+      const nodes = [...overlay.querySelectorAll('button:not(:disabled), summary')].filter(el => el.getClientRects().length);
+      if (!nodes.length) { e.preventDefault(); return; }
+      const index = nodes.indexOf(document.activeElement);
+      if (e.shiftKey && index <= 0) { e.preventDefault(); nodes[nodes.length - 1].focus(); }
+      else if (!e.shiftKey && (index === nodes.length - 1 || index < 0)) { e.preventDefault(); nodes[0].focus(); }
+    }
+  });
+
+  function downloadError() {
+    setDownloading(false);
+    const error = document.getElementById('updateError');
+    error.textContent = '下载失败，请检查网络后重试。';
+    error.style.display = '';
+  }
+
+  document.getElementById('btnUpdateNow').addEventListener('click', async () => {
+    if (downloading) return;
+    if (patrolRunning) {
+      document.getElementById('updateError').textContent = '正在巡检，请等待巡检结束后再下载更新。';
+      document.getElementById('updateError').style.display = '';
+      return;
+    }
+    document.getElementById('updateError').style.display = 'none';
+    document.getElementById('updateProgressFill').style.width = '0%';
+    document.getElementById('updateProgressBar').setAttribute('aria-valuenow', '0');
+    document.getElementById('updateProgressText').textContent = '0%';
+    document.getElementById('updateDownloadLabel').textContent = '正在下载更新…';
+    setDownloading(true);
+    try { await window.electronAPI.startUpdateDownload(); } catch (e) { downloadError(); }
   });
 
   document.getElementById('btnUpdateSkip').addEventListener('click', () => {
-    if (pendingVersion) window.electronAPI.skipUpdateVersion(pendingVersion);
-    document.getElementById('updateAvailableOverlay').style.display = 'none';
-    pendingVersion = null;
+    closeUpdate();
   });
 
   // --- 下载出错（解除进度弹框卡死）---
-  window.electronAPI.onUpdateError(() => {
-    document.getElementById('updateProgressOverlay').style.display = 'none';
-    document.getElementById('updateAvailableOverlay').style.display = 'none';
-  });
+  window.electronAPI.onUpdateError(() => { if (downloading) downloadError(); });
 
   // --- 下载进度 ---
   window.electronAPI.onUpdateProgress(({ percent }) => {
+    percent = Math.max(0, Math.min(100, Number(percent) || 0));
     document.getElementById('updateProgressFill').style.width = percent + '%';
-    document.getElementById('updateProgressText').textContent = percent + '%';
+    document.getElementById('updateProgressBar').setAttribute('aria-valuenow', String(percent));
+    document.getElementById('updateProgressText').textContent = Math.floor(percent) + '%';
   });
 
   // --- 下载完成（安装前） ---
   window.electronAPI.onUpdateDownloaded(() => {
     document.getElementById('updateProgressFill').style.width = '100%';
+    document.getElementById('updateProgressBar').setAttribute('aria-valuenow', '100');
+    document.getElementById('updateDownloadLabel').textContent = '下载完成，正在准备安装';
     document.getElementById('updateProgressText').textContent = '100% — 即将重启安装...';
   });
 
