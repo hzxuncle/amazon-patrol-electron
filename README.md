@@ -80,14 +80,16 @@ ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm run build:win
 
 ### GitHub Actions 自动构建
 
-推送 `v*` 格式的 tag 会自动触发 CI，在 Windows 和 Mac 环境下分别构建，产物上传为 Artifact，并自动创建 GitHub Release：
+发布前先编写 `docs/releases/v版本号.md`，**将完整更新说明发给用户查看并等待明确确认**。未确认时只允许准备代码、构建和 Release 草稿。
+
+推送 `v*` 格式的 tag 会自动触发 CI，在 Windows 和 Mac 环境下分别构建，产物上传至 GitHub Release 草稿：
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-也可以在 GitHub 仓库的 Actions 页面手动触发（workflow_dispatch）。构建产物包含：
+用户确认更新说明后，在 GitHub 仓库 Actions 的 Build 工作流中选择对应版本标签，勾选 `release_notes_confirmed` 并手动运行。两个平台构建及产物校验均通过后才正式发布；不能选择普通分支发布。构建产物包含：
 - Windows：`.exe` 安装包 + `.zip` 绿色版
 - Mac：`.dmg` + `.zip`（x64 + arm64）
 

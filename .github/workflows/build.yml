@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_notes_confirmed:
+        description: '仅在用户已查看并明确确认本版本更新说明后勾选，且必须选择对应版本标签运行'
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: write
@@ -27,11 +33,12 @@ jobs:
         run: node --test tests/asin-identity.test.js
 
       - name: Build and Publish Windows
-        run: npx electron-builder --win --publish always
+        run: npx electron-builder --win --publish always -c.publish.releaseType=draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release:
+    if: github.event_name == 'workflow_dispatch' && inputs.release_notes_confirmed
     needs: [build-windows, build-mac]
     runs-on: ubuntu-latest
     steps:
@@ -98,6 +105,6 @@ jobs:
         run: node --test tests/asin-identity.test.js
 
       - name: Build and Publish Mac
-        run: npx electron-builder --mac --publish always
+        run: npx electron-builder --mac --publish always -c.publish.releaseType=draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
